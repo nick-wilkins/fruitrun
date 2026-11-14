@@ -95,7 +95,7 @@ const RECIPES: Record<string, PieceName[]> = {
   'level-4': ['spinnerRun', 'sweeper', 'loopOne', 'crateField', 'forkShortcut', 'spinnerRun', 'hairpinWall', 'loopDouble', 'sBends', 'jumpLine', 'spinnerRun'],
   'level-5': ['corkscrewDown', 'twist', 'sBends', 'helixUp', 'sliderTunnel', 'corkscrewDown', 'forkDiamond', 'twist', 'pinAlley', 'bigDrop', 'loopOne'],
   'level-6': ['waves', 'forkShortcut', 'gooField', 'sweeper', 'waves', 'pendulumBridge', 'loopOne', 'sBends', 'megaJump', 'forkDiamond', 'crateField'],
-  'level-7': ['waves', 'hairpinWall', 'megaJump', 'waves', 'jumpLine', 'hairpinWall', 'twist', 'bigDrop', 'loopDouble', 'forkHill', 'megaJump'],
+  'level-7': ['waves', 'hairpinWall', 'megaJump', 'gooField', 'jumpLine', 'hairpinWall', 'twist', 'crateField', 'bigDrop', 'loopDouble', 'forkHill', 'megaJump'],
   'level-8': ['bigDrop', 'sliderTunnel', 'pendulumBridge', 'forkHill', 'climb', 'bigDrop', 'corkscrewDown', 'spinnerRun', 'sliderTunnel', 'loopOne', 'twist', 'bigDrop'],
   'level-9': ['helixUp', 'padStraight', 'loopDouble', 'helixUp', 'bigDrop', 'forkDiamond', 'corkscrewDown', 'pinAlley', 'megaJump', 'loopOne', 'bigDrop'],
   'level-10': ['bigDrop', 'twist', 'forkDiamond', 'gooField', 'climb', 'bigDrop', 'forkShortcut', 'waves', 'loopOne', 'twist', 'pendulumBridge', 'forkHill', 'bigDrop'],
@@ -184,25 +184,36 @@ function generate(level: Level): CourseBuilder {
   return b;
 }
 
-const built = new Map<string, Course>();
+/** Finish at or under these times (seconds) for 5, 4, 3 and 2 stars. Anything slower is 1. */
+export type StarTimes = [number, number, number, number];
+
+const built = new Map<string, { course: Course; starTimes: StarTimes }>();
 
 /**
- * The course for a level, built once and reused. Building it also plays it hands-free to set the level's star times:
- * five stars needs a bit slower than a good racing line, two stars is about what you get without steering at all.
+ * Star times come from playing the course hands-free: five stars allows a little over a good racing line, and
+ * never steering at all lands in the two-star band at best.
  */
-export function courseFor(level: Level): Course {
-  let course = built.get(level.id);
-  if (!course) {
-    course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(THEMES[level.id]);
-    built.set(level.id, course);
-    const idle = timeCourse(course, level, 'none');
-    const best = Math.min(timeCourse(course, level, 'smart'), idle * 0.88);
-    const five = Math.ceil(best * 1.08);
-    const two = Math.max(five + 9, Math.ceil(idle * 1.02));
-    const gap = (two - five) / 3;
-    level.starTimes = [five, Math.round(five + gap), Math.round(five + gap * 2), two];
-  }
-  return course;
+function calibrate(course: Course, level: Level): StarTimes {
+  const idle = timeCourse(course, level, 'none');
+  const best = Math.min(timeCourse(course, level, 'smart'), idle * 0.9);
+  const two = Math.ceil(idle * 1.02);
+  let five = Math.ceil(best * 1.08);
+  const three = Math.min(Math.round(five + ((two - five) * 2) / 3), Math.ceil(idle) - 1);
+  five = Math.min(five, three - 2);
+  return [five, Math.round((five + three) / 2), three, two];
 }
 
-export const hasCourse = (level: Level) => level.id === 'level-1' || level.id in RECIPES;
+function prepared(level: Level) {
+  let entry = built.get(level.id);
+  if (!entry) {
+    const course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(THEMES[level.id]);
+    entry = { course, starTimes: calibrate(course, level) };
+    built.set(level.id, entry);
+  }
+  return entry;
+}
+
+/** The course for a level, built once and reused. */
+export const courseFor = (level: Level): Course => prepared(level).course;
+
+export const starTimesFor = (level: Level): StarTimes => prepared(level).starTimes;

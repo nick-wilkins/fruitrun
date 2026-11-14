@@ -1,7 +1,7 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { BLENDER_NODE, LEVELS, type Level } from '../data/levels';
-import { courseFor } from '../game/courses';
+import { starTimesFor } from '../game/courses';
 import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
@@ -10,7 +10,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
   const record = app.save.levels[level.id];
   const fruit = ingredient(level.fruit);
   const targets = el('div.targets');
-  level.starTimes.forEach((limit, i) => {
+  starTimesFor(level).forEach((limit, i) => {
     targets.append(el('div.target', {}, stars(5 - i, 5), el('span', {}, `under ${formatTime(limit).slice(0, -2)}`)));
   });
   return el(
@@ -64,8 +64,6 @@ export function mapScreen(app: App): HTMLElement {
         node.classList.add('shake');
         app.toast(`Finish level ${level.n - 1} first!`);
       } else {
-        // Building the course also sets its star times, which the card shows.
-        courseFor(level);
         sfx.tap();
         const card = levelCard(app, level, () => card.remove());
         stage.append(card);

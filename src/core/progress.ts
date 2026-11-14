@@ -1,4 +1,5 @@
 import { LEVELS, type Level } from '../data/levels';
+import { starTimesFor } from '../game/courses';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
 export interface LevelRecord {
@@ -63,7 +64,7 @@ export function clearSave(): void {
 }
 
 export function starsForTime(level: Level, seconds: number): number {
-  const beaten = level.starTimes.findIndex((limit) => seconds <= limit);
+  const beaten = starTimesFor(level).findIndex((limit) => seconds <= limit);
   return beaten === -1 ? 1 : 5 - beaten;
 }
 

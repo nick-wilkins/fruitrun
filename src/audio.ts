@@ -4,6 +4,8 @@ let master: GainNode | null = null;
 let muted = false;
 let music: HTMLAudioElement | null = null;
 let wantMusic = false;
+let musicGain: GainNode | null = null;
+let duckTimer = 0;
 
 const SFX_VOLUME = 0.8;
 const MUSIC_VOLUME = 0.32;
@@ -20,6 +22,13 @@ function audio(): AudioContext | null {
     master = ctx.createGain();
     master.gain.value = SFX_VOLUME;
     master.connect(squash);
+  }
+  // iPads ignore an audio element's own volume, so the music is turned down inside the audio graph instead.
+  if (music && !musicGain) {
+    musicGain = ctx.createGain();
+    musicGain.gain.value = MUSIC_VOLUME;
+    ctx.createMediaElementSource(music).connect(musicGain).connect(ctx.destination);
+    music.volume = 1;
   }
   if (ctx.state === 'suspended') void ctx.resume();
   return ctx;
@@ -64,9 +73,14 @@ export function startMusic(urls: string[]): void {
 
 /** Turn the music down while something noisy happens, then bring it back. */
 function duck(seconds: number): void {
-  if (!music) return;
-  music.volume = MUSIC_VOLUME * 0.35;
-  window.setTimeout(() => music && (music.volume = MUSIC_VOLUME), seconds * 1000);
+  const level = (value: number) => {
+    if (musicGain) musicGain.gain.value = value;
+    else if (music) music.volume = value;
+  };
+  level(MUSIC_VOLUME * 0.35);
+  // One timer only: a second duck extends the first rather than being cut short by it.
+  clearTimeout(duckTimer);
+  duckTimer = window.setTimeout(() => level(MUSIC_VOLUME), seconds * 1000);
 }
 
 interface ToneOptions {

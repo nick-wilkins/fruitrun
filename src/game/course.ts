@@ -147,6 +147,7 @@ export class CourseBuilder {
    * A ball on the `side` half of the road (further out than `gate`) takes the arm.
    */
   fork(side: 1 | -1, arm: (b: CourseBuilder) => void, main: (b: CourseBuilder) => void, gate = 0): this {
+    if (this.lane !== 0) throw new Error('A fork arm cannot fork again: arms always leave and rejoin the main route');
     const index = this.shared.arms.length;
     const record: Arm = { segments: [], s0: this.s, s1: this.s, side: (side * this.flip) as 1 | -1, gate };
     this.shared.arms.push(record);

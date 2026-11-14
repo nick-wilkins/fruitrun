@@ -18,6 +18,9 @@ function bulge(b: CourseBuilder, dir: 1 | -1, middle: (b: CourseBuilder) => void
   b.turn(-dir * angle, radius).straight(out).turn(dir * angle, radius);
 }
 
+/** How far into a fork the two roads still overlap: nothing solid goes on the main route before this. */
+const PARTED = 54;
+
 /** Straight-line distance a bulge covers, so a straight alternative can be made to match. */
 const bulgeAdvance = (middle: number, angle = 28, radius = 30, out = 14) =>
   4 * radius * Math.sin(rad(angle)) + 2 * out * Math.cos(rad(angle)) + middle;
@@ -137,13 +140,14 @@ export const PIECES = {
     b.straight(96);
   },
 
-  /** Downhill run-up, a huge launch, and rings to thread in mid-air. */
-  megaJump(b) {
+  /** Downhill run-up, a huge launch, and rings to thread in mid-air. Line it up: the ramp is on one lane. */
+  megaJump(b, r) {
+    const x = lane(r) * 0.8;
     b.pitchTo(-12);
-    b.pad(6, 0).pad(26, 0);
+    b.pad(6, x).pad(26, x);
     b.straight(44);
     b.pitchTo(0, 14);
-    b.jump(4, 0, 17).ring(22, 0, 5.6).fruit(31, 0, 6.4).ring(40, 0, 6).pad(72, 0);
+    b.jump(4, x, 17).ring(22, x, 5.6).fruit(31, x, 6.4).ring(40, x, 6).pad(72, x);
     b.straight(86);
   },
 
@@ -151,7 +155,8 @@ export const PIECES = {
   waves(b, r) {
     b.pitchTo(7, 10);
     for (let i = 0; i < 3; i++) {
-      b.pickup(2, lane(r)).pad(12, lane(r));
+      const x = side(r) * 3;
+      b.pickup(2, -x).pad(12, x);
       b.pitchTo(-7, 20);
       if (i < 2) b.pitchTo(7, 20);
     }
@@ -212,7 +217,8 @@ export const PIECES = {
   /** The whole track barrel-rolls. */
   twist(b, r) {
     b.pad(4, 0).straight(16);
-    b.pickup(18, 0).pickup(40, 0).fruit(62, 0).pad(84, 0);
+    const x = side(r) * 2.6;
+    b.pickup(18, x).pad(30, -x).pickup(46, -x).fruit(62, x).pad(84, x);
     b.tunnel(8, 74);
     b.twist(90, side(r));
     b.straight(10);
@@ -242,21 +248,23 @@ export const PIECES = {
 
   /** Straight on is short but cluttered; swing left for a clear, boosted detour with fruit. */
   forkShortcut(b, _r, d) {
+    const middle = 80;
     b.straight(12);
     b.pad(-6, -3.4);
     b.fork(
       -1,
       (arm) =>
         bulge(arm, -1, (m) => {
-          m.pad(2, 0).fruit(14, 0).pad(26, 0);
-          m.straight(40);
+          m.pad(2, 0).fruit(22, 0).pad(40, 0).pickup(58, 0).pad(72, 0);
+          m.straight(middle);
         }),
       (main) => {
-        const len = bulgeAdvance(40);
+        const len = bulgeAdvance(middle);
+        // Hazards only start once the detour has peeled clear, or its takers would drive through them.
         const rows = 3 + Math.round(d * 2);
         for (let i = 0; i < rows; i++) {
           const open = i % 2 ? 3 : 0;
-          const at = 18 + (i * (len - 36)) / (rows - 1);
+          const at = PARTED + (i * (len - PARTED * 2)) / (rows - 1);
           i % 2 ? main.goo(at, others(open)[1]).crates(at, others(open)[0]) : main.crates(at, ...others(open));
         }
         main.straight(len);

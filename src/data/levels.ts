@@ -8,11 +8,6 @@ export interface Level {
   y: number;
   /** Whether the map art draws this node as locked (grey) rather than gold. */
   artLocked: boolean;
-  /**
-   * Finish at or under these times (seconds) for 5, 4, 3 and 2 stars. Anything slower is 1.
-   * Placeholder until the course is first built, which sets them from a test run (see game/courses.ts).
-   */
-  starTimes: [number, number, number, number];
   /** Bonus ingredients that can appear on this course. */
   bonusPool: string[];
 }
@@ -31,7 +26,6 @@ const node = (n: number, fruit: string, name: string, px: number, py: number, sp
   x: (px / W) * 100,
   y: (py / H) * 100,
   artLocked: n >= 15,
-  starTimes: [60, 70, 80, 95],
   // Specials are listed twice so the ingredients that suit this fruit turn up more often.
   bonusPool: [...BASICS, ...specials, ...specials],
 });

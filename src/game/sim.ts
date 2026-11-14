@@ -12,6 +12,8 @@ const COUNTDOWN = 3;
 const START_S = 12;
 /** How far past the kerb a steering target may reach, so pressing into the wall registers as a scrape. */
 export const PUSH = 1.2;
+/** The rules always advance in steps this long, so a course plays the same at any frame rate. */
+export const TICK = 1 / 120;
 
 export type Autopilot = 'none' | 'smart';
 
@@ -47,6 +49,8 @@ export class Sim {
   readonly items: (string | undefined)[];
   readonly limit: number;
 
+  /** The fork arm the ball has just come off, while it is still close behind. */
+  private cameFrom = 0;
   private vh = 0;
   private knockT = 0;
   private scrapeT = 0;
@@ -87,7 +91,19 @@ export class Sim {
   frameAt(s: number, out: Frame, lane = this.lane): Frame {
     const { lanes, track } = this.course;
     const from = lanes[lane].from;
-    if (!from) return track.at(s, out);
+    if (!from) {
+      // Looking back just after leaving a fork arm, or ahead just before taking one, follow the arm rather than
+      // the main route's alternative, so the camera does not jump sideways.
+      if (lane === this.lane) {
+        const left = this.cameFrom ? lanes[this.cameFrom] : null;
+        if (left && s < left.from!.s1) return left.track.at(left.track.length - (left.from!.s1 - s), out);
+        for (let i = 1; i < lanes.length; i++) {
+          const next = lanes[i].from!;
+          if (this.s < next.s0 && s > next.s0 && s - next.s0 < 40 && next.side * this.x > next.gate) return lanes[i].track.at(s - next.s0, out);
+        }
+      }
+      return track.at(s, out);
+    }
     const arm = lanes[lane].track;
     if (s < 0) return track.at(from.s0 + s, out);
     if (s > arm.length) return track.at(from.s1 + s - arm.length, out);
@@ -192,6 +208,7 @@ export class Sim {
 
     if (this.lane === 0) {
       this.s = Math.min(track.length - 2, this.s);
+      if (this.cameFrom && this.s > lanes[this.cameFrom].from!.s1 + 14) this.cameFrom = 0;
       for (let i = 1; i < lanes.length; i++) {
         const from = lanes[i].from!;
         if (before < from.s0 && this.s >= from.s0 && from.side * this.x > from.gate) {
@@ -205,6 +222,7 @@ export class Sim {
     } else if (this.s >= lanes[this.lane].track.length) {
       this.s = lanes[this.lane].from!.s1 + this.s - lanes[this.lane].track.length;
       before = lanes[this.lane].from!.s1 - 0.01;
+      this.cameFrom = this.lane;
       this.lane = 0;
     }
 
@@ -340,6 +358,6 @@ export function timeCourse(course: Course, level: Level, autopilot: Autopilot): 
   const sim = new Sim(course, level, () => {}, () => 0);
   sim.autopilot = autopilot;
   sim.skipCountdown();
-  for (let step = 0; step < 60 * 600 && !sim.finished; step++) sim.step(1 / 60);
+  for (let step = 0; step < 600 / TICK && !sim.finished; step++) sim.step(TICK);
   return sim.finished ? sim.time : Infinity;
 }

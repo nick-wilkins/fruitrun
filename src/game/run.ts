@@ -20,7 +20,7 @@ import { starsForTime } from '../core/progress';
 import type { Level } from '../data/levels';
 import { buildPip, type Pip } from './character';
 import type { Course } from './course';
-import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, type SimEvent } from './sim';
+import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type SimEvent } from './sim';
 import { blobTexture } from './textures';
 import { makeFrame } from './track';
 import { buildWorld, PIVOT, standing, type World } from './world';
@@ -142,6 +142,7 @@ export class Run {
   private last = 0;
   private paused = false;
   private hudT = 0;
+  private owed = 0;
   private disposed = false;
 
   private readonly f = makeFrame();
@@ -272,9 +273,13 @@ export class Run {
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (this.paused) return;
+    // Fixed steps, however long the frame took: the same line earns the same time on any device.
     this.sim.steer = this.steer();
-    this.sim.step(dt / 2);
-    this.sim.step(dt / 2);
+    this.owed += dt;
+    while (this.owed >= TICK) {
+      this.sim.step(TICK);
+      this.owed -= TICK;
+    }
     this.animate(dt);
     this.renderer.render(this.world.scene, this.camera);
     this.hudT -= dt;

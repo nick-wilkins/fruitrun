@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { Vector3 } from 'three';
+import { starsForTime } from '../src/core/progress';
 import { LEVELS } from '../src/data/levels';
-import { findClash } from '../src/game/course';
-import { courseFor } from '../src/game/courses';
+import { findClash, type CourseObj } from '../src/game/course';
+import { courseFor, starTimesFor } from '../src/game/courses';
 import { Sim, timeCourse } from '../src/game/sim';
 
 describe.each(LEVELS)('$name course', (level) => {
@@ -41,12 +43,37 @@ describe.each(LEVELS)('$name course', (level) => {
     expect(good).toBeLessThan(idle);
   });
 
-  it('has star times in order with room between them', () => {
-    const [five, four, three, two] = level.starTimes;
+  it('gives five stars for a good line and no more than two for never steering', () => {
+    const [five, four, three, two] = starTimesFor(level);
     expect(five).toBeLessThan(four);
     expect(four).toBeLessThan(three);
     expect(three).toBeLessThan(two);
-    expect(five).toBeGreaterThan(20);
+    expect(starsForTime(level, timeCourse(course, level, 'smart'))).toBe(5);
+    expect(starsForTime(level, timeCourse(course, level, 'none'))).toBeLessThanOrEqual(2);
+  });
+
+  it('keeps solid obstacles off the stretch where a fork\'s two roads overlap', () => {
+    // The ball only collides with things on its own route, so anything solid there could be driven through.
+    const solid = new Set(['crate', 'slider', 'pendulum', 'spinner', 'goo', 'pin', 'jump']);
+    const p = new Vector3();
+    const d = new Vector3();
+    course.lanes.forEach((lane, index) => {
+      if (!lane.from) return;
+      const onOther = (o: CourseObj) => {
+        const mine = course.lanes[o.lane].track;
+        const other = o.lane === 0 ? lane.track : course.track;
+        mine.point(o.s, o.x, 0, p);
+        return other.frames.some((f) => {
+          d.subVectors(p, f.p);
+          return Math.abs(d.dot(f.t)) < 1 && Math.abs(d.dot(f.r)) < other.half + 1 && Math.abs(d.dot(f.u)) < 3;
+        });
+      };
+      for (const o of course.objects) {
+        if (!solid.has(o.kind)) continue;
+        const inFork = o.lane === index || (o.lane === 0 && o.s > lane.from.s0 && o.s < lane.from.s1);
+        if (inFork) expect(onOther(o), `${o.kind} on lane ${o.lane} at s=${o.s}`).toBe(false);
+      }
+    });
   });
 });
 
@@ -63,8 +90,8 @@ describe('forks', () => {
       sim.s = from.s0 - 5;
       sim.x = x;
       const seen = new Set<number>();
-      for (let i = 0; i < 60 * 30 && !(sim.lane === 0 && sim.s > from.s1 + 5); i++) {
-        sim.step(1 / 60);
+      for (let i = 0; i < 120 * 30 && !(sim.lane === 0 && sim.s > from.s1 + 5); i++) {
+        sim.step(1 / 120);
         seen.add(sim.lane);
       }
       return { seen, s: sim.s };

@@ -49,4 +49,19 @@ Chrome at 1280x720 against `npm run dev`:
 - PASS music file requested and streaming after the first tap.
 - Not checked: how the sound actually sounds (no ears here); a real iPad; every level by hand. Levels 3, 4, 6 to 9, 11, 12 and 15 to 17 are covered by the headless tests only.
 
-Level lengths run from about 1,850 to 3,300 units; five-star times from about 43 s (level 1) to 71 s (level 18).
+Level lengths run from about 1,850 to 3,700 units. Star times were recalibrated after review: see below.
+
+## Review
+
+`/code-review medium`, 9 findings, all fixed. `npm test`: 141 passed.
+
+- Obstacles on a shortcut fork sat where its two roads still overlap, so players on the detour drove through them. Hazards now start once the roads have parted. New test (failed on 6 levels, now passes on all).
+- Never steering could earn four stars on level 7. Star bands now guarantee five stars for the good line and two at most for hands-off. New test (failed on level 7, now passes on all). Level 7 also gained a sticky field and a crate field so steering matters more: hands-off 55 s, good line 44 s.
+- Rules now advance in fixed 1/120 s steps, in play and in calibration, so the same line earns the same time at any frame rate, and fast balls cannot skip through skittles or bumpers.
+- Camera follows the arm when looking back after a rejoin and ahead before a split. Measured in Chrome on level 4: largest camera move in one frame 0.73 units through the whole fork (a jump would be over 2).
+- Music volume and ducking go through the audio graph, because iPads ignore an audio element's own volume. One duck timer, so the blender no longer un-ducks the sip.
+- Star times are returned by `starTimesFor(level)` instead of being written onto the level as a side effect.
+- A fork arm that tries to fork again now throws.
+- Mega jumps, twists and waves put their pads and ramps off-centre.
+
+Final five-star times: 44 s (level 4) to 80 s (level 18).
