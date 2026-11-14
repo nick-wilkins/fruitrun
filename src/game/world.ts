@@ -3,7 +3,6 @@ import {
   BackSide,
   BoxGeometry,
   BufferGeometry,
-  CanvasTexture,
   CircleGeometry,
   Color,
   ConeGeometry,
@@ -141,34 +140,57 @@ function mix(a: string, b: string, amount: number): string {
 }
 
 /**
- * The finish: a giant cut-out of the level's fruit standing across the road, with an archway through the middle.
+ * The finish: a chunky candy-striped arch in the fruit's colour, crowned with the fruit itself between two
+ * leaves, with smaller fruit studded round the curve and a plinth at each foot.
  */
-function fruitArch(course: Course, fruitUrl: string): Mesh {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = size;
-  const texture = new CanvasTexture(canvas);
-  texture.colorSpace = SRGBColorSpace;
-  const image = new Image();
-  image.onload = () => {
-    const g = canvas.getContext('2d')!;
-    g.drawImage(image, 0, 0, size, size);
-    // Cut the archway: as wide as the road and kerbs, rounded at the top.
-    g.globalCompositeOperation = 'destination-out';
-    const half = size * 0.215;
-    const top = size * 0.66;
-    g.beginPath();
-    g.moveTo(size / 2 - half, size);
-    g.lineTo(size / 2 - half, top);
-    g.arc(size / 2, top, half, Math.PI, 0);
-    g.lineTo(size / 2 + half, size);
-    g.closePath();
-    g.fill();
-    texture.needsUpdate = true;
-  };
-  image.src = fruitUrl;
-  const arch = new Mesh(new PlaneGeometry(32, 32), new MeshBasicMaterial({ map: texture, transparent: true, alphaTest: 0.5, side: DoubleSide }));
-  place(arch, standing(course.track, course.finishS, 0, 14.6));
+function fruitArch(course: Course, fruitId: string): Group {
+  const fruit = ingredient(fruitId);
+  const half = course.track.half;
+  const radius = half + 2.4;
+  const arch = new Group();
+
+  const stripes = bumperTexture(fruit.color, '#ffffff');
+  stripes.repeat.set(14, 1);
+  const hoop = new Mesh(new TorusGeometry(radius, 1.25, 12, 40, Math.PI), new MeshLambertMaterial({ map: stripes, emissive: 0xffffff, emissiveMap: stripes, emissiveIntensity: 0.35 }));
+  // A white piping line round the front edge, for a cartoon outline.
+  const piping = new Mesh(new TorusGeometry(radius, 0.3, 8, 40, Math.PI), new MeshBasicMaterial({ color: '#ffffff' }));
+  piping.position.z = 1.15;
+  arch.add(hoop, piping);
+
+  const stone = new MeshLambertMaterial({ color: mix(fruit.color, '#ffffff', 0.25) });
+  const cap = new MeshLambertMaterial({ color: '#ffffff' });
+  for (const side of [-1, 1]) {
+    const plinth = new Mesh(new CylinderGeometry(1.9, 2.2, 1.6, 14), stone);
+    plinth.position.set(side * radius, 0.5, 0);
+    const ball = new Mesh(new SphereGeometry(0.9, 12, 10), cap);
+    ball.position.set(side * (radius + 1.5), 1.9, 0);
+    arch.add(plinth, ball);
+  }
+
+  // Leaves and a stalk at the crown, behind the fruit.
+  const leaf = new MeshLambertMaterial({ color: '#3fb54a', emissive: '#1d6b25', emissiveIntensity: 0.4 });
+  for (const side of [-1, 1]) {
+    const blade = new Mesh(new SphereGeometry(1, 12, 8), leaf);
+    blade.scale.set(3.2, 0.5, 1.5);
+    blade.position.set(side * 3.4, radius + 2.6, -0.3);
+    blade.rotation.z = side * 0.5;
+    arch.add(blade);
+  }
+
+  const icon = iconTexture(fruit.img);
+  const crown = new Sprite(new SpriteMaterial({ map: icon, transparent: true }));
+  crown.scale.setScalar(7.5);
+  crown.position.set(0, radius + 3.2, 1.6);
+  arch.add(crown);
+  // Smaller fruit studded round the curve.
+  for (const angle of [0.42, 0.95, Math.PI - 0.95, Math.PI - 0.42]) {
+    const stud = new Sprite(new SpriteMaterial({ map: icon, transparent: true }));
+    stud.scale.setScalar(2.6);
+    stud.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 1.7);
+    arch.add(stud);
+  }
+
+  place(arch, standing(course.track, course.finishS, 0, 0.2));
   return arch;
 }
 
@@ -655,7 +677,7 @@ export function buildWorld(course: Course, items: (string | undefined)[], fruitI
   addScenery(scene, course, groundY);
 
   scene.add(gate(track, 44, 'GO!', '#2fb344'));
-  scene.add(fruitArch(course, ingredient(fruitId).img));
+  scene.add(fruitArch(course, fruitId));
   const line = new Mesh(new PlaneGeometry(half * 2, 3), new MeshBasicMaterial({ map: checkerTexture() }));
   place(line, lying(track, course.finishS, 0, 0.04));
   scene.add(line);
