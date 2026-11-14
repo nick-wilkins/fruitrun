@@ -35,3 +35,11 @@ Clean:
 ## Not checked
 
 A real iPad. By eye in the browser I only confirmed a level still plays; the smoothness numbers come from the audit and the frame measurement above.
+
+## Regression found by Nick: camera drifting overhead
+
+The camera smoothing added above predicted the next view from how far the camera moved in the previous frame. A frame that took longer than the last looked like a jump; the "correction" was carried forward, the prediction was never refreshed, and the error grew every frame until the camera sat far above the track. The audit missed it because it only used even frames.
+
+- Test first: six levels played with uneven frames (60, 30 and 20 a second, plus hitches). Camera wandered 23 to 62 units from the ball; all six failed.
+- Fix: the prediction now comes from the ball's speed and the length of the frame, so nothing goes stale, and a carried difference of more than a road's width is dropped outright.
+- After: all six pass (camera within 22 units), with the 204 smoothness runs still passing. In Chrome on level 7 with a forced 70 ms hitch every 25 frames, a pause and resume and a turbo pad, the camera stayed within 12.8 units of the ball.

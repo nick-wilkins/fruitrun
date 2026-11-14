@@ -15,12 +15,10 @@ export class Rig {
 
   private started = false;
   private back = 8.2;
-  // Where the camera would be from the track alone, last frame, and how far that moved in the frame.
+  // Where the camera would be from the track alone, last frame.
   private readonly rawPos = new Vector3();
   private readonly rawLook = new Vector3();
   private readonly rawUp = new Vector3();
-  private readonly stepPos = new Vector3();
-  private readonly stepLook = new Vector3();
   // Left over from the last change of road: fades away so the view glides across instead of cutting.
   private readonly carryPos = new Vector3();
   private readonly carryLook = new Vector3();
@@ -46,17 +44,21 @@ export class Rig {
     const look = this.b.copy(fl.p).addScaledVector(fl.r, x * 0.75).addScaledVector(fl.u, 1 + h * 0.65);
     const up = this.c.copy(fc.u).add(f.u).normalize();
 
-    if (this.started) {
+    if (this.started && dt > 0) {
       // Whenever the view from the track alone jumps (the ball moves onto another road, or the road it is looking
       // down changes at a fork), carry on from where the camera was heading and let the difference fade, rather
-      // than cutting to the new view.
-      const posJump = this.d.copy(this.rawPos).add(this.stepPos).sub(pos);
-      if (posJump.length() > 1.2) this.carryPos.add(posJump);
-      else this.stepPos.subVectors(pos, this.rawPos);
-      const lookJump = this.d.copy(this.rawLook).add(this.stepLook).sub(look);
-      if (lookJump.length() > 1.5) this.carryLook.add(lookJump);
-      else this.stepLook.subVectors(look, this.rawLook);
-      if (this.rawUp.dot(up) < 0.985) this.carryUp.add(this.rawUp).sub(up);
+      // than cutting to the new view. "Where it was heading" is worked out from the ball's speed and how long this
+      // frame took, so a slow or uneven frame is never mistaken for a jump.
+      const travel = sim.v * dt;
+      const slack = 1.2 + travel * 0.8;
+      const posJump = this.d.copy(this.rawPos).addScaledVector(fc.t, travel).sub(pos);
+      if (posJump.length() > slack) this.carryPos.add(posJump);
+      const lookJump = this.d.copy(this.rawLook).addScaledVector(fl.t, travel).sub(look);
+      if (lookJump.length() > slack + 0.6) this.carryLook.add(lookJump);
+      if (this.rawUp.dot(up) < 0.985 - Math.min(0.3, dt * 4)) this.carryUp.add(this.rawUp).sub(up);
+      // A safety net: the carried difference is only ever a road's width or so. If it is more, let go at once.
+      if (this.carryPos.length() > 16) this.carryPos.set(0, 0, 0);
+      if (this.carryLook.length() > 20) this.carryLook.set(0, 0, 0);
     }
     this.started = true;
     this.rawPos.copy(pos);

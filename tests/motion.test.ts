@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 import { LEVELS } from '../src/data/levels';
 import { Rig } from '../src/game/camera';
 import { courseFor } from '../src/game/courses';
+import { seeded } from '../src/game/random';
 import { Sim, TICK } from '../src/game/sim';
 
 /** Ways of driving that between them take both sides of every fork and wander all over the road. */
@@ -65,5 +66,32 @@ describe.each(LEVELS)('$name motion', (level) => {
     expect(worst.through).toEqual([]);
     expect(worst.camera).toBeLessThan(1.2);
     expect(worst.swing).toBeLessThan(22);
+  });
+});
+
+describe('camera with uneven frames', () => {
+  // Real screens do not deliver frames evenly: a slow tablet, a hitch, a tab switched away and back.
+  it.each([2, 7, 12, 18, 30, 45])('stays with the ball on level %i', (n) => {
+    const level = LEVELS[n - 1];
+    const course = courseFor(level);
+    const sim = new Sim(course, level, () => {}, () => 0);
+    sim.autopilot = 'smart';
+    sim.skipCountdown();
+    const rig = new Rig();
+    const ball = new Vector3();
+    const random = seeded(n);
+    let furthest = 0;
+    for (let frame = 0; frame < 60 * 240 && !sim.finished; frame++) {
+      // Mostly 60 a second, with stretches at 30 and 20 and the odd long hitch.
+      const roll = random();
+      const ticks = frame % 400 < 80 ? 4 : frame % 400 < 120 ? 6 : roll < 0.02 ? 6 : roll < 0.1 ? 3 : 2;
+      for (let i = 0; i < ticks; i++) sim.step(TICK);
+      rig.update(sim, sim.s, sim.x, sim.h, ticks * TICK);
+      sim.point(sim.s, sim.x, sim.h, ball);
+      furthest = Math.max(furthest, rig.pos.distanceTo(ball));
+    }
+    expect(sim.finished).toBe(true);
+    // The camera rides 8 to 12 behind and 4 above: anything much more means it has wandered off.
+    expect(furthest).toBeLessThan(22);
   });
 });
