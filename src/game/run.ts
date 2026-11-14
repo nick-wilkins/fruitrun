@@ -22,6 +22,7 @@ import {
 import { sfx } from '../audio';
 import { starsForTime, type Feats } from '../core/progress';
 import type { Level } from '../data/levels';
+import { Rig } from './camera';
 import { buildPip, type Pip } from './character';
 import type { Course } from './course';
 import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type SimEvent } from './sim';
@@ -183,10 +184,12 @@ class Weather {
 export class Run {
   readonly sim: Sim;
   readonly world: World;
-  private readonly camera = new PerspectiveCamera(62, 1, 0.3, 3200);
+  // The near plane is kept well out: it sharpens depth in the distance, where overlapping roads would shimmer.
+  private readonly camera = new PerspectiveCamera(62, 1, 0.6, 3200);
   private readonly pip: Pip;
   private readonly shadow: Mesh;
   private readonly sparks = new Sparks();
+  private readonly rig = new Rig();
   private readonly canvas: HTMLCanvasElement;
   private readonly flying: Flying[] = [];
   private readonly weather: Weather | null;
@@ -210,8 +213,6 @@ export class Run {
   private disposed = false;
 
   private readonly f = makeFrame();
-  private readonly fc = makeFrame();
-  private readonly fl = makeFrame();
   private readonly v1 = new Vector3();
   private readonly v2 = new Vector3();
   private readonly v3 = new Vector3();
@@ -270,7 +271,7 @@ export class Run {
     window.addEventListener('blur', this.dropInput);
     window.addEventListener('resize', this.resize);
     this.resize();
-    this.place();
+    this.place(0);
   }
 
   // ---- input ----
@@ -504,28 +505,32 @@ export class Run {
   // ---- presentation ----
 
   /** Put the ball, shadow and camera where the rules say they are. */
-  private place(): void {
+  private place(dt: number): void {
     const sim = this.sim;
-    const f = sim.frameAt(sim.s, this.f);
+    // The rules move in fixed steps that rarely line up with the screen's frames. Draw the ball where it will be
+    // by now, part-way into the next step, so its motion is even rather than a step ahead or behind.
+    const lead = sim.countdown > 0 || sim.finished ? 0 : this.owed;
+    const s = sim.s + sim.v * lead;
+    const x = sim.x + sim.xv * lead;
+    const h = sim.h > 0 ? Math.max(0, sim.h + sim.vh * lead) : 0;
+
+    const f = sim.frameAt(s, this.f);
     this.v1.copy(f.r).negate();
-    this.v2.copy(f.p).addScaledVector(f.r, sim.x).addScaledVector(f.u, BALL_RADIUS + sim.h);
+    this.v2.copy(f.p).addScaledVector(f.r, x).addScaledVector(f.u, BALL_RADIUS + h);
     this.pip.root.matrix.makeBasis(this.v1, f.u, f.t).setPosition(this.v2);
     this.pip.root.matrixWorldNeedsUpdate = true;
 
-    const shrink = 1 / (1 + sim.h * 0.45);
-    this.v3.copy(f.p).addScaledVector(f.r, sim.x).addScaledVector(f.u, 0.06);
+    const shrink = 1 / (1 + h * 0.45);
+    this.v3.copy(f.p).addScaledVector(f.r, x).addScaledVector(f.u, 0.06);
     this.shadow.matrix.makeBasis(f.r, f.t, f.u).scale(this.camUp.set(shrink, shrink, 1)).setPosition(this.v3);
     this.shadow.matrixWorldNeedsUpdate = true;
     // Nothing to cast a shadow on where the road has been taken away.
     this.shadow.visible = !sim.overGap();
 
-    // Chase camera, riding the track a little way behind so it loops, twists and corkscrews with the ball.
-    const back = 8.2 + clamp((sim.v - CRUISE) * 0.07, 0, 4.2);
-    const fc = sim.frameAt(sim.s - back, this.fc);
-    this.camPos.copy(fc.p).addScaledVector(fc.u, 4 + sim.h * 0.8).addScaledVector(fc.r, sim.x * 0.55);
-    const fl = sim.frameAt(sim.s + 7, this.fl);
-    this.camLook.copy(fl.p).addScaledVector(fl.r, sim.x * 0.75).addScaledVector(fl.u, 1 + sim.h * 0.65);
-    this.camUp.copy(fc.u).add(f.u).normalize();
+    this.rig.update(sim, s, x, h, dt);
+    this.camPos.copy(this.rig.pos);
+    this.camLook.copy(this.rig.look);
+    this.camUp.copy(this.rig.up);
 
     if (sim.finished) {
       // Swing round to the front for the celebration.
@@ -634,7 +639,7 @@ export class Run {
       this.sparks.burst(sim.point(sim.s - 0.6, sim.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), hot ? 3 : 1, hot ? ['#ff5a2a', '#ffd23f'] : ['#eaff3d', '#ffffff'], 2);
     }
     this.sparks.update(dt);
-    this.place();
+    this.place(dt);
     this.weather?.update(dt, sim.clock, this.camPos);
   }
 

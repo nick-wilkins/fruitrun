@@ -70,7 +70,8 @@ export class Sim {
   /** The fork arm the ball has just come off, while it is still close behind. */
   private cameFrom = 0;
   private riding = false;
-  private vh = 0;
+  /** Upward speed while airborne. */
+  vh = 0;
   private knockT = 0;
   private scrapeT = 0;
   private gooT = 0;
@@ -82,6 +83,8 @@ export class Sim {
   private readonly f = makeFrame();
   private readonly ahead = makeFrame();
   private readonly scratch = makeFrame();
+  private readonly spot = new Vector3();
+  private readonly offset = new Vector3();
 
   constructor(
     readonly course: Course,
@@ -146,6 +149,20 @@ export class Sim {
       if (this.done[i]) pickups++;
     });
     return { ...this.tally, pickups, possible };
+  }
+
+  /** Where a point in the world is on a lane: how far along, and how far to the right of its centre. */
+  private locate(lane: number, world: Vector3, guess: number): { s: number; x: number } {
+    const track = this.course.lanes[lane].track;
+    const f = this.scratch;
+    let s = guess;
+    // Step along until the point is square-on to the track.
+    for (let i = 0; i < 8; i++) {
+      track.at(s, f);
+      s = Math.min(track.length, Math.max(0, s + this.offset.subVectors(world, f.p).dot(f.t)));
+    }
+    track.at(s, f);
+    return { s, x: this.offset.subVectors(world, f.p).dot(f.r) };
   }
 
   /** Jump straight to racing. */
@@ -289,7 +306,9 @@ export class Sim {
     this.x += this.xv * dt;
     const [lo, hi] = this.bounds();
     if (this.x < lo || this.x > hi) {
-      this.x = clamp(this.x, lo, hi);
+      // Slide back on rather than snap: the road may have just narrowed, or a fork just closed behind the ball.
+      const over = this.x - clamp(this.x, lo, hi);
+      this.x -= Math.sign(over) * Math.min(Math.abs(over), 30 * dt);
       if (this.xv * (this.x - (lo + hi) / 2) > 0) this.xv = 0;
       if (target !== null && (target < lo || target > hi) && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
@@ -331,18 +350,22 @@ export class Sim {
       if (this.cameFrom && this.s > lanes[this.cameFrom].from!.s1 + 14) this.cameFrom = 0;
       for (let i = 1; i < lanes.length; i++) {
         const from = lanes[i].from!;
-        // The roads have parted: the ball is on whichever it is nearer the middle of.
+        // The roads have parted: the ball is on whichever it is nearer the middle of. The arm points a different
+        // way by now, so find where the ball actually is on it rather than assuming the two run side by side.
         const parted = from.s0 + from.decide;
-        const off = from.spread[from.decide];
-        if (before < parted && this.s >= parted && Math.abs(this.x - off) < Math.abs(this.x)) {
-          this.lane = i;
-          this.s -= from.s0;
-          this.x -= off;
-          this.shift -= off;
-          this.taken.add(i);
-          before = -1;
-          this.emit({ type: 'fork' });
-          break;
+        if (before < parted && this.s >= parted) {
+          this.point(this.s, this.x, 0, this.spot);
+          const on = this.locate(i, this.spot, this.s - from.s0);
+          if (Math.abs(on.x) < Math.abs(this.x)) {
+            this.shift += on.x - this.x;
+            this.lane = i;
+            this.s = on.s;
+            this.x = on.x;
+            this.taken.add(i);
+            before = -1;
+            this.emit({ type: 'fork' });
+            break;
+          }
         }
       }
     } else if (this.s >= lanes[this.lane].track.length) {
