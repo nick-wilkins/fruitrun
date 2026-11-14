@@ -218,7 +218,8 @@ export class Sim {
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
     const grip = GRIP[this.course.mood];
     if (target !== null) {
-      const wanted = clamp((target - this.x) * (riding ? 2.5 : 9), -16, 16);
+      // Quick enough to cross the whole road in about a third of a second.
+      const wanted = clamp((target - this.x) * (riding ? 2.5 : 14), -28, 28);
       this.xv += (wanted - this.xv) * Math.min(1, dt * grip);
     } else {
       this.xv *= Math.exp(-Math.min(8, grip * 0.5) * dt);

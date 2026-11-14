@@ -43,7 +43,7 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   const count = el('div.countdown');
   const touch = window.matchMedia('(pointer: coarse)').matches;
   const warning = { sunny: '', night: 'Night run! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
-  const hint = el('div.hint', {}, warning + (touch ? 'Hold and slide your finger to steer' : 'Hold the mouse and slide, or use the arrow keys'));
+  const hint = el('div.hint', {}, warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
   const soundButton = el('button.btn.blue', {}, handlers.muted() ? '🔇 Sound off' : '🔊 Sound on');

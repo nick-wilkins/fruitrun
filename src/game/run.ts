@@ -51,6 +51,9 @@ export interface RunHooks {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/** How much of the screen's width a finger swipes to take the ball from one kerb to the other. */
+const SWIPE = 0.24;
+
 interface Flying {
   mesh: InstancedMesh;
   index: number;
@@ -190,6 +193,8 @@ export class Run {
   /** Where the steering finger is across the screen, -0.5 to 0.5, or null when nothing is held. */
   private pointerAcross: number | null = null;
   private pointerId: number | null = null;
+  /** For a finger: where it first touched across the screen, and where the ball was then. */
+  private swipeFrom: { across: number; x: number } | null = null;
   private keySteer = 0;
   private shake = 0;
   private fov = 62;
@@ -270,6 +275,8 @@ export class Run {
     }
     const rect = this.canvas.getBoundingClientRect();
     this.pointerAcross = (e.clientX - rect.left) / rect.width - 0.5;
+    // A finger steers by swiping from wherever it lands; a mouse steers by where it points.
+    if (e.type === 'pointerdown') this.swipeFrom = e.pointerType === 'mouse' ? null : { across: this.pointerAcross, x: this.sim.x };
     e.preventDefault();
   };
 
@@ -277,6 +284,7 @@ export class Run {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
     this.pointerAcross = null;
+    this.swipeFrom = null;
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
@@ -291,6 +299,7 @@ export class Run {
     this.keySteer = 0;
     this.pointerId = null;
     this.pointerAcross = null;
+    this.swipeFrom = null;
   };
 
   private readonly resize = () => {
@@ -305,6 +314,15 @@ export class Run {
   private steer(): number | null {
     // Worked out afresh every frame: a finger held still means something different as the road narrows or widens.
     const reach = this.sim.limit + PUSH;
+    if (this.pointerAcross !== null && this.swipeFrom) {
+      // The ball moves as far as the finger has swiped: SWIPE of the screen's width carries it right across the road.
+      const from = this.swipeFrom;
+      const wanted = from.x + ((this.pointerAcross - from.across) / SWIPE) * reach * 2;
+      const target = clamp(wanted, -reach, reach);
+      // Swiped past the kerb: move the starting point along, so swiping back answers straight away.
+      from.x += target - wanted;
+      return target;
+    }
     if (this.pointerAcross !== null) return clamp(this.pointerAcross * 2 * (this.sim.limit + BALL_RADIUS) * 1.35, -reach, reach);
     if (this.keySteer) return clamp(this.sim.x + this.keySteer * 3, -reach, reach);
     return null;
