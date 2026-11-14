@@ -274,10 +274,11 @@ function kerbRuns(lanes: Lane[], index: number, side: 1 | -1): [number, number][
   const runs: [number, number][] = [];
   let open: number | null = null;
   const q = new Vector3();
-  for (let i = 0; i < track.frames.length; i += 2) {
+  for (let i = 0; i < track.frames.length; i++) {
     const s = i * STEP;
     const f = track.frames[i];
-    q.copy(f.p).addScaledVector(f.r, side * (track.half + 0.45));
+    // Test the kerb's outer edge: it starts the moment the whole kerb is clear of the other road, no later.
+    q.copy(f.p).addScaledVector(f.r, side * (track.half + 0.9));
     const covered = near.some((n) => s >= n.mine[0] && s <= n.mine[1] && onRoad(q, n.other, n.theirs[0], n.theirs[1]));
     if (!covered && open === null) open = s;
     if (covered && open !== null) {
@@ -563,22 +564,28 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
     }
   });
 
+  const noseGeometry = new CylinderGeometry(1.15, 1.3, 1.7, 14);
   // Where two roads part or meet there is a sliver between them that neither covers. Fill it with road, laid
   // from one centreline to the other just under both surfaces, only as far as the roads are still touching.
   const a = makeFrame();
   const b = makeFrame();
   for (const lane of course.lanes) {
     if (!lane.from) continue;
-    const reach = lane.from.decide + 10;
     for (const end of [0, 1]) {
       const at = end ? lane.from.s1 : lane.from.s0;
       const points: number[] = [];
       const uvs: number[] = [];
-      for (let d = 0; d <= reach; d += 2) {
+      let nose: Vector3 | null = null;
+      for (let d = 0; d <= 70; d += 1) {
         course.track.at(end ? at - d : at + d, a);
         lane.track.at(end ? lane.track.length - d : d, b);
         // Stop where one road has climbed away from the other: there is nothing to join there.
         if (Math.abs(a.p.y - b.p.y) > 0.6) break;
+        // Stop once both kerbs stand between the roads: from there on they cover the gap themselves, and
+        // anything wider would show as a patch of road on the island.
+        const apart = a.p.distanceTo(b.p);
+        if (apart > course.track.half * 2 + 0.9 && !nose) nose = a.p.clone().add(b.p).multiplyScalar(0.5).addScaledVector(a.u, 0.75);
+        if (apart > course.track.half * 2 + 1.7) break;
         for (const f of [a, b]) {
           points.push(f.p.x - f.u.x * 0.02, f.p.y - f.u.y * 0.02, f.p.z - f.u.z * 0.02);
           uvs.push(f === a ? 0.3 : 0.7, d * 0.1);
@@ -593,6 +600,13 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
       fill.setIndex(index);
       fill.computeVertexNormals();
       scene.add(new Mesh(fill, fills[tintAt(lane.from.s0)]));
+      // A bollard on the nose of the island, where the two kerbs meet, to finish the join off.
+      if (nose) {
+        const bollard = new Mesh(noseGeometry, kerbMaterial);
+        bollard.position.copy(nose);
+        bollard.quaternion.setFromUnitVectors(Y.set(0, 1, 0), a.u);
+        scene.add(bollard);
+      }
     }
   }
 
