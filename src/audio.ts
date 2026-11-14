@@ -1,4 +1,4 @@
-/** Sound kit: effects are synthesised from oscillators and noise, music is a looping track. */
+/** Sound kit: effects are synthesised from oscillators and noise, music is a short playlist on repeat. */
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = false;
@@ -43,13 +43,19 @@ export function unlockAudio(): void {
   syncMusic();
 }
 
-/** Start the looping soundtrack (it begins on the first tap if the browser is not ready yet). */
-export function startMusic(url: string): void {
+/** Start the soundtrack: the tracks play in turn, for ever. It begins on the first tap if the browser is not ready yet. */
+export function startMusic(urls: string[]): void {
   if (!music) {
-    music = new Audio(url);
-    music.loop = true;
-    music.volume = MUSIC_VOLUME;
-    music.preload = 'auto';
+    let playing = 0;
+    const player = new Audio(urls[0]);
+    player.volume = MUSIC_VOLUME;
+    player.preload = 'auto';
+    player.addEventListener('ended', () => {
+      playing = (playing + 1) % urls.length;
+      player.src = urls[playing];
+      syncMusic();
+    });
+    music = player;
     document.addEventListener('visibilitychange', syncMusic);
   }
   wantMusic = true;

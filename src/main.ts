@@ -90,7 +90,7 @@ const app: App = {
 setMuted(app.save.muted);
 // Browsers hold sound back until the player does something, and differ on which event counts.
 for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(type, unlockAudio, { passive: true });
-startMusic(asset('assets/audio/track1.mp3'));
+startMusic([asset('assets/audio/track1.mp3'), asset('assets/audio/track2.mp3')]);
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
