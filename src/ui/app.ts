@@ -1,7 +1,7 @@
 import type { Save } from '../core/progress';
 import type { Level } from '../data/levels';
 
-export type Screen = 'menu' | 'map' | 'blender';
+export type Screen = 'menu' | 'map' | 'blender' | 'superblender' | 'book';
 
 export interface App {
   save: Save;

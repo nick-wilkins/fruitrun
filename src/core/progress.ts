@@ -2,6 +2,18 @@ import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
+/** A smoothie as remembered in the book. */
+export interface Sip {
+  name: string;
+  points: number;
+  rating: number;
+  color: string;
+  /** Made in the super blender. */
+  big: boolean;
+}
+
+const HISTORY = 12;
+
 /** Bump when courses are re-laid, so best times set on the old layouts stop counting against the new ones. */
 export const COURSES = 2;
 
@@ -22,6 +34,12 @@ export interface Save {
   smoothies: number;
   bestSmoothie: { name: string; points: number } | null;
   combosFound: string[];
+  /** Every ingredient ever collected, whether or not any are left. */
+  seen: string[];
+  /** The most recent smoothies, newest first. */
+  history: Sip[];
+  /** How many smoothies earned each rating, from Yuck to Legendary. */
+  ratings: number[];
   muted: boolean;
 }
 
@@ -37,6 +55,9 @@ export function newSave(): Save {
     smoothies: 0,
     bestSmoothie: null,
     combosFound: [],
+    seen: [],
+    history: [],
+    ratings: [0, 0, 0, 0, 0],
     muted: false,
   };
 }
@@ -49,6 +70,8 @@ export function loadSave(): Save | null {
     if (parsed.version !== 1) return null;
     delete parsed.unlocked;
     const save = { ...newSave(), ...parsed };
+    // Saves from before the book existed only know what is in the basket now.
+    if (!parsed.seen) save.seen = Object.keys(save.inventory);
     // Pip stands on the level last played. Older saves did not record it, and a level may since have gone:
     // fall back to the furthest level finished.
     if (!save.last || !LEVELS.some((l) => l.id === save.last)) {
@@ -110,19 +133,25 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   };
   save.inventory[level.fruit] = (save.inventory[level.fruit] ?? 0) + stars;
   for (const id of bonuses) save.inventory[id] = (save.inventory[id] ?? 0) + 1;
+  for (const id of [level.fruit, ...bonuses]) if (!save.seen.includes(id)) save.seen.push(id);
   save.last = level.id;
   return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous };
 }
 
+/** The super blender stands at the end of the side path on the first map: finish that path to use it. */
+export function superBlenderOpen(save: Save): boolean {
+  return Boolean(save.levels['level-14']);
+}
+
 /** Blend the chosen ingredients: they are used up and the smoothie's points are banked. */
-export function blend(save: Save, ids: string[]): SmoothieResult {
-  const jug = ids.slice(0, MAX_JUG);
+export function blend(save: Save, ids: string[], capacity = MAX_JUG): SmoothieResult {
+  const jug = ids.slice(0, capacity);
   const needed: Record<string, number> = {};
   for (const id of jug) needed[id] = (needed[id] ?? 0) + 1;
   for (const [id, count] of Object.entries(needed)) {
     if ((save.inventory[id] ?? 0) < count) throw new Error(`Not enough ${id} to blend`);
   }
-  const result = scoreSmoothie(jug);
+  const result = scoreSmoothie(jug, capacity);
   for (const [id, count] of Object.entries(needed)) {
     const left = save.inventory[id] - count;
     if (left > 0) save.inventory[id] = left;
@@ -130,6 +159,9 @@ export function blend(save: Save, ids: string[]): SmoothieResult {
   }
   save.points += result.points;
   save.smoothies += 1;
+  save.ratings[result.rating - 1] += 1;
+  save.history.unshift({ name: result.name, points: result.points, rating: result.rating, color: result.color, big: capacity > MAX_JUG });
+  save.history.length = Math.min(save.history.length, HISTORY);
   if (!save.bestSmoothie || result.points > save.bestSmoothie.points) {
     save.bestSmoothie = { name: result.name, points: result.points };
   }

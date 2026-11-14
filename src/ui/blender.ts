@@ -18,9 +18,18 @@ const PILE: [number, number][] = [
   [53, 56], [36, 53], [71, 57], [46, 40], [63, 41],
 ];
 
-export function blenderScreen(app: App): HTMLElement {
+/** Where the nth ingredient settles in the glass, as a percentage of its box: a brick-like pile from the bottom up. */
+function pile(index: number, capacity: number): [number, number] {
+  if (capacity <= MAX_JUG) return PILE[index];
+  const row = Math.floor(index / 4);
+  return [30 + (index % 4) * 14 + (row % 2) * 5, 89 - row * 12];
+}
+
+/** The blender: `capacity` is 10 for the ordinary one and 20 for the super blender. */
+export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
   const { save } = app;
-  const stage = el('div.stage.blend-stage');
+  const big = capacity > MAX_JUG;
+  const stage = el(`div.stage.blend-stage${big ? '.big' : ''}`);
   stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
 
   const jug: string[] = [];
@@ -42,15 +51,16 @@ export function blenderScreen(app: App): HTMLElement {
   const close = el('button.hit.blend-close', { ariaLabel: 'Back to map' });
   const points = el('div.chip.blend-points');
   stage.append(slots, pager, glass, power, panel, blendButton, close, points);
+  if (big) stage.append(el('div.super-tag', {}, 'Super Blender'));
 
   const left = (id: string) => (save.inventory[id] ?? 0) - jug.filter((j) => j === id).length;
   const owned = () => INGREDIENTS.filter((item) => (save.inventory[item.id] ?? 0) > 0);
 
   const add = (id: string) => {
     if (busy) return;
-    if (jug.length >= MAX_JUG) {
+    if (jug.length >= capacity) {
       sfx.nope();
-      app.toast(`The jug is full! ${MAX_JUG} things is the most it holds.`);
+      app.toast(`The jug is full! ${capacity} things is the most it holds.`);
       return;
     }
     if (left(id) <= 0) {
@@ -112,15 +122,15 @@ export function blenderScreen(app: App): HTMLElement {
     mix.replaceChildren();
     jug.forEach((id, i) => {
       const item = ingredient(id);
-      const [x, y] = PILE[i];
+      const [x, y] = pile(i, capacity);
       glassItems.append(el('img', { src: asset(item.img), alt: '', draggable: false, style: `left:${x}%;top:${y}%;--tilt:${((i * 47) % 50) - 25}deg` }));
       const chip = el('button.mix-item', { title: `Take out ${item.name}` }, el('img', { src: asset(item.img), alt: item.name, draggable: false }), el('i', {}, '✕'));
       onTap(chip, () => remove(i));
       mix.append(chip);
     });
-    for (let i = jug.length; i < MAX_JUG; i++) mix.append(el('div.mix-item.blank'));
+    for (let i = jug.length; i < capacity; i++) mix.append(el('div.mix-item.blank'));
 
-    mixTitle.textContent = `Your mix ${jug.length}/${MAX_JUG}`;
+    mixTitle.textContent = `Your mix ${jug.length}/${capacity}`;
     mixHint.textContent = jug.length ? 'Tap one to take it back out.' : 'Tap ingredients to drop them in the jug.';
     recipes.textContent = `Secret recipes found: ${save.combosFound.length}/${COMBOS.length}`;
     blendButton.classList.toggle('off', jug.length === 0);
@@ -210,12 +220,12 @@ export function blenderScreen(app: App): HTMLElement {
     }
     busy = true;
     const known = new Set(save.combosFound);
-    const result = blend(save, jug);
+    const result = blend(save, jug, capacity);
     app.persist();
     const fresh = result.combos.map((c) => c.id).filter((id) => !known.has(id));
     sfx.blend(BLEND_SECONDS);
     liquid.style.background = result.color;
-    liquid.style.height = `${40 + jug.length * 5}%`;
+    liquid.style.height = `${40 + (jug.length / capacity) * 50}%`;
     stage.classList.add('blending');
     setTimeout(() => {
       jug.length = 0;

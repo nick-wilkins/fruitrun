@@ -7,7 +7,9 @@ import { courseFor, warmCourses } from './game/courses';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import type { App, Screen } from './ui/app';
+import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
+import { bookScreen } from './ui/book';
 import { el } from './ui/dom';
 import { createHud } from './ui/hud';
 import { mapScreen } from './ui/map';
@@ -41,7 +43,13 @@ const app: App = {
   },
   show(screen: Screen) {
     endRun();
-    const build = { menu: menuScreen, map: mapScreen, blender: blenderScreen }[screen];
+    const build = {
+      menu: menuScreen,
+      map: mapScreen,
+      blender: (a: App) => blenderScreen(a, MAX_JUG),
+      superblender: (a: App) => blenderScreen(a, SUPER_JUG),
+      book: bookScreen,
+    }[screen];
     ui.replaceChildren(build(app));
   },
   play(level: Level) {

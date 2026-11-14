@@ -1,6 +1,8 @@
-import { ingredient, type Category, type Ingredient, type Taste } from '../data/ingredients';
+import { INGREDIENTS, ingredient, type Category, type Ingredient, type Taste } from '../data/ingredients';
 
 export const MAX_JUG = 10;
+/** The super blender's jug. */
+export const SUPER_JUG = 20;
 
 type Need = string | string[];
 
@@ -12,6 +14,10 @@ export interface Combo {
   needs?: Need[];
   /** At least `count` different ingredients from `pool`. */
   distinct?: { pool: string[]; count: number };
+  /** At least this many different kinds of ingredient (fruit, nut, seed and so on). */
+  kinds?: number;
+  /** Only the super blender is big enough to make this. */
+  big?: boolean;
 }
 
 const MILKY = ['milk', 'oatmilk', 'almondmilk', 'coconutmilk', 'yogurt', 'coconutyogurt', 'frozenyogurt', 'icecream'];
@@ -22,6 +28,8 @@ const SEEDS = ['chia', 'flax', 'hemp', 'pumpkinseed', 'sunflower', 'poppy', 'qui
 const BERRIES = ['strawberry', 'blueberry', 'raspberry', 'blackberry', 'cranberry', 'cherry', 'grape'];
 const CITRUS = ['orange', 'lemon', 'lime'];
 const TROPICAL = ['mango', 'pineapple', 'banana', 'coconut', 'passionfruit', 'guava', 'dragonfruit'];
+
+const FRUITS = INGREDIENTS.filter((i) => i.cat === 'fruit').map((i) => i.id);
 
 export const COMBOS: Combo[] = [
   { id: 'apple-pie', name: 'Apple Pie', pts: 60, needs: ['apple', 'cinnamon', 'oats'] },
@@ -62,6 +70,17 @@ export const COMBOS: Combo[] = [
   { id: 'honey-nut', name: 'Honey Nut', pts: 35, needs: ['honey', NUTS] },
   { id: 'super-seeds', name: 'Super Seeds', pts: 40, distinct: { pool: SEEDS, count: 3 } },
   { id: 'nut-party', name: 'Nut Party', pts: 40, distinct: { pool: NUTS, count: 3 } },
+  // Super blender only.
+  { id: 'rainbow', name: 'Rainbow Fruit Salad', pts: 160, big: true, distinct: { pool: FRUITS, count: 8 } },
+  { id: 'berry-mountain', name: 'Berry Mountain', pts: 120, big: true, distinct: { pool: BERRIES, count: 5 } },
+  { id: 'tropical-storm', name: 'Tropical Storm', pts: 120, big: true, distinct: { pool: TROPICAL, count: 5 } },
+  { id: 'orchard-harvest', name: 'Orchard Harvest', pts: 110, big: true, distinct: { pool: ['apple', 'greenapple', 'pear', 'plum', 'apricot', 'peach', 'cherry', 'fig'], count: 5 } },
+  { id: 'nutcracker', name: 'The Nutcracker', pts: 100, big: true, distinct: { pool: NUTS, count: 5 } },
+  { id: 'seed-bank', name: 'Seed Bank', pts: 100, big: true, distinct: { pool: SEEDS, count: 5 } },
+  { id: 'garden-party', name: 'Garden Party', pts: 100, big: true, distinct: { pool: ['spinach', 'kale', 'cucumber', 'celery', 'carrot', 'beetroot', 'wheatgrass', 'avocado'], count: 5 } },
+  { id: 'choc-factory', name: 'Chocolate Factory', pts: 120, big: true, needs: ['cocoa', 'darkchoc', 'whitechoc', 'cacaonibs'] },
+  { id: 'parlour', name: 'Ice Cream Parlour', pts: 110, big: true, needs: ['icecream', 'sorbet', 'frozenyogurt', CHOC, NUTS] },
+  { id: 'everything', name: 'The Everything Smoothie', pts: 250, big: true, kinds: 10 },
   { id: 'trail-mix', name: 'Trail Mix', pts: 40, needs: [NUTS, ['raisins', 'dates'], ['oats', 'granola', 'seedmix']] },
 ];
 
@@ -85,7 +104,8 @@ const DUPLICATE_WORTH = [1, 0.8, 0.6, 0.45, 0.3];
 const VERDICTS = ['Yuck!', 'Hmm, not bad', 'Yummy!', 'Delicious!', 'LEGENDARY!'];
 const RATING_FLOORS = [0, 80, 220, 420, 720];
 
-function comboMatches(combo: Combo, have: Set<string>): boolean {
+function comboMatches(combo: Combo, have: Set<string>, kinds: number): boolean {
+  if (combo.kinds && kinds < combo.kinds) return false;
   if (combo.distinct) {
     const hits = combo.distinct.pool.filter((id) => have.has(id)).length;
     if (hits < combo.distinct.count) return false;
@@ -132,9 +152,10 @@ function nameSmoothie(items: Ingredient[], counts: Map<string, number>, combos: 
   return `${adjective} ${lead.name} ${noun}`;
 }
 
-/** Score a jug of ingredient ids. Only the first MAX_JUG items are blended. */
-export function scoreSmoothie(ids: string[]): SmoothieResult {
-  const items = ids.slice(0, MAX_JUG).map(ingredient);
+/** Score a jug of ingredient ids. Only the first `capacity` items are blended: 10 normally, 20 in the super blender. */
+export function scoreSmoothie(ids: string[], capacity = MAX_JUG): SmoothieResult {
+  const big = capacity > MAX_JUG;
+  const items = ids.slice(0, capacity).map(ingredient);
   const notes: ScoreNote[] = [];
   if (!items.length) {
     return { points: 0, rating: 1, verdict: 'The jug is empty!', name: 'Thin Air', color: '#ffffff', combos: [], notes };
@@ -159,7 +180,7 @@ export function scoreSmoothie(ids: string[]): SmoothieResult {
   score += fruitCount * 12 + Math.max(0, fruitKinds - 1) * 15;
   score += cats.size * 8;
 
-  const combos = COMBOS.filter((combo) => comboMatches(combo, have));
+  const combos = COMBOS.filter((combo) => (big || !combo.big) && comboMatches(combo, have, cats.size));
   for (const combo of combos) score += combo.pts;
 
   let multiplier = 1;
@@ -193,14 +214,15 @@ export function scoreSmoothie(ids: string[]): SmoothieResult {
     multiplier *= 1.05;
     notes.push({ id: 'variety', label: 'So much variety!', good: true });
   }
-  if (items.length === MAX_JUG) {
+  if (items.length === capacity) {
     multiplier *= 1.1;
     notes.push({ id: 'full', label: 'Full jug!', good: true });
   }
 
   const points = Math.max(5, Math.round((score * multiplier) / 5) * 5);
   let rating = 1;
-  for (let i = 0; i < RATING_FLOORS.length; i++) if (points >= RATING_FLOORS[i]) rating = i + 1;
+  // Twenty slots make big scores easy, so the super blender expects more than twice as much for each rating.
+  for (let i = 0; i < RATING_FLOORS.length; i++) if (points >= RATING_FLOORS[i] * (big ? 2.3 : 1)) rating = i + 1;
 
   return {
     points,

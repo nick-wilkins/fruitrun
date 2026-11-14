@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, completeLevel, isUnlocked, newSave, starsForTime } from '../src/core/progress';
+import { blend, completeLevel, isUnlocked, newSave, starsForTime, superBlenderOpen } from '../src/core/progress';
 import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
@@ -110,5 +110,39 @@ describe('blend', () => {
     save.inventory = { apple: 1 };
     expect(() => blend(save, ['apple', 'apple'])).toThrow();
     expect(save.inventory.apple).toBe(1);
+  });
+});
+
+describe('the smoothie book', () => {
+  it('remembers every ingredient ever collected, even after it is blended away', () => {
+    const save = newSave();
+    completeLevel(save, level, 9999, ['chia', 'honey', 'chia']);
+    blend(save, ['chia', 'honey']);
+    expect([...save.seen].sort()).toEqual([level.fruit, 'chia', 'honey'].sort());
+  });
+
+  it('keeps a history of smoothies, newest first, and counts each rating', () => {
+    const save = newSave();
+    save.inventory = { apple: 5, cinnamon: 3 };
+    const first = blend(save, ['cinnamon', 'cinnamon', 'cinnamon']);
+    const second = blend(save, ['apple', 'apple']);
+    expect(save.history.map((h) => h.name)).toEqual([second.name, first.name]);
+    expect(save.ratings[first.rating - 1]).toBeGreaterThanOrEqual(1);
+    expect(save.ratings.reduce((a, b) => a + b, 0)).toBe(2);
+  });
+
+  it('opens the super blender once the path to it is finished', () => {
+    const save = newSave();
+    expect(superBlenderOpen(save)).toBe(false);
+    save.levels['level-14'] = { stars: 1, time: 99 };
+    expect(superBlenderOpen(save)).toBe(true);
+  });
+
+  it('lets the super blender take twenty', () => {
+    const save = newSave();
+    save.inventory = { apple: 20 };
+    blend(save, Array.from({ length: 20 }, () => 'apple'), 20);
+    expect(save.inventory.apple).toBeUndefined();
+    expect(save.history[0].big).toBe(true);
   });
 });

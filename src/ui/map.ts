@@ -1,6 +1,6 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
-import { COURSES, isUnlocked } from '../core/progress';
+import { COURSES, isUnlocked, superBlenderOpen } from '../core/progress';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import type { App } from './app';
@@ -89,15 +89,24 @@ export function mapScreen(app: App): HTMLElement {
     stage.append(node);
   }
 
+  // The purple pad on the first map is the Super Blender, powered up by finishing the path that leads to it.
+  // The stands on the other maps, and the Blend button at the top, are the ordinary blender.
+  const superPad = app.world === 0;
+  const powered = superBlenderOpen(save);
   const blender = el(
-    'button.blend-node',
-    { style: `left:${world.blender.x}%;top:${world.blender.y}%`, ariaLabel: 'Blend a smoothie' },
+    `button.blend-node${superPad ? '.super' : ''}${superPad && !powered ? '.shut' : ''}`,
+    { style: `left:${world.blender.x}%;top:${world.blender.y}%`, ariaLabel: superPad ? 'Super Blender' : 'Blend a smoothie' },
     el('img', { src: asset('assets/smoothie-cup.png'), alt: '', draggable: false }),
-    el('span', {}, 'Blend!'),
+    el('span', {}, superPad ? 'Super Blender' : 'Blend!'),
   );
   onTap(blender, () => {
+    if (superPad && !powered) {
+      sfx.nope();
+      app.toast('Finish level 14 to power up the Super Blender!');
+      return;
+    }
     sfx.tap();
-    app.show('blender');
+    app.show(superPad ? 'superblender' : 'blender');
   });
 
   const home = el('button.round.home', { ariaLabel: 'Menu' }, '⌂');
@@ -125,6 +134,14 @@ export function mapScreen(app: App): HTMLElement {
     stage.append(way);
   }
 
+  const go = (label: string, color: string, screen: 'blender' | 'book') => {
+    const button = el(`button.btn.${color}.small`, {}, label);
+    onTap(button, () => {
+      sfx.tap();
+      app.show(screen);
+    });
+    return button;
+  };
   const items = Object.values(save.inventory).reduce((sum, n) => sum + n, 0);
   const totalStars = Object.values(save.levels).reduce((sum, r) => sum + r.stars, 0);
   const bar = el(
@@ -133,6 +150,8 @@ export function mapScreen(app: App): HTMLElement {
     el('div.chip', {}, el('img', { src: asset('assets/ui/star.png'), alt: 'Stars' }), String(totalStars)),
     el('div.chip', {}, el('img', { src: asset('assets/fruits/apple.png'), alt: 'Ingredients' }), String(items)),
     el('div.chip', {}, el('img', { src: asset('assets/smoothie-cup.png'), alt: 'Smoothie points' }), String(save.points)),
+    go('Blend', 'green', 'blender'),
+    go('Book', 'orange', 'book'),
   );
   stage.append(blender, home, el('div.chip.world-name', {}, world.name), bar);
   return stage;
