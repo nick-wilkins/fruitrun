@@ -1,6 +1,7 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { BLENDER_NODE, LEVELS, type Level } from '../data/levels';
+import { courseFor } from '../game/courses';
 import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
@@ -62,10 +63,9 @@ export function mapScreen(app: App): HTMLElement {
         void node.offsetWidth;
         node.classList.add('shake');
         app.toast(`Finish level ${level.n - 1} first!`);
-      } else if (!level.built) {
-        sfx.nope();
-        app.toast(`${level.name} is coming soon!`);
       } else {
+        // Building the course also sets its star times, which the card shows.
+        courseFor(level);
         sfx.tap();
         const card = levelCard(app, level, () => card.remove());
         stage.append(card);

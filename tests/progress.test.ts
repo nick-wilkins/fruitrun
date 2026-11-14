@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { blend, completeLevel, newSave, starsForTime } from '../src/core/progress';
 import { LEVELS } from '../src/data/levels';
+import { courseFor } from '../src/game/courses';
 
 const level = LEVELS[0];
+courseFor(level);
 
 describe('starsForTime', () => {
   it('gives 5 for a fast run and never less than 1', () => {

@@ -6,9 +6,9 @@ import {
   MeshPhongMaterial,
   SphereGeometry,
 } from 'three';
+import { BALL_RADIUS } from './sim';
 import { bubbleTexture } from './textures';
 
-export const BALL_RADIUS = 1;
 
 export interface Pip {
   /** Everything: move this to place the ball. */

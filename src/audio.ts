@@ -1,7 +1,12 @@
-/** Tiny synthesised sound kit: no audio files, everything is oscillators and noise. */
+/** Sound kit: effects are synthesised from oscillators and noise, music is a looping track. */
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let muted = false;
+let music: HTMLAudioElement | null = null;
+let wantMusic = false;
+
+const SFX_VOLUME = 0.8;
+const MUSIC_VOLUME = 0.32;
 
 function audio(): AudioContext | null {
   if (muted) return null;
@@ -9,33 +14,84 @@ function audio(): AudioContext | null {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
     ctx = new Ctor();
+    // A compressor keeps layered effects loud without clipping.
+    const squash = ctx.createDynamicsCompressor();
+    squash.connect(ctx.destination);
     master = ctx.createGain();
-    master.gain.value = 0.5;
-    master.connect(ctx.destination);
+    master.gain.value = SFX_VOLUME;
+    master.connect(squash);
   }
   if (ctx.state === 'suspended') void ctx.resume();
   return ctx;
 }
 
+function syncMusic(): void {
+  if (!music) return;
+  if (wantMusic && !muted && !document.hidden) void music.play().catch(() => {});
+  else music.pause();
+}
+
 export function setMuted(value: boolean): void {
   muted = value;
-  if (master) master.gain.value = value ? 0 : 0.5;
+  if (master) master.gain.value = value ? 0 : SFX_VOLUME;
+  syncMusic();
 }
 
-/** Browsers only allow sound after a tap, so call this from the first one. */
+/** Browsers only allow sound after a tap or key press, so call this from every early one. */
 export function unlockAudio(): void {
   audio();
+  syncMusic();
 }
 
-function tone(freq: number, length: number, type: OscillatorType = 'sine', volume = 0.3, delay = 0, slideTo?: number): void {
+/** Start the looping soundtrack (it begins on the first tap if the browser is not ready yet). */
+export function startMusic(url: string): void {
+  if (!music) {
+    music = new Audio(url);
+    music.loop = true;
+    music.volume = MUSIC_VOLUME;
+    music.preload = 'auto';
+    document.addEventListener('visibilitychange', syncMusic);
+  }
+  wantMusic = true;
+  syncMusic();
+}
+
+/** Turn the music down while something noisy happens, then bring it back. */
+function duck(seconds: number): void {
+  if (!music) return;
+  music.volume = MUSIC_VOLUME * 0.35;
+  window.setTimeout(() => music && (music.volume = MUSIC_VOLUME), seconds * 1000);
+}
+
+interface ToneOptions {
+  type?: OscillatorType;
+  volume?: number;
+  delay?: number;
+  /** Glide to this frequency over the note. */
+  to?: number;
+  /** Wobble the pitch: [speed in Hz, depth in Hz]. */
+  wobble?: [number, number];
+}
+
+function tone(freq: number, length: number, options: ToneOptions = {}): void {
   const a = audio();
   if (!a || !master) return;
+  const { type = 'sine', volume = 0.3, delay = 0, to, wobble } = options;
   const start = a.currentTime + delay;
   const osc = a.createOscillator();
   const gain = a.createGain();
   osc.type = type;
   osc.frequency.setValueAtTime(freq, start);
-  if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, start + length);
+  if (to) osc.frequency.exponentialRampToValueAtTime(to, start + length);
+  if (wobble) {
+    const lfo = a.createOscillator();
+    const depth = a.createGain();
+    lfo.frequency.value = wobble[0];
+    depth.gain.value = wobble[1];
+    lfo.connect(depth).connect(osc.frequency);
+    lfo.start(start);
+    lfo.stop(start + length + 0.03);
+  }
   gain.gain.setValueAtTime(0.0001, start);
   gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
@@ -44,7 +100,7 @@ function tone(freq: number, length: number, type: OscillatorType = 'sine', volum
   osc.stop(start + length + 0.03);
 }
 
-function noise(length: number, volume: number, cutoff: number, delay = 0, sweepTo?: number): void {
+function noise(length: number, volume: number, cutoff: number, delay = 0, sweepTo?: number, kind: BiquadFilterType = 'lowpass'): void {
   const a = audio();
   if (!a || !master) return;
   const start = a.currentTime + delay;
@@ -54,7 +110,7 @@ function noise(length: number, volume: number, cutoff: number, delay = 0, sweepT
   const source = a.createBufferSource();
   source.buffer = buffer;
   const filter = a.createBiquadFilter();
-  filter.type = 'lowpass';
+  filter.type = kind;
   filter.frequency.setValueAtTime(cutoff, start);
   if (sweepTo) filter.frequency.exponentialRampToValueAtTime(sweepTo, start + length);
   const gain = a.createGain();
@@ -64,48 +120,110 @@ function noise(length: number, volume: number, cutoff: number, delay = 0, sweepT
   source.start(start);
 }
 
+/** Play notes one after another. */
+function run(notes: number[], gap: number, length: number, options: ToneOptions = {}): void {
+  notes.forEach((f, i) => tone(f, length, { ...options, delay: (options.delay ?? 0) + i * gap }));
+}
+
+// Pickups collected in quick succession climb a scale, so a good line sounds like a tune.
+const SCALE = [523, 587, 659, 784, 880, 1047, 1175, 1319];
+let streak = 0;
+let lastPickup = 0;
+
 export const sfx = {
-  tap: () => tone(520, 0.08, 'triangle', 0.2),
-  tick: () => tone(440, 0.14, 'square', 0.16),
+  tap: () => {
+    tone(620, 0.07, { type: 'triangle', volume: 0.22 });
+    tone(930, 0.05, { type: 'sine', volume: 0.12, delay: 0.03 });
+  },
+  /** 3, 2, 1. */
+  tick: () => {
+    tone(440, 0.22, { type: 'square', volume: 0.2 });
+    tone(880, 0.22, { type: 'sine', volume: 0.16 });
+    noise(0.05, 0.12, 3000);
+  },
   go: () => {
-    tone(660, 0.12, 'square', 0.18);
-    tone(990, 0.3, 'square', 0.18, 0.1);
+    run([660, 880, 1320], 0.07, 0.5, { type: 'square', volume: 0.2 });
+    tone(1320, 0.7, { type: 'sawtooth', volume: 0.1, delay: 0.14, wobble: [9, 14] });
+    noise(0.5, 0.2, 800, 0.1, 6000, 'highpass');
   },
   pickup: () => {
-    tone(880, 0.09, 'triangle', 0.3);
-    tone(1320, 0.14, 'triangle', 0.3, 0.07);
+    const now = performance.now();
+    streak = now - lastPickup < 2200 ? Math.min(streak + 1, SCALE.length - 1) : 0;
+    lastPickup = now;
+    const note = SCALE[streak];
+    tone(note, 0.1, { type: 'triangle', volume: 0.32 });
+    tone(note * 1.5, 0.16, { type: 'triangle', volume: 0.3, delay: 0.06 });
+    tone(note * 2, 0.22, { type: 'sine', volume: 0.2, delay: 0.12 });
+    noise(0.12, 0.06, 6000, 0.02, 9000, 'highpass');
   },
   ring: () => {
-    tone(1175, 0.1, 'sine', 0.3);
-    tone(1568, 0.22, 'sine', 0.3, 0.06);
+    tone(1175, 0.45, { volume: 0.3 });
+    tone(1760, 0.5, { volume: 0.2, delay: 0.04 });
+    tone(2349, 0.4, { volume: 0.1, delay: 0.08 });
   },
+  /** Speed pad: a whoosh with a rising zip. */
   boost: () => {
-    tone(260, 0.4, 'sawtooth', 0.14, 0, 1040);
-    noise(0.4, 0.14, 600, 0, 5000);
+    tone(220, 0.45, { type: 'sawtooth', volume: 0.18, to: 1320 });
+    tone(330, 0.45, { type: 'square', volume: 0.08, to: 1980 });
+    noise(0.55, 0.3, 500, 0, 7000, 'bandpass');
+    run([784, 988, 1175, 1568], 0.045, 0.12, { type: 'triangle', volume: 0.16, delay: 0.05 });
   },
   hit: () => {
-    noise(0.28, 0.5, 900, 0, 120);
-    tone(150, 0.2, 'square', 0.2, 0, 60);
+    noise(0.3, 0.6, 1100, 0, 100);
+    tone(160, 0.25, { type: 'square', volume: 0.26, to: 55 });
+    noise(0.08, 0.3, 3500, 0.02);
   },
-  jump: () => tone(330, 0.3, 'sine', 0.26, 0, 880),
-  land: () => noise(0.12, 0.25, 420),
-  finish: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.28, 'triangle', 0.28, i * 0.11)),
-  star: (n: number) => tone(660 + n * 110, 0.22, 'triangle', 0.3),
+  pin: () => {
+    tone(1100 + Math.random() * 500, 0.08, { type: 'square', volume: 0.14, to: 600 });
+    noise(0.05, 0.14, 4000);
+  },
+  squelch: () => {
+    noise(0.16, 0.2, 420, 0, 150);
+    tone(140, 0.14, { volume: 0.14, to: 80, wobble: [30, 20] });
+  },
+  fork: () => run([523, 784], 0.08, 0.16, { type: 'triangle', volume: 0.22 }),
+  jump: () => {
+    tone(300, 0.35, { volume: 0.3, to: 990 });
+    tone(450, 0.3, { type: 'triangle', volume: 0.14, to: 1480, delay: 0.03 });
+  },
+  land: () => {
+    noise(0.14, 0.34, 380);
+    tone(110, 0.12, { volume: 0.2, to: 60 });
+  },
+  finish: () => {
+    duck(2.4);
+    run([523, 659, 784, 1047, 784, 1047, 1319], 0.12, 0.3, { type: 'triangle', volume: 0.3 });
+    run([262, 330, 392, 523], 0.12, 0.5, { type: 'square', volume: 0.1 });
+    tone(1568, 0.9, { volume: 0.2, delay: 0.84, wobble: [7, 10] });
+    noise(1.2, 0.1, 5000, 0.8, 9000, 'highpass');
+  },
+  star: (n: number) => {
+    tone(660 + n * 110, 0.25, { type: 'triangle', volume: 0.32 });
+    tone(1320 + n * 220, 0.3, { volume: 0.16, delay: 0.03 });
+  },
+  /** Blender motor: winds up, growls with a wobble, chops, and winds down. */
   blend: (seconds: number) => {
-    tone(90, seconds, 'sawtooth', 0.16, 0, 240);
-    noise(seconds, 0.2, 500, 0, 2600);
+    duck(seconds + 0.4);
+    tone(70, seconds, { type: 'sawtooth', volume: 0.24, to: 210, wobble: [17, 12] });
+    tone(141, seconds, { type: 'square', volume: 0.08, to: 420, wobble: [23, 20] });
+    noise(seconds, 0.24, 500, 0, 3200, 'bandpass');
+    for (let t = 0.15; t < seconds - 0.2; t += 0.09 + Math.random() * 0.08) noise(0.05, 0.14, 1800 + Math.random() * 2000, t);
+    tone(210, 0.35, { type: 'sawtooth', volume: 0.14, to: 50, delay: seconds });
+  },
+  sip: (seconds: number) => {
+    duck(seconds);
+    for (let t = 0; t < seconds; t += 0.1) tone(190 + Math.random() * 150, 0.09, { volume: 0.2, delay: t, to: 120 + Math.random() * 60 });
+    noise(seconds, 0.09, 800);
+  },
+  yuck: () => {
+    tone(330, 0.55, { type: 'sawtooth', volume: 0.22, to: 85, wobble: [11, 18] });
+    tone(140, 0.35, { type: 'square', volume: 0.14, to: 70, delay: 0.32 });
   },
   reveal: (rating: number) => {
     const notes = [392, 494, 587, 784, 988].slice(0, Math.max(2, rating));
-    notes.forEach((f, i) => tone(f, 0.3, 'triangle', 0.3, i * 0.12));
+    run(notes, 0.12, 0.32, { type: 'triangle', volume: 0.3 });
+    if (rating >= 4) tone(notes[notes.length - 1] * 2, 0.8, { volume: 0.16, delay: notes.length * 0.12, wobble: [7, 12] });
+    if (rating === 5) noise(1, 0.1, 5000, 0.5, 9000, 'highpass');
   },
-  sip: (seconds: number) => {
-    for (let t = 0; t < seconds; t += 0.11) tone(180 + Math.random() * 140, 0.09, 'sine', 0.16, t, 120 + Math.random() * 60);
-    noise(seconds, 0.07, 700);
-  },
-  yuck: () => {
-    tone(320, 0.5, 'sawtooth', 0.2, 0, 90);
-    tone(140, 0.3, 'square', 0.12, 0.3, 70);
-  },
-  nope: () => tone(200, 0.18, 'square', 0.14, 0, 140),
+  nope: () => tone(210, 0.2, { type: 'square', volume: 0.16, to: 130 }),
 };

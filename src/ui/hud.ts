@@ -11,6 +11,9 @@ export interface HudHandlers {
   restart(): void;
   quit(): void;
   blend(): void;
+  muted(): boolean;
+  /** Flip sound on or off and return whether it is now muted. */
+  toggleSound(): boolean;
 }
 
 export interface Hud {
@@ -42,6 +45,11 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   const hint = el('div.hint', {}, touch ? 'Hold and slide your finger to steer' : 'Hold the mouse and slide, or use the arrow keys');
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
+  const soundButton = el('button.btn.blue', {}, handlers.muted() ? '🔇 Sound off' : '🔊 Sound on');
+  soundButton.onclick = () => {
+    soundButton.textContent = handlers.toggleSound() ? '🔇 Sound off' : '🔊 Sound on';
+  };
+
   const pauseMenu = el(
     'div.modal.hidden',
     {},
@@ -54,6 +62,7 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
         {},
         el('button.btn.green', { onclick: () => setPaused(false) }, '▶ Carry on'),
         el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Start level again'),
+        soundButton,
         el('button.btn.purple', { onclick: () => handlers.quit() }, '← Back to map'),
       ),
     ),

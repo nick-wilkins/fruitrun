@@ -1,5 +1,6 @@
 import { CanvasTexture, LinearFilter, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
-import type { Theme } from './course';
+import { seeded } from './random';
+import type { Theme } from './themes';
 
 function canvas(w: number, h: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const el = document.createElement('canvas');
@@ -16,46 +17,63 @@ function finish(el: HTMLCanvasElement, repeat = true): CanvasTexture {
   return texture;
 }
 
-/** Deterministic noise so a level looks the same every run. */
-export function seeded(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 function shade(hex: string, amount: number): string {
   const n = parseInt(hex.slice(1), 16);
   const mix = (c: number) => Math.round(amount < 0 ? c * (1 + amount) : c + (255 - c) * amount);
   return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
 }
 
-/** Wooden boardwalk with painted edge lines and centre dashes. U runs across the road, V along it. */
+/** The road surface in the theme's style. U runs across the road, V along it. */
 export function roadTexture(theme: Theme): Texture {
   const [el, g] = canvas(512, 512);
   const rand = seeded(7);
   g.fillStyle = theme.road;
   g.fillRect(0, 0, 512, 512);
-  const boards = 8;
-  for (let i = 0; i < boards; i++) {
-    const y = (i * 512) / boards;
-    g.fillStyle = shade(theme.road, (rand() - 0.5) * 0.16);
-    g.fillRect(0, y, 512, 512 / boards);
-    g.strokeStyle = shade(theme.road, -0.12);
-    g.lineWidth = 1.5;
-    for (let n = 0; n < 5; n++) {
-      const gy = y + 8 + rand() * (512 / boards - 16);
+  if (theme.roadStyle === 'planks') {
+    const boards = 8;
+    for (let i = 0; i < boards; i++) {
+      const y = (i * 512) / boards;
+      g.fillStyle = shade(theme.road, (rand() - 0.5) * 0.16);
+      g.fillRect(0, y, 512, 512 / boards);
+      g.strokeStyle = shade(theme.road, -0.12);
+      g.lineWidth = 1.5;
+      for (let n = 0; n < 5; n++) {
+        const gy = y + 8 + rand() * (512 / boards - 16);
+        g.beginPath();
+        g.moveTo(0, gy);
+        g.bezierCurveTo(170, gy + (rand() - 0.5) * 10, 340, gy + (rand() - 0.5) * 10, 512, gy);
+        g.stroke();
+      }
+      g.fillStyle = shade(theme.road, -0.3);
+      g.fillRect(0, y, 512, 3);
+    }
+  } else if (theme.roadStyle === 'tiles') {
+    const size = 64;
+    for (let y = 0; y < 512; y += size) {
+      for (let x = 0; x < 512; x += size) {
+        g.fillStyle = shade(theme.road, ((x + y) / size) % 2 ? -0.07 : 0.05);
+        g.fillRect(x, y, size, size);
+      }
+    }
+    g.strokeStyle = shade(theme.road, -0.2);
+    g.lineWidth = 2;
+    for (let i = 0; i <= 512; i += size) {
       g.beginPath();
-      g.moveTo(0, gy);
-      g.bezierCurveTo(170, gy + (rand() - 0.5) * 10, 340, gy + (rand() - 0.5) * 10, 512, gy);
+      g.moveTo(i, 0);
+      g.lineTo(i, 512);
+      g.moveTo(0, i);
+      g.lineTo(512, i);
       g.stroke();
     }
-    g.fillStyle = shade(theme.road, -0.3);
-    g.fillRect(0, y, 512, 3);
+  } else {
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = shade(theme.road, (rand() - 0.5) * 0.3);
+      g.globalAlpha = 0.5;
+      g.beginPath();
+      g.arc(rand() * 512, rand() * 512, 2 + rand() * 6, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
   }
   g.fillStyle = theme.roadLine;
   g.fillRect(14, 0, 12, 512);
@@ -64,6 +82,54 @@ export function roadTexture(theme: Theme): Texture {
   g.fillRect(250, 40, 12, 176);
   g.fillRect(250, 296, 12, 176);
   return finish(el);
+}
+
+/** A splat of something sticky. */
+export function gooTexture(color: string): Texture {
+  const [el, g] = canvas(128, 256);
+  const rand = seeded(99);
+  g.fillStyle = color;
+  g.beginPath();
+  g.ellipse(64, 128, 50, 112, 0, 0, Math.PI * 2);
+  g.fill();
+  for (let i = 0; i < 16; i++) {
+    const a = rand() * Math.PI * 2;
+    g.beginPath();
+    g.arc(64 + Math.cos(a) * 46, 128 + Math.sin(a) * 106, 6 + rand() * 9, 0, Math.PI * 2);
+    g.fill();
+  }
+  g.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let i = 0; i < 5; i++) {
+    g.beginPath();
+    g.ellipse(34 + rand() * 60, 40 + rand() * 170, 5 + rand() * 6, 3 + rand() * 3, rand() * 3, 0, Math.PI * 2);
+    g.fill();
+  }
+  return finish(el, false);
+}
+
+/** Arrows for the sign at a fork. */
+export function forkSignTexture(): Texture {
+  const [el, g] = canvas(256, 128);
+  g.fillStyle = '#ffd23f';
+  g.fillRect(0, 0, 256, 128);
+  g.strokeStyle = '#5a2d0c';
+  g.lineWidth = 12;
+  g.strokeRect(6, 6, 244, 116);
+  g.fillStyle = '#5a2d0c';
+  for (const dir of [-1, 1]) {
+    const cx = 128 + dir * 62;
+    g.beginPath();
+    g.moveTo(cx + dir * 42, 64);
+    g.lineTo(cx - dir * 6, 26);
+    g.lineTo(cx - dir * 6, 48);
+    g.lineTo(cx - dir * 40, 48);
+    g.lineTo(cx - dir * 40, 80);
+    g.lineTo(cx - dir * 6, 80);
+    g.lineTo(cx - dir * 6, 102);
+    g.closePath();
+    g.fill();
+  }
+  return finish(el, false);
 }
 
 /** Two-colour stripes that repeat along the track. */

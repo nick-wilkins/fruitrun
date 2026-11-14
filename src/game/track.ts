@@ -21,17 +21,27 @@ export interface Segment {
   turn?: number;
   /** Total pitch change in radians. Positive climbs. */
   pitch?: number;
-  /** Peak banking in radians. Positive drops the right edge. */
+  /** Peak banking in radians, eased in and out. Positive drops the right edge. */
   bank?: number;
+  /** Total barrel-roll in radians, kept afterwards: a full twist is 2π. */
+  roll?: number;
   /** Sideways drift across the segment, used to stop a loop meeting itself. Positive is right. */
   shift?: number;
-  kind?: 'loop' | 'spiral';
+  kind?: 'loop' | 'spiral' | 'twist';
 }
 
 export interface Span {
   kind: string;
   s0: number;
   s1: number;
+}
+
+/** Where a track starts, or where it has got to: enough to continue building from that spot. */
+export interface Pose {
+  pos: Vector3;
+  yaw: number;
+  pitch: number;
+  roll: number;
 }
 
 const smooth = (x: number) => {
@@ -47,14 +57,19 @@ export class Track {
   readonly frames: Frame[] = [];
   readonly spans: Span[] = [];
   readonly length: number;
+  private readonly yaws: number[] = [];
+  private readonly pitches: number[] = [];
+  private readonly rolls: number[] = [];
 
   constructor(
     segments: Segment[],
     readonly half = 5,
+    start?: Pose,
   ) {
-    const pos = new Vector3();
-    let yaw = 0;
-    let pitch = 0;
+    const pos = start ? start.pos.clone() : new Vector3();
+    let yaw = start?.yaw ?? 0;
+    let pitch = start?.pitch ?? 0;
+    let roll = start?.roll ?? 0;
     let s = 0;
     const push = (bank: number, k: number) => {
       const sy = Math.sin(yaw);
@@ -69,14 +84,18 @@ export class Track {
       const ub = u.clone().multiplyScalar(cb).addScaledVector(r, sb);
       const rb = r.clone().multiplyScalar(cb).addScaledVector(u, -sb);
       this.frames.push({ p: pos.clone(), t, u: ub, r: rb, k });
+      this.yaws.push(yaw);
+      this.pitches.push(pitch);
+      this.rolls.push(roll);
     };
 
-    push(0, 0);
+    push(roll, 0);
     for (const seg of segments) {
       const n = Math.max(1, Math.round(seg.len / STEP));
       const len = n * STEP;
       const dYaw = -(seg.turn ?? 0) / n;
       const dPitch = (seg.pitch ?? 0) / n;
+      const dRoll = (seg.roll ?? 0) / n;
       const shiftDir = new Vector3(-Math.cos(yaw), 0, Math.sin(yaw));
       if (seg.kind) this.spans.push({ kind: seg.kind, s0: s, s1: s + len });
       let shifted = 0;
@@ -84,6 +103,7 @@ export class Track {
         const at = (i + 1) / n;
         yaw += dYaw;
         pitch += dPitch;
+        roll += dRoll;
         pos.x += Math.sin(yaw) * Math.cos(pitch) * STEP;
         pos.y += Math.sin(pitch) * STEP;
         pos.z += Math.cos(yaw) * Math.cos(pitch) * STEP;
@@ -93,13 +113,16 @@ export class Track {
           shifted = target;
         }
         const bank = (seg.bank ?? 0) * smooth((Math.min(at, 1 - at) * len) / 14);
-        push(bank, (-dYaw / STEP) * Math.cos(pitch));
+        push(roll + bank, (-dYaw / STEP) * Math.cos(pitch));
       }
       s += len;
     }
     this.length = s;
+    this.square();
+  }
 
-    // A shifted loop no longer points exactly along its turtle heading, so square the frames up to the real path.
+  /** A shifted or bent path no longer points exactly along its turtle heading, so square the frames up to it. */
+  private square(): void {
     const last = this.frames.length - 1;
     for (let i = 0; i <= last; i++) {
       const f = this.frames[i];
@@ -109,6 +132,21 @@ export class Track {
       f.u.addScaledVector(f.t, -f.u.dot(f.t)).normalize();
       f.r.crossVectors(f.t, f.u).normalize();
     }
+  }
+
+  /** The pose to start another track from at distance `s`. */
+  poseAt(s: number): Pose {
+    const i = Math.min(this.frames.length - 1, Math.max(0, Math.round(s / STEP)));
+    return { pos: this.frames[i].p.clone(), yaw: this.yaws[i], pitch: this.pitches[i], roll: this.rolls[i] };
+  }
+
+  /** Ease the whole path so it ends exactly at `target`. Returns how far the end had to move. */
+  bendTo(target: Vector3): number {
+    const last = this.frames.length - 1;
+    const error = target.clone().sub(this.frames[last].p);
+    this.frames.forEach((f, i) => f.p.addScaledVector(error, smooth(i / last)));
+    this.square();
+    return error.length();
   }
 
   /** Interpolated frame at distance `s`, written into `out`. */

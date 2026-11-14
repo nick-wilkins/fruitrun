@@ -12,16 +12,18 @@ import {
   PointsMaterial,
   Quaternion,
   Vector3,
+  type InstancedMesh,
   type WebGLRenderer,
 } from 'three';
 import { sfx } from '../audio';
 import { starsForTime } from '../core/progress';
 import type { Level } from '../data/levels';
-import { BALL_RADIUS, buildPip, type Pip } from './character';
-import type { Course, CourseObj } from './course';
+import { buildPip, type Pip } from './character';
+import type { Course } from './course';
+import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, type SimEvent } from './sim';
 import { blobTexture } from './textures';
 import { makeFrame } from './track';
-import { buildWorld, lying, standing, type World } from './world';
+import { buildWorld, PIVOT, standing, type World } from './world';
 
 export interface HudState {
   time: number;
@@ -44,20 +46,10 @@ export interface RunHooks {
   results(): void;
 }
 
-export type Autopilot = 'none' | 'centre' | 'smart';
-
-const CRUISE = 26;
-const MIN_SPEED = 12;
-const MAX_SPEED = 56;
-const GRAVITY = 11;
-const COUNTDOWN = 3;
-const START_S = 12;
-/** How far past the kerb a steering target may reach, so pressing into the wall registers as a scrape. */
-const PUSH = 1.2;
-
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 interface Flying {
+  mesh: InstancedMesh;
   index: number;
   pos: Vector3;
   vel: Vector3;
@@ -69,7 +61,7 @@ interface Flying {
 /** A small pool of glowing dots for sparkles, splinters and confetti. */
 class Sparks {
   readonly points: Points;
-  private readonly max = 220;
+  private readonly max = 240;
   private readonly pos = new Float32Array(this.max * 3);
   private readonly col = new Float32Array(this.max * 3);
   private readonly vel = new Float32Array(this.max * 3);
@@ -130,44 +122,22 @@ class Sparks {
   }
 }
 
-/** One attempt at a course: owns the scene, the ball, the rules and the frame loop. */
+/** One attempt at a course: the rules live in Sim; this draws them, plays the sounds and reads the controls. */
 export class Run {
+  readonly sim: Sim;
   readonly world: World;
-  private readonly camera = new PerspectiveCamera(62, 1, 0.3, 2600);
+  private readonly camera = new PerspectiveCamera(62, 1, 0.3, 3200);
   private readonly pip: Pip;
   private readonly shadow: Mesh;
   private readonly sparks = new Sparks();
   private readonly canvas: HTMLCanvasElement;
-
-  s = START_S;
-  x = 0;
-  v = 0;
-  time = 0;
-  finished = false;
-  private xv = 0;
-  private h = 0;
-  private vh = 0;
-  private clock = 0;
-  private countdown = COUNTDOWN;
-  private lastTick = COUNTDOWN + 1;
-  private finishT = 0;
-  private reported = false;
-  private boostT = 0;
-  private shake = 0;
-  private fov = 62;
-  private scrapeT = 0;
-  private readonly bonuses: string[] = [];
-  private readonly pickupIds: string[];
-  private readonly done: boolean[];
-  private readonly cooldown: number[];
   private readonly flying: Flying[] = [];
 
   private pointerSteer: number | null = null;
   private pointerId: number | null = null;
-  private knockT = 0;
   private keySteer = 0;
-  autopilot: Autopilot = 'none';
-
+  private shake = 0;
+  private fov = 62;
   private raf = 0;
   private last = 0;
   private paused = false;
@@ -184,6 +154,7 @@ export class Run {
   private readonly camLook = new Vector3();
   private readonly camUp = new Vector3(0, 1, 0);
   private readonly m = new Matrix4();
+  private readonly m2 = new Matrix4();
   private readonly q = new Quaternion();
   private readonly axisX = new Vector3(1, 0, 0);
   private readonly axisZ = new Vector3(0, 0, 1);
@@ -195,12 +166,8 @@ export class Run {
     private readonly hooks: RunHooks,
   ) {
     this.canvas = renderer.domElement;
-    const pickupCount = course.objects.filter((o) => o.kind === 'pickup').length;
-    const pool = level.bonusPool.length ? level.bonusPool : [level.fruit];
-    this.pickupIds = Array.from({ length: pickupCount }, () => pool[Math.floor(Math.random() * pool.length)]);
-    this.world = buildWorld(course, this.pickupIds);
-    this.done = course.objects.map(() => false);
-    this.cooldown = course.objects.map(() => 0);
+    this.sim = new Sim(course, level, (event) => this.react(event));
+    this.world = buildWorld(course, this.sim.items);
 
     this.pip = buildPip();
     this.pip.root.matrixAutoUpdate = false;
@@ -245,7 +212,8 @@ export class Run {
     }
     const rect = this.canvas.getBoundingClientRect();
     const across = (e.clientX - rect.left) / rect.width - 0.5;
-    this.pointerSteer = clamp(across * 2 * this.course.track.half * 1.35, -this.limit - PUSH, this.limit + PUSH);
+    const reach = this.sim.limit + PUSH;
+    this.pointerSteer = clamp(across * 2 * this.course.track.half * 1.35, -reach, reach);
     e.preventDefault();
   };
 
@@ -278,8 +246,11 @@ export class Run {
     this.camera.updateProjectionMatrix();
   };
 
-  private get limit(): number {
-    return this.course.track.half - BALL_RADIUS;
+  private steer(): number | null {
+    if (this.pointerSteer !== null) return this.pointerSteer;
+    const reach = this.sim.limit + PUSH;
+    if (this.keySteer) return clamp(this.sim.x + this.keySteer * 3, -reach, reach);
+    return null;
   }
 
   // ---- loop ----
@@ -295,20 +266,15 @@ export class Run {
     if (value) this.dropInput();
   }
 
-  /** Jump straight to racing: used by the test autopilot. */
-  skipCountdown(): void {
-    this.countdown = 0;
-    this.v = CRUISE * 0.6;
-  }
-
   private readonly frame = (now: number) => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
     const dt = Math.min(0.05, (now - this.last) / 1000);
     this.last = now;
     if (this.paused) return;
-    this.step(dt / 2);
-    this.step(dt / 2);
+    this.sim.steer = this.steer();
+    this.sim.step(dt / 2);
+    this.sim.step(dt / 2);
     this.animate(dt);
     this.renderer.render(this.world.scene, this.camera);
     this.hudT -= dt;
@@ -319,212 +285,112 @@ export class Run {
   };
 
   hud(): HudState {
+    const sim = this.sim;
     return {
-      time: this.time,
-      stars: starsForTime(this.level, this.time),
-      speed: clamp((this.v - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), 0, 1),
-      progress: clamp((this.s - START_S) / (this.course.finishS - START_S), 0, 1),
-      bonuses: this.bonuses.length,
-      countdown: this.countdown > 0 ? this.countdown : null,
-      boosting: this.boostT > 0,
+      time: sim.time,
+      stars: starsForTime(this.level, sim.time),
+      speed: clamp((sim.v - MIN_SPEED) / (MAX_SPEED - MIN_SPEED), 0, 1),
+      progress: sim.progress(),
+      bonuses: sim.bonuses.length,
+      countdown: sim.countdown > 0 ? sim.countdown : null,
+      boosting: sim.boostT > 0,
     };
   }
 
-  // ---- rules ----
+  // ---- reactions ----
 
-  private steerTarget(): number | null {
-    if (this.autopilot !== 'none') return this.autopilot === 'centre' ? 0 : this.smartLine();
-    if (this.pointerSteer !== null) return this.pointerSteer;
-    if (this.keySteer) return clamp(this.x + this.keySteer * 3, -this.limit - PUSH, this.limit + PUSH);
-    return null;
+  /** Where a course object is in the world. */
+  private objectAt(index: number, y: number, out: Vector3): Vector3 {
+    const o = this.course.objects[index];
+    return this.sim.point(o.s, o.x, y, out, o.lane);
   }
 
-  private sliderX(o: CourseObj): number {
-    return o.x + (o.amp ?? 0) * Math.sin(this.clock * (o.speed ?? 1) + (o.phase ?? 0));
+  private ballAt(y: number, out: Vector3): Vector3 {
+    return this.sim.point(this.sim.s, this.sim.x, y, out);
   }
 
-  /** A sensible racing line, used to calibrate star times: chase goodies, dodge blockers, hug the inside. */
-  private smartLine(): number {
-    const hazards: { s: number; x: number }[] = [];
-    const wants: number[] = [];
-    this.course.objects.forEach((o, i) => {
-      const ahead = o.s - this.s;
-      if (ahead < 0.5 || ahead > 36 || this.done[i]) return;
-      if (o.kind === 'crate') hazards.push({ s: ahead, x: o.x });
-      else if (o.kind === 'slider') hazards.push({ s: ahead, x: this.sliderX(o) });
-      else if (ahead < 26) wants.push(o.x);
-    });
-    this.course.track.at(this.s + 8, this.fl);
-    wants.push(clamp(this.fl.k * 160, -3.4, 3.4), this.x);
-    const safe = (x: number) => hazards.every((h) => h.s > 20 || Math.abs(h.x - x) > 2.3);
-    const pick = wants.find(safe);
-    if (pick !== undefined) return pick;
-    return [-3.6, -1.8, 0, 1.8, 3.6].sort(
-      (a, b) => Math.min(...hazards.map((h) => Math.abs(h.x - b))) - Math.min(...hazards.map((h) => Math.abs(h.x - a))),
-    )[0];
+  private fling(mesh: InstancedMesh, index: number, height: number, lift: number): void {
+    const sim = this.sim;
+    const o = this.course.objects[index];
+    const f = sim.frameAt(sim.s, this.f);
+    const pos = this.objectAt(index, height, new Vector3());
+    const vel = f.t
+      .clone()
+      .multiplyScalar(sim.v * (0.8 + Math.random() * 0.4))
+      .addScaledVector(f.u, lift * (0.7 + Math.random() * 0.6))
+      .addScaledVector(f.r, (o.x - sim.x) * 5 + (Math.random() - 0.5) * 4);
+    this.flying.push({ mesh, index: this.world.instance[index], pos, vel, spin: new Vector3(Math.random(), Math.random(), Math.random()).normalize(), angle: 0, life: 1.6 });
   }
 
-  /** Advance the game by `dt` seconds. Rendering is separate so this can be driven headlessly. */
-  step(dt: number): void {
-    const { track, objects, finishS } = this.course;
-    this.clock += dt;
-
-    if (this.countdown > 0) {
-      this.countdown -= dt;
-      const shown = Math.ceil(this.countdown);
-      if (shown < this.lastTick) {
-        this.lastTick = shown;
-        if (shown > 0) sfx.tick();
-        else sfx.go();
-      }
-      if (this.countdown > 0) return;
-      this.v = CRUISE * 0.6;
-    }
-
-    const f = track.at(this.s, this.f);
-
-    // Steering: the ball chases the finger; let go and it holds its line.
-    this.knockT -= dt;
-    const target = this.finished || this.knockT > 0 ? null : this.steerTarget();
-    if (target !== null) this.xv = clamp((target - this.x) * 9, -16, 16);
-    else this.xv *= Math.exp(-8 * dt);
-    this.x += this.xv * dt;
-    if (Math.abs(this.x) > this.limit) {
-      this.x = Math.sign(this.x) * this.limit;
-      if (target !== null && Math.abs(target) > this.limit && this.v > CRUISE * 0.75) {
-        this.v -= 7 * dt;
-        this.scrapeT -= dt;
-        if (this.scrapeT <= 0) {
-          this.scrapeT = 0.06;
-          this.sparks.burst(track.point(this.s, this.x + Math.sign(this.x) * 0.7, 0.4, this.v1), 2, ['#fff2a8', '#ffb347'], 3);
-        }
-      }
-    }
-
-    // Speed: always rolling, quicker downhill, and boosts fade slowly so chaining them pays off.
-    if (this.finished) {
-      this.v -= this.v * 1.7 * dt;
-    } else {
-      if (this.v < CRUISE) this.v += 10 * dt;
-      else this.v -= (this.v - CRUISE) * 0.24 * dt;
-      this.v -= GRAVITY * f.t.y * dt;
-      this.v = clamp(this.v, MIN_SPEED, MAX_SPEED);
-      this.time += dt;
-    }
-    this.boostT -= dt;
-
-    // The inside of a bend is a shorter path, so taking the right line is genuinely faster.
-    const before = this.s;
-    this.s = Math.min(track.length - 2, this.s + (this.v * dt) / clamp(1 - f.k * this.x, 0.6, 1.5));
-
-    if (this.h > 0 || this.vh > 0) {
-      this.vh -= 26 * dt;
-      this.h += this.vh * dt;
-      if (this.h <= 0) {
-        this.h = 0;
-        this.vh = 0;
-        sfx.land();
-        this.sparks.burst(track.point(this.s, this.x, 0.2, this.v1), 8, ['#ffffff', '#ffe9a8'], 4);
-      }
-    }
-
-    if (!this.finished) {
-      for (let i = 0; i < objects.length; i++) {
-        const o = objects[i];
-        const ds = o.s - this.s;
-        if (ds > 4) break;
-        if (ds < -4 || this.done[i]) continue;
-        this.touch(o, i, before);
-      }
-      if (this.s >= finishS) {
-        this.finished = true;
-        this.hooks.finish(this.time, this.bonuses);
-        sfx.finish();
-        const at = track.point(this.s, this.x, 2, this.v1);
-        this.sparks.burst(at, 90, ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#ffffff'], 14, this.v2.copy(f.t).multiplyScalar(this.v * 0.5));
-      }
-    } else {
-      this.finishT += dt;
-      if (this.finishT > 1.8 && !this.reported) {
-        this.reported = true;
-        this.hooks.results();
-      }
-    }
-  }
-
-  private touch(o: CourseObj, i: number, before: number): void {
-    const { track } = this.course;
-    const ds = o.s - this.s;
-    const crossed = before < o.s && this.s >= o.s;
-    const dx = Math.abs(this.x - o.x);
-    this.cooldown[i] -= 1;
-    switch (o.kind) {
-      case 'pad':
-        if (Math.abs(ds) < 3 && dx < 1.9 && this.h < 0.6 && this.cooldown[i] <= 0) {
-          this.cooldown[i] = 600;
-          this.v = Math.min(MAX_SPEED, Math.max(this.v, CRUISE) + 13);
-          this.boostT = 1.1;
-          sfx.boost();
-          this.sparks.burst(track.point(this.s, this.x, 0.5, this.v1), 12, ['#eaff3d', '#7dffb0'], 5);
-        }
+  private react(event: SimEvent): void {
+    const sim = this.sim;
+    switch (event.type) {
+      case 'tick':
+        sfx.tick();
+        break;
+      case 'go':
+        sfx.go();
+        break;
+      case 'boost':
+        sfx.boost();
+        this.sparks.burst(this.ballAt(0.5, this.v1), 12, ['#eaff3d', '#7dffb0'], 5);
         break;
       case 'crate':
-        if (Math.abs(ds) < 1.4 && dx < 1.15 + BALL_RADIUS * 0.9 && this.h < 1.7) {
-          this.done[i] = true;
-          this.v = Math.max(MIN_SPEED, this.v * 0.5);
-          this.shake = 0.5;
-          sfx.hit();
-          const f = this.f;
-          const pos = track.point(o.s, o.x, 1.05, new Vector3());
-          const vel = f.t.clone().multiplyScalar(this.v * 0.9).addScaledVector(f.u, 9).addScaledVector(f.r, (o.x - this.x) * 5);
-          this.flying.push({ index: this.world.instance[i], pos, vel, spin: new Vector3(Math.random(), Math.random(), Math.random()).normalize(), angle: 0, life: 1.6 });
-          this.sparks.burst(pos, 16, ['#d89a4e', '#8a531f', '#fff2a8'], 7);
-        }
+        this.shake = 0.5;
+        sfx.hit();
+        this.fling(this.world.crates, event.index, 1.05, 9);
+        this.sparks.burst(this.objectAt(event.index, 1, this.v1), 16, ['#d89a4e', '#8a531f', '#fff2a8'], 7);
         break;
-      case 'slider': {
-        const sx = this.sliderX(o);
-        if (Math.abs(ds) < 1.2 && Math.abs(this.x - sx) < 1.0 + BALL_RADIUS * 0.9 && this.h < 2 && this.cooldown[i] <= 0) {
-          this.cooldown[i] = 240;
-          this.v = Math.max(MIN_SPEED, this.v * 0.55);
-          this.xv = Math.sign(this.x - sx || 1) * 10;
-          this.knockT = 0.25;
-          this.shake = 0.4;
-          sfx.hit();
-          this.sparks.burst(track.point(this.s, this.x, 0.8, this.v1), 12, ['#ff4fa3', '#ffffff'], 6);
-        }
+      case 'pin':
+        sfx.pin();
+        this.fling(this.world.pins, event.index, 0.75, 11);
         break;
-      }
+      case 'bump':
+        this.shake = 0.4;
+        sfx.hit();
+        this.sparks.burst(this.ballAt(0.8, this.v1), 12, ['#ff4fa3', '#ffffff'], 6);
+        break;
       case 'ring':
-        if (crossed && dx < 1.75 && this.h < 2.6) {
-          this.done[i] = true;
-          this.v = Math.min(MAX_SPEED, this.v + 6);
-          this.boostT = 0.5;
-          sfx.ring();
-          this.world.rings.setMatrixAt(this.world.instance[i], this.m.makeScale(0, 0, 0));
-          this.world.rings.instanceMatrix.needsUpdate = true;
-          this.sparks.burst(track.point(o.s, o.x, 2, this.v1), 18, ['#ffd23f', '#fff6c2'], 7);
-        }
+        sfx.ring();
+        this.world.rings.setMatrixAt(this.world.instance[event.index], this.m.makeScale(0, 0, 0));
+        this.world.rings.instanceMatrix.needsUpdate = true;
+        this.sparks.burst(this.objectAt(event.index, this.course.objects[event.index].y ?? 2, this.v1), 18, ['#ffd23f', '#fff6c2'], 7);
         break;
       case 'jump':
-        if (crossed && dx < 2.3 && this.h === 0) {
-          this.vh = 11.5;
-          this.h = 0.01;
-          this.v = Math.min(MAX_SPEED, this.v + 3);
-          sfx.jump();
-        }
+        sfx.jump();
         break;
-      case 'pickup':
-        if (Math.abs(ds) < 1.5 && dx < 1.6 && Math.abs(this.h + BALL_RADIUS - (o.y ?? 1.3)) < 1.9) {
-          this.done[i] = true;
-          const visual = this.world.pickups.get(i)!;
-          visual.sprite.visible = false;
-          visual.glow.visible = false;
-          const id = this.pickupIds[this.course.objects.slice(0, i).filter((p) => p.kind === 'pickup').length];
-          this.bonuses.push(id);
-          sfx.pickup();
-          this.hooks.pickup(id);
-          this.sparks.burst(visual.base, 14, ['#ffffff', '#ffe066', '#ff9ecb'], 6);
-        }
+      case 'land':
+        sfx.land();
+        this.sparks.burst(this.ballAt(0.2, this.v1), 8, ['#ffffff', '#ffe9a8'], 4);
+        break;
+      case 'goo':
+        sfx.squelch();
+        this.sparks.burst(this.ballAt(0.3, this.v1), 3, [this.course.theme.goo], 3);
+        break;
+      case 'scrape':
+        this.sparks.burst(sim.point(sim.s, sim.x + Math.sign(sim.x) * 0.9, 0.4, this.v1), 2, ['#fff2a8', '#ffb347'], 3);
+        break;
+      case 'fork':
+        sfx.fork();
+        break;
+      case 'pickup': {
+        const visual = this.world.pickups.get(event.index)!;
+        visual.sprite.visible = false;
+        visual.glow.visible = false;
+        sfx.pickup();
+        this.hooks.pickup(event.id);
+        this.sparks.burst(visual.base, 14, ['#ffffff', '#ffe066', '#ff9ecb'], 6);
+        break;
+      }
+      case 'finish': {
+        this.hooks.finish(sim.time, sim.bonuses);
+        sfx.finish();
+        const f = sim.frameAt(sim.s, this.f);
+        this.sparks.burst(this.ballAt(2, this.v1), 90, ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#ffffff'], 14, this.v2.copy(f.t).multiplyScalar(sim.v * 0.5));
+        break;
+      }
+      case 'results':
+        this.hooks.results();
         break;
     }
   }
@@ -533,30 +399,31 @@ export class Run {
 
   /** Put the ball, shadow and camera where the rules say they are. */
   private place(): void {
-    const { track } = this.course;
-    const f = track.at(this.s, this.f);
+    const sim = this.sim;
+    const f = sim.frameAt(sim.s, this.f);
     this.v1.copy(f.r).negate();
-    this.v2.copy(f.p).addScaledVector(f.r, this.x).addScaledVector(f.u, BALL_RADIUS + this.h);
+    this.v2.copy(f.p).addScaledVector(f.r, sim.x).addScaledVector(f.u, BALL_RADIUS + sim.h);
     this.pip.root.matrix.makeBasis(this.v1, f.u, f.t).setPosition(this.v2);
     this.pip.root.matrixWorldNeedsUpdate = true;
 
-    const shrink = 1 / (1 + this.h * 0.45);
-    this.shadow.matrix.copy(lying(track, this.s, this.x, 0.06)).scale(this.v3.set(shrink, shrink, 1));
+    const shrink = 1 / (1 + sim.h * 0.45);
+    this.v3.copy(f.p).addScaledVector(f.r, sim.x).addScaledVector(f.u, 0.06);
+    this.shadow.matrix.makeBasis(f.r, f.t, f.u).scale(this.camUp.set(shrink, shrink, 1)).setPosition(this.v3);
     this.shadow.matrixWorldNeedsUpdate = true;
 
-    // Chase camera, riding the track a little way behind so it loops and corkscrews with the ball.
-    const back = 8.2 + clamp((this.v - CRUISE) * 0.07, 0, 2.4);
-    const fc = track.at(Math.max(0, this.s - back), this.fc);
-    this.camPos.copy(fc.p).addScaledVector(fc.u, 4 + this.h * 0.45).addScaledVector(fc.r, this.x * 0.55);
-    const fl = track.at(this.s + 7, this.fl);
-    this.camLook.copy(fl.p).addScaledVector(fl.r, this.x * 0.75).addScaledVector(fl.u, 1 + this.h * 0.3);
+    // Chase camera, riding the track a little way behind so it loops, twists and corkscrews with the ball.
+    const back = 8.2 + clamp((sim.v - CRUISE) * 0.07, 0, 2.4);
+    const fc = sim.frameAt(sim.s - back, this.fc);
+    this.camPos.copy(fc.p).addScaledVector(fc.u, 4 + sim.h * 0.45).addScaledVector(fc.r, sim.x * 0.55);
+    const fl = sim.frameAt(sim.s + 7, this.fl);
+    this.camLook.copy(fl.p).addScaledVector(fl.r, sim.x * 0.75).addScaledVector(fl.u, 1 + sim.h * 0.3);
     this.camUp.copy(fc.u).add(f.u).normalize();
 
-    if (this.finished) {
+    if (sim.finished) {
       // Swing round to the front for the celebration.
-      const k = clamp(this.finishT / 1.4, 0, 1);
+      const k = clamp(sim.finishT / 1.4, 0, 1);
       const ease = k * k * (3 - 2 * k);
-      this.v1.copy(f.p).addScaledVector(f.t, 6.5).addScaledVector(f.u, 2.4).addScaledVector(f.r, this.x + 2.6);
+      this.v1.copy(f.p).addScaledVector(f.t, 6.5).addScaledVector(f.u, 2.4).addScaledVector(f.r, sim.x + 2.6);
       this.camPos.lerp(this.v1, ease);
       this.camLook.lerp(this.v2, ease);
     }
@@ -571,22 +438,23 @@ export class Run {
   }
 
   private animate(dt: number): void {
-    const { track, objects } = this.course;
+    const sim = this.sim;
+    const { objects, lanes } = this.course;
     const world = this.world;
     this.shake = Math.max(0, this.shake - dt * 1.6);
 
     // Roll the bubble; Pip stays upright inside it.
-    const racing = this.countdown <= 0;
+    const racing = sim.countdown <= 0;
     if (racing) {
-      this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (this.v * dt) / BALL_RADIUS));
-      this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisZ, (this.xv * dt) / BALL_RADIUS));
+      this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (sim.v * dt) / BALL_RADIUS));
+      this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisZ, (sim.xv * dt) / BALL_RADIUS));
     }
-    const pace = clamp(this.v / MAX_SPEED, 0, 1);
-    this.pip.leaves.rotation.x = -pace * 0.9 + Math.sin(this.clock * 13) * 0.06;
-    this.pip.body.rotation.z = clamp(this.xv * 0.035, -0.5, 0.5);
-    this.pip.body.position.y = this.finished ? Math.abs(Math.sin(this.clock * 7)) * 0.18 - 0.05 : Math.sin(this.clock * 15) * 0.025 * pace - 0.05;
+    const pace = clamp(sim.v / MAX_SPEED, 0, 1);
+    this.pip.leaves.rotation.x = -pace * 0.9 + Math.sin(sim.clock * 13) * 0.06;
+    this.pip.body.rotation.z = clamp(sim.xv * 0.035, -0.5, 0.5);
+    this.pip.body.position.y = sim.finished ? Math.abs(Math.sin(sim.clock * 7)) * 0.18 - 0.05 : Math.sin(sim.clock * 15) * 0.025 * pace - 0.05;
 
-    const target = 62 + clamp((this.v - CRUISE) / 26, 0, 1) * 16;
+    const target = 62 + clamp((sim.v - CRUISE) / 26, 0, 1) * 16;
     this.fov += (target - this.fov) * Math.min(1, dt * 4);
     if (Math.abs(this.camera.fov - this.fov) > 0.05) {
       this.camera.fov = this.fov;
@@ -595,37 +463,61 @@ export class Run {
 
     world.padMap.offset.y -= dt * 1.8;
 
-    let slidersMoved = false;
+    const moved = { slider: false, spinner: false, pendulum: false };
     objects.forEach((o, i) => {
+      const track = lanes[o.lane].track;
+      const slot = world.instance[i];
       if (o.kind === 'slider') {
-        world.sliders.setMatrixAt(world.instance[i], standing(track, o.s, this.sliderX(o), 1.2, 1, this.m));
-        slidersMoved = true;
-      } else if (o.kind === 'pickup' && !this.done[i]) {
+        world.sliders.setMatrixAt(slot, standing(track, o.s, sim.swingX(o), 1.2, 1, this.m));
+        moved.slider = true;
+      } else if (o.kind === 'spinner') {
+        standing(track, o.s, o.x, 0.95, 1, this.m);
+        this.m.multiply(this.m2.makeRotationY(sim.spinAngle(o))).scale(this.v3.set((o.len ?? 3.2) / 3.2, 1, 1));
+        world.spinners.setMatrixAt(slot, this.m);
+        moved.spinner = true;
+      } else if (o.kind === 'pendulum') {
+        // The ball swings on a rod from the top of its arch, lifting a little at each end of the swing.
+        const px = sim.swingX(o);
+        const arm = PIVOT - 1.2;
+        const py = PIVOT - Math.sqrt(Math.max(1, arm * arm - px * px));
+        world.balls.setMatrixAt(slot, standing(track, o.s, px, py, 1, this.m));
+        const f = track.at(o.s, this.f);
+        this.v1.copy(f.p).addScaledVector(f.u, PIVOT);
+        this.v2.copy(f.p).addScaledVector(f.r, px).addScaledVector(f.u, py);
+        const length = this.v3.subVectors(this.v2, this.v1).length();
+        this.v3.divideScalar(length);
+        this.camUp.crossVectors(this.v3, f.t).normalize();
+        this.m.makeBasis(this.camUp, this.v3.multiplyScalar(length), f.t).setPosition(this.v1.add(this.v2).multiplyScalar(0.5));
+        world.rods.setMatrixAt(slot, this.m);
+        moved.pendulum = true;
+      } else if (o.kind === 'pickup' && !sim.done[i]) {
         const visual = world.pickups.get(i)!;
-        const bob = Math.sin(this.clock * 3 + i) * 0.22;
+        const bob = Math.sin(sim.clock * 3 + i) * 0.22;
         visual.sprite.position.copy(visual.base).addScaledVector(visual.up, bob);
         visual.glow.position.copy(visual.sprite.position);
-        visual.glow.scale.setScalar(3.4 + Math.sin(this.clock * 5 + i) * 0.4);
+        visual.glow.scale.setScalar(3.4 + Math.sin(sim.clock * 5 + i) * 0.4);
       }
     });
-    if (slidersMoved) world.sliders.instanceMatrix.needsUpdate = true;
+    if (moved.slider) world.sliders.instanceMatrix.needsUpdate = true;
+    if (moved.spinner) world.spinners.instanceMatrix.needsUpdate = true;
+    if (moved.pendulum) world.balls.instanceMatrix.needsUpdate = world.rods.instanceMatrix.needsUpdate = true;
 
     if (this.flying.length) {
-      for (const crate of this.flying) {
-        crate.life -= dt;
-        crate.vel.y -= 22 * dt;
-        crate.pos.addScaledVector(crate.vel, dt);
-        crate.angle += dt * 9;
-        const scale = clamp(crate.life * 2, 0, 1);
-        this.m.makeRotationAxis(crate.spin, crate.angle).scale(this.v3.set(scale, scale, scale)).setPosition(crate.pos);
-        world.crates.setMatrixAt(crate.index, this.m);
+      for (const item of this.flying) {
+        item.life -= dt;
+        item.vel.y -= 22 * dt;
+        item.pos.addScaledVector(item.vel, dt);
+        item.angle += dt * 9;
+        const scale = clamp(item.life * 2, 0, 1);
+        this.m.makeRotationAxis(item.spin, item.angle).scale(this.v3.set(scale, scale, scale)).setPosition(item.pos);
+        item.mesh.setMatrixAt(item.index, this.m);
+        item.mesh.instanceMatrix.needsUpdate = true;
       }
-      world.crates.instanceMatrix.needsUpdate = true;
       for (let i = this.flying.length - 1; i >= 0; i--) if (this.flying[i].life <= 0) this.flying.splice(i, 1);
     }
 
-    if (this.boostT > 0 && racing) {
-      this.sparks.burst(track.point(this.s - 0.6, this.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), 1, ['#eaff3d', '#ffffff'], 2);
+    if (sim.boostT > 0 && racing) {
+      this.sparks.burst(sim.point(sim.s - 0.6, sim.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), 1, ['#eaff3d', '#ffffff'], 2);
     }
     this.sparks.update(dt);
     this.place();

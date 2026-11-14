@@ -161,6 +161,10 @@ img {
   background: linear-gradient(#b574f2, #7a3fc9);
 }
 
+.btn.blue {
+  background: linear-gradient(#5cc6ff, #2a8fe0);
+}
+
 .btn.big {
   font-size: 1.5em;
   padding: 0.5em 1.8em;

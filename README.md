@@ -17,12 +17,17 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 
 ## Where things are
 
-- `src/data/` ingredients (28 fruits, 58 extras) and the 18 map levels
+- `src/data/` ingredients (28 fruits, 58 extras) and the 18 map levels with their bonus pools
 - `src/core/` smoothie scoring and save/progress rules (localStorage key `fruitrun.save.v1`)
-- `src/game/` track maths, course layout (`course.ts`), scenery, Pip, and the run loop
+- `src/game/sim.ts` the rules of a run, with no rendering: steering, speed, forks, every obstacle
+- `src/game/pieces.ts` the library of course pieces; `courses.ts` the recipe for each level and the generator
+- `src/game/themes.ts` the look of each level
+- `src/game/track.ts`, `course.ts` track maths and the builder; `world.ts`, `run.ts`, `character.ts` what you see
 - `src/ui/` menu, map, HUD/results and blender screens
 - `tools/slice.py` cuts `tools/source/*.png` sticker sheets into `public/assets/` (needs Pillow)
 
-## Adding a level
+## Changing levels
 
-Write a `buildXxx()` in `src/game/course.ts` with `CourseBuilder`, register it in `COURSES` in `src/main.ts`, and set `built` plus `starTimes` and `bonusPool` on the level in `src/data/levels.ts`. In dev, `__fr.sim('smart')` and `__fr.sim('none')` in the browser console return a good-line and a hands-off time to set star times from.
+A level is a list of piece names in `RECIPES` in `src/game/courses.ts`. Reorder, swap or add pieces and the generator fits them together; `npm test` proves the result does not hit itself and can be finished. Star times set themselves from a hands-free test run. New piece types go in `src/game/pieces.ts`.
+
+In dev, the browser console has `__fr.play(7)` to jump into a level and `__fr.sim('smart', 'level-7')` for a good-line finish time.
