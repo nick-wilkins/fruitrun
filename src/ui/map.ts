@@ -1,5 +1,6 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
+import { isUnlocked } from '../core/progress';
 import { BLENDER_NODE, LEVELS, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import type { App } from './app';
@@ -44,16 +45,18 @@ export function mapScreen(app: App): HTMLElement {
   const stage = el('div.stage.map-stage');
   stage.append(el('img.bg', { src: asset('assets/map.webp'), alt: '', draggable: false }));
 
-  const current = Math.min(save.unlocked, LEVELS.length);
+  const here = save.last ?? LEVELS[0].id;
   for (const level of LEVELS) {
-    const locked = level.n > save.unlocked;
+    const locked = !isUnlocked(save, level);
     const record = save.levels[level.id];
     const node = el('button.node', { style: `left:${level.x}%;top:${level.y}%`, ariaLabel: `Level ${level.n}` });
     if (locked && !level.artLocked) node.append(el('div.cover.grey', {}, el('img', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false })));
     if (!locked && level.artLocked) node.append(el('div.cover.gold', {}, String(level.n)));
     if (record) node.append(stars(record.stars));
-    if (level.n === current) {
-      node.classList.add('current');
+    // Every level waiting to be played pulses, so a fork in the path reads as a choice.
+    if (!locked && !record) node.classList.add('open');
+    if (level.id === here) {
+      node.classList.add('here');
       node.append(el('div.marker', { innerHTML: pipSvg() }));
     }
     onTap(node, () => {
@@ -62,7 +65,7 @@ export function mapScreen(app: App): HTMLElement {
         node.classList.remove('shake');
         void node.offsetWidth;
         node.classList.add('shake');
-        app.toast(`Finish level ${level.n - 1} first!`);
+        app.toast(`Finish level ${level.after.join(' or ')} first!`);
       } else {
         sfx.tap();
         const card = levelCard(app, level, () => card.remove());

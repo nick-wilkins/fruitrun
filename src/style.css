@@ -429,7 +429,7 @@ img {
   height: 1.5cqw;
 }
 
-.node.current::before {
+.node.open::before {
   content: '';
   position: absolute;
   left: 50%;
@@ -454,7 +454,7 @@ img {
   pointer-events: none;
 }
 
-.node.current .stars {
+.node.here .stars {
   bottom: 150%;
 }
 

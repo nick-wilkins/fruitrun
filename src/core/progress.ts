@@ -9,8 +9,8 @@ export interface LevelRecord {
 
 export interface Save {
   version: 1;
-  /** Highest level number the player may enter. */
-  unlocked: number;
+  /** The level played most recently: where Pip stands on the map. */
+  last: string | null;
   levels: Record<string, LevelRecord>;
   inventory: Record<string, number>;
   points: number;
@@ -25,7 +25,7 @@ const KEY = 'fruitrun.save.v1';
 export function newSave(): Save {
   return {
     version: 1,
-    unlocked: 1,
+    last: null,
     levels: {},
     inventory: {},
     points: 0,
@@ -63,6 +63,11 @@ export function clearSave(): void {
   }
 }
 
+/** A level opens once any level leading to it on the map has been finished. */
+export function isUnlocked(save: Save, level: Level): boolean {
+  return level.after.length === 0 || level.after.some((n) => LEVELS.some((l) => l.n === n && save.levels[l.id]));
+}
+
 export function starsForTime(level: Level, seconds: number): number {
   const beaten = starTimesFor(level).findIndex((limit) => seconds <= limit);
   return beaten === -1 ? 1 : 5 - beaten;
@@ -77,7 +82,7 @@ export interface RunResult {
   firstClear: boolean;
 }
 
-/** Bank a finished run: one fruit per star, every bonus picked up, and the next level unlocked. */
+/** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
 export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[]): RunResult {
   const stars = starsForTime(level, seconds);
   const previous = save.levels[level.id];
@@ -88,7 +93,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   };
   save.inventory[level.fruit] = (save.inventory[level.fruit] ?? 0) + stars;
   for (const id of bonuses) save.inventory[id] = (save.inventory[id] ?? 0) + 1;
-  save.unlocked = Math.min(LEVELS.length, Math.max(save.unlocked, level.n + 1));
+  save.last = level.id;
   return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous };
 }
 
