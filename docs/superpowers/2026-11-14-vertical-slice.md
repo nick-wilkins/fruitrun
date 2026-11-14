@@ -42,5 +42,15 @@ Chrome at 1280x720 against `npm run dev`, 14 Nov 2026.
 - PASS finish: 43.65 s gave 5 stars, 5 apples plus pickups banked, level 2 unlocked, save written.
 - PASS blend: 3 apple, milk, honey, cinnamon, oats, granola scored 370 (Apple Pie +60, Toffee Apple +40), ingredients removed, points banked, recipes found 2/39.
 - PASS `npm test` 17/17, `npm run build` clean.
-- Timing probe: hands-off 56.8 s, centre line 54.5 s, good line 40.0 s. Star times set to 45 / 49 / 53 / 58 s.
+- Timing probe after review fixes: hands-off 56.1 s, good line 42.2 s. Star times set to 45 / 49 / 53 / 58 s.
 - Not checked: a real iPad (touch path exercised with synthetic touch pointer events only); portrait prompt.
+
+## Review
+
+`/code-review medium` over `src/` and `tests/`, 10 findings. Fixed and re-checked in Chrome:
+
+- PASS result is banked the moment the line is crossed and pause is hidden (was lost if you quit within 1.8 s).
+- PASS pressing into the kerb now scrapes and slows (40 to 33 over 0.9 s); a bumper knock is no longer cancelled by a held finger.
+- PASS a second finger touching and lifting no longer drops steering; keys use physical codes and are cleared on pause and window blur.
+- Fixed: tab switch on the results card no longer freezes the scene; test autopilot launches at real speed; empty bonus pool falls back to the level fruit; plurals ("cherries", "peaches"); double-tap no longer stacks dialogs; the course layout is cached between retries.
+- Not done: the scenery and track meshes are still rebuilt on every retry. Worth doing if retries hitch on an older iPad.

@@ -38,7 +38,10 @@ export interface HudState {
 export interface RunHooks {
   hud(state: HudState): void;
   pickup(id: string): void;
+  /** The line has been crossed: bank the result now. */
   finish(time: number, bonuses: string[]): void;
+  /** The celebration has played: show the results. */
+  results(): void;
 }
 
 export type Autopilot = 'none' | 'centre' | 'smart';
@@ -49,6 +52,8 @@ const MAX_SPEED = 56;
 const GRAVITY = 11;
 const COUNTDOWN = 3;
 const START_S = 12;
+/** How far past the kerb a steering target may reach, so pressing into the wall registers as a scrape. */
+const PUSH = 1.2;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
@@ -158,6 +163,8 @@ export class Run {
   private readonly flying: Flying[] = [];
 
   private pointerSteer: number | null = null;
+  private pointerId: number | null = null;
+  private knockT = 0;
   private keySteer = 0;
   autopilot: Autopilot = 'none';
 
@@ -189,7 +196,8 @@ export class Run {
   ) {
     this.canvas = renderer.domElement;
     const pickupCount = course.objects.filter((o) => o.kind === 'pickup').length;
-    this.pickupIds = Array.from({ length: pickupCount }, () => level.bonusPool[Math.floor(Math.random() * level.bonusPool.length)]);
+    const pool = level.bonusPool.length ? level.bonusPool : [level.fruit];
+    this.pickupIds = Array.from({ length: pickupCount }, () => pool[Math.floor(Math.random() * pool.length)]);
     this.world = buildWorld(course, this.pickupIds);
     this.done = course.objects.map(() => false);
     this.cooldown = course.objects.map(() => 0);
@@ -219,6 +227,7 @@ export class Run {
     this.canvas.addEventListener('pointerleave', this.onRelease);
     window.addEventListener('keydown', this.onKey);
     window.addEventListener('keyup', this.onKey);
+    window.addEventListener('blur', this.dropInput);
     window.addEventListener('resize', this.resize);
     this.resize();
     this.place();
@@ -227,22 +236,37 @@ export class Run {
   // ---- input ----
 
   private readonly onPointer = (e: PointerEvent) => {
-    if (e.type === 'pointermove' && e.pointerType === 'mouse' && e.buttons === 0) return;
+    if (e.type === 'pointerdown') {
+      // The first finger down steers; extra fingers or a resting palm are ignored.
+      if (this.pointerId !== null) return;
+      this.pointerId = e.pointerId;
+    } else if (e.pointerId !== this.pointerId) {
+      return;
+    }
     const rect = this.canvas.getBoundingClientRect();
     const across = (e.clientX - rect.left) / rect.width - 0.5;
-    this.pointerSteer = clamp(across * 2 * this.course.track.half * 1.35, -this.limit, this.limit);
+    this.pointerSteer = clamp(across * 2 * this.course.track.half * 1.35, -this.limit - PUSH, this.limit + PUSH);
     e.preventDefault();
   };
 
-  private readonly onRelease = () => {
+  private readonly onRelease = (e: PointerEvent) => {
+    if (e.pointerId !== this.pointerId) return;
+    this.pointerId = null;
     this.pointerSteer = null;
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
-    const dir = e.key === 'ArrowLeft' || e.key === 'a' ? -1 : e.key === 'ArrowRight' || e.key === 'd' ? 1 : 0;
+    const dir = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : e.code === 'ArrowRight' || e.code === 'KeyD' ? 1 : 0;
     if (!dir) return;
     if (e.type === 'keydown') this.keySteer = dir;
     else if (this.keySteer === dir) this.keySteer = 0;
+  };
+
+  /** Forget held keys and fingers: their release can be missed while paused or in another window. */
+  private readonly dropInput = () => {
+    this.keySteer = 0;
+    this.pointerId = null;
+    this.pointerSteer = null;
   };
 
   private readonly resize = () => {
@@ -268,11 +292,13 @@ export class Run {
   setPaused(value: boolean): void {
     this.paused = value;
     this.last = performance.now();
+    if (value) this.dropInput();
   }
 
   /** Jump straight to racing: used by the test autopilot. */
   skipCountdown(): void {
     this.countdown = 0;
+    this.v = CRUISE * 0.6;
   }
 
   private readonly frame = (now: number) => {
@@ -309,7 +335,7 @@ export class Run {
   private steerTarget(): number | null {
     if (this.autopilot !== 'none') return this.autopilot === 'centre' ? 0 : this.smartLine();
     if (this.pointerSteer !== null) return this.pointerSteer;
-    if (this.keySteer) return clamp(this.x + this.keySteer * 3, -this.limit, this.limit);
+    if (this.keySteer) return clamp(this.x + this.keySteer * 3, -this.limit - PUSH, this.limit + PUSH);
     return null;
   }
 
@@ -358,13 +384,14 @@ export class Run {
     const f = track.at(this.s, this.f);
 
     // Steering: the ball chases the finger; let go and it holds its line.
-    const target = this.finished ? null : this.steerTarget();
+    this.knockT -= dt;
+    const target = this.finished || this.knockT > 0 ? null : this.steerTarget();
     if (target !== null) this.xv = clamp((target - this.x) * 9, -16, 16);
     else this.xv *= Math.exp(-8 * dt);
     this.x += this.xv * dt;
     if (Math.abs(this.x) > this.limit) {
       this.x = Math.sign(this.x) * this.limit;
-      if (target !== null && Math.abs(target) >= this.limit - 0.05 && this.v > CRUISE * 0.75) {
+      if (target !== null && Math.abs(target) > this.limit && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
         this.scrapeT -= dt;
         if (this.scrapeT <= 0) {
@@ -411,6 +438,7 @@ export class Run {
       }
       if (this.s >= finishS) {
         this.finished = true;
+        this.hooks.finish(this.time, this.bonuses);
         sfx.finish();
         const at = track.point(this.s, this.x, 2, this.v1);
         this.sparks.burst(at, 90, ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#ffffff'], 14, this.v2.copy(f.t).multiplyScalar(this.v * 0.5));
@@ -419,7 +447,7 @@ export class Run {
       this.finishT += dt;
       if (this.finishT > 1.8 && !this.reported) {
         this.reported = true;
-        this.hooks.finish(this.time, this.bonuses);
+        this.hooks.results();
       }
     }
   }
@@ -459,6 +487,7 @@ export class Run {
           this.cooldown[i] = 240;
           this.v = Math.max(MIN_SPEED, this.v * 0.55);
           this.xv = Math.sign(this.x - sx || 1) * 10;
+          this.knockT = 0.25;
           this.shake = 0.4;
           sfx.hit();
           this.sparks.burst(track.point(this.s, this.x, 0.8, this.v1), 12, ['#ff4fa3', '#ffffff'], 6);
@@ -618,6 +647,7 @@ export class Run {
     this.canvas.removeEventListener('pointerleave', this.onRelease);
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('keyup', this.onKey);
+    window.removeEventListener('blur', this.dropInput);
     window.removeEventListener('resize', this.resize);
     this.world.dispose();
   }

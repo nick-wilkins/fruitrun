@@ -3,7 +3,7 @@ import type { RunResult } from '../core/progress';
 import { ingredient } from '../data/ingredients';
 import type { Level } from '../data/levels';
 import type { HudState } from '../game/run';
-import { asset, el, formatTime, onTap, stars } from './dom';
+import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
 
 export interface HudHandlers {
@@ -17,6 +17,8 @@ export interface Hud {
   root: HTMLElement;
   update(state: HudState): void;
   pickup(id: string): void;
+  /** The line is crossed: nothing left to pause or quit. */
+  finished(): void;
   results(result: RunResult): void;
 }
 
@@ -105,6 +107,9 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
       root.append(label);
       setTimeout(() => label.remove(), 1300);
     },
+    finished() {
+      pauseButton.classList.add('hidden');
+    },
     results(result) {
       root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
       const starRow = stars(0);
@@ -129,7 +134,7 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
           el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
           el('div.time', {}, formatTime(result.time), result.newBest && !result.firstClear ? el('span.new-best', {}, 'New best!') : null),
           starRow,
-          el('div.kicker', {}, `You won ${result.fruits} ${fruit.name.toLowerCase()}${result.fruits === 1 ? '' : 's'}!`),
+          el('div.kicker', {}, `You won ${countOf(result.fruits, fruit.name)}!`),
           loot,
           counts.size ? el('div.kicker.small', {}, 'Extras you picked up') : null,
           counts.size ? extras : null,

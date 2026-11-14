@@ -1,6 +1,6 @@
 import { WebGLRenderer } from 'three';
 import { setMuted, unlockAudio } from './audio';
-import { clearSave, completeLevel, loadSave, newSave, storeSave } from './core/progress';
+import { clearSave, completeLevel, loadSave, newSave, storeSave, type RunResult } from './core/progress';
 import { levelById, type Level } from './data/levels';
 import { buildAppleOrchard, type Course } from './game/course';
 import { Run, type Autopilot } from './game/run';
@@ -15,6 +15,14 @@ import './style.css';
 const COURSES: Record<string, () => Course> = {
   'level-1': buildAppleOrchard,
 };
+
+/** A course never changes once laid out, so retries reuse it. */
+const built = new Map<string, Course>();
+function course(id: string): Course {
+  let found = built.get(id);
+  if (!found) built.set(id, (found = COURSES[id]()));
+  return found;
+}
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const ui = document.querySelector<HTMLDivElement>('#ui')!;
@@ -55,14 +63,16 @@ const app: App = {
     });
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');
-    run = new Run(renderer, COURSES[level.id](), level, {
+    let result: RunResult | null = null;
+    run = new Run(renderer, course(level.id), level, {
       hud: (state) => hud.update(state),
       pickup: (id) => hud.pickup(id),
       finish: (time, bonuses) => {
-        const result = completeLevel(app.save, level, time, bonuses);
+        result = completeLevel(app.save, level, time, bonuses);
         app.persist();
-        hud.results(result);
+        hud.finished();
       },
+      results: () => result && hud.results(result),
     });
     run.start();
   },
@@ -86,7 +96,7 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) run?.setPaused(true);
-  else if (!document.querySelector('.hud .modal:not(.hidden)')) run?.setPaused(false);
+  else if (!document.querySelector('.hud .modal:not(.hidden):not(.clear)')) run?.setPaused(false);
 });
 
 app.show('menu');
@@ -100,7 +110,7 @@ if (import.meta.env.DEV) {
         return run;
       },
       sim(mode: Autopilot, levelId = 'level-1') {
-        const probe = new Run(renderer, COURSES[levelId](), levelById(levelId), { hud: () => {}, pickup: () => {}, finish: () => {} });
+        const probe = new Run(renderer, course(levelId), levelById(levelId), { hud: () => {}, pickup: () => {}, finish: () => {}, results: () => {} });
         setMuted(true);
         probe.autopilot = mode;
         probe.skipCountdown();

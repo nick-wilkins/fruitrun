@@ -2,7 +2,7 @@ import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { BLENDER_NODE, LEVELS, type Level } from '../data/levels';
 import type { App } from './app';
-import { asset, el, formatTime, onTap, stars } from './dom';
+import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
 
 function levelCard(app: App, level: Level, close: () => void): HTMLElement {
@@ -22,7 +22,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('img.big-fruit', { src: asset(fruit.img), alt: fruit.name, draggable: false }),
       el('div.kicker', {}, `Level ${level.n}`),
       el('h2', {}, level.name),
-      record ? el('div.best', {}, stars(record.stars), el('span', {}, `Best ${formatTime(record.time)}`)) : el('p', {}, `Roll fast to win up to 5 ${fruit.name.toLowerCase()}s!`),
+      record ? el('div.best', {}, stars(record.stars), el('span', {}, `Best ${formatTime(record.time)}`)) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
       targets,
       el(
         'button.btn.green.big',

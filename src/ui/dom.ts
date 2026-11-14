@@ -33,10 +33,22 @@ export function stars(filled: number, total = 5): HTMLElement {
   return row;
 }
 
-/** Tap handler that also fires the click sound and swallows double-taps. */
+/** Tap handler that swallows the second tap of a double-tap. */
 export function onTap(node: HTMLElement, handler: () => void): void {
+  let last = -Infinity;
   node.addEventListener('click', (e) => {
     e.preventDefault();
+    if (e.timeStamp - last < 350) return;
+    last = e.timeStamp;
     handler();
   });
+}
+
+/** "1 apple", "5 cherries", "3 peaches": ingredient names are singular or already plural. */
+export function countOf(n: number, name: string): string {
+  const word = name.toLowerCase();
+  if (n === 1 || word.endsWith('s')) return `${n} ${word}`;
+  if (word.endsWith('y')) return `${n} ${word.slice(0, -1)}ies`;
+  if (word.endsWith('ch') || word.endsWith('o')) return `${n} ${word}es`;
+  return `${n} ${word}s`;
 }
