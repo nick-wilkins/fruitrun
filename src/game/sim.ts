@@ -24,7 +24,7 @@ const LIFT_SPEED = 24;
 export const SAIL = 6.2;
 const SAIL_LOW = 0.76;
 
-export type Autopilot = 'none' | 'smart';
+export type Autopilot = 'none' | 'smart' | 'ace';
 
 export type SimEvent =
   | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' }
@@ -241,7 +241,7 @@ export class Sim {
     return this.clock * (o.speed ?? 1) + (o.phase ?? 0);
   }
 
-  /** A sensible racing line, used to set star times: chase goodies, dodge blockers, hug the inside. */
+  /** A careful player's line, for the hands-free test runs: go for everything, give blockers a wide berth. */
   private smartLine(): number {
     const hazards: { s: number; x: number; wide: number }[] = [];
     const wants: number[] = [];
@@ -264,6 +264,45 @@ export class Sim {
     if (pick !== undefined) return pick;
     const room = (x: number) => Math.min(...hazards.map((h) => Math.abs(h.x - x) - h.wide));
     return [-3.8, -1.9, 0, 1.9, 3.8].sort((a, b) => room(b) - room(a))[0];
+  }
+
+  /**
+   * An expert's line, driving for time alone: it sets the five-star time. It heads for the next speed pad, ring or
+   * ramp it can actually reach, takes the inside of bends otherwise, and sidesteps blockers at the last moment.
+   */
+  private aceLine(): number {
+    const edge = this.limit - 0.4;
+    const reach = (ahead: number) => (26 * ahead) / Math.max(this.v, 20) + 0.8;
+    const blockers: { s: number; x: number; wide: number }[] = [];
+    let goal: number | null = null;
+    for (const i of this.byLane[this.lane]) {
+      const o = this.course.objects[i];
+      const ahead = o.s - this.s;
+      if (ahead < -1 || ahead > 60 || this.done[i]) continue;
+      if (o.kind === 'crate') blockers.push({ s: ahead, x: o.x, wide: 2.15 });
+      else if (o.kind === 'goo') blockers.push({ s: ahead, x: o.x, wide: 2.0 });
+      else if (o.kind === 'slider' || o.kind === 'pendulum') blockers.push({ s: ahead, x: this.swingX(o), wide: 2.1 });
+      else if (o.kind === 'spinner') blockers.push({ s: ahead, x: o.x, wide: (o.len ?? 3.2) + 0.4 });
+      else if (o.kind === 'windmill') for (const x of this.sailsAt(o)) blockers.push({ s: ahead, x, wide: 2.4 });
+      else if (goal === null && ahead > 0.5 && (o.kind === 'pad' || o.kind === 'turbo' || o.kind === 'jump' || (o.kind === 'ring' && (o.y ?? 2) < 3))) {
+        // Worth going for only if the ball can get across in time and it is not behind a blocker.
+        const behindBlocker = blockers.some((b) => b.s < ahead + 1 && b.s > ahead - 6 && Math.abs(b.x - o.x) < b.wide);
+        if (Math.abs(o.x - this.x) <= reach(ahead) && !behindBlocker) goal = o.x;
+      }
+    }
+    if (goal === null) {
+      this.frameAt(this.s + 8, this.ahead);
+      goal = Math.abs(this.ahead.k) > 0.004 ? clamp(this.ahead.k * 400, -edge, edge) : clamp(this.x, -edge, edge);
+    }
+    // Anything about to be hit on this line: step round it by the shorter way that stays on the road.
+    const soon = Math.max(8, this.v * 0.32);
+    const inWay = blockers.filter((b) => b.s > -1 && b.s < soon);
+    const clear = (x: number) => inWay.every((b) => Math.abs(b.x - x) > b.wide);
+    if (!clear(goal)) {
+      const options = inWay.flatMap((b) => [b.x - b.wide - 0.15, b.x + b.wide + 0.15]).filter((x) => Math.abs(x) <= edge && clear(x));
+      if (options.length) goal = options.sort((p, q) => Math.abs(p - this.x) - Math.abs(q - this.x))[0];
+    }
+    return clamp(goal, -edge, edge);
   }
 
   step(dt: number): void {
@@ -290,14 +329,14 @@ export class Sim {
     const riding = this.onLift();
     if (riding && !this.riding) this.emit({ type: 'lift' });
     this.riding = riding;
-    const wanted = riding ? 0 : this.autopilot === 'smart' ? this.smartLine() : this.steer;
+    const wanted = riding ? 0 : this.autopilot === 'ace' ? this.aceLine() : this.autopilot === 'smart' ? this.smartLine() : this.steer;
     const target = this.finished || this.knockT > 0 ? null : wanted;
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
     const grip = GRIP[this.course.mood];
     if (target !== null) {
       // A swiping finger gets a snappier ball than keys or the mouse: quick enough to cross the road in about a
       // third of a second.
-      const pace = this.swiping ? { pull: 14, top: 28 } : { pull: 9, top: 16 };
+      const pace = this.swiping || this.autopilot === 'ace' ? { pull: 14, top: 28 } : { pull: 9, top: 16 };
       const wanted = clamp((target - this.x) * (riding ? 2.5 : pace.pull), -pace.top, pace.top);
       this.xv += (wanted - this.xv) * Math.min(1, dt * grip);
     } else {

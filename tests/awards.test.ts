@@ -75,7 +75,7 @@ describe('a result without feats', () => {
 });
 
 describe('star times', () => {
-  it('ask for the good line itself for five stars, and spread the rest evenly towards a hands-off run', () => {
+  it('are spread out, with at least a second between each band', () => {
     for (const each of LEVELS.slice(0, 6)) {
       const [five, four, three, two] = starTimesFor(each);
       expect(four - five).toBeGreaterThanOrEqual(1);

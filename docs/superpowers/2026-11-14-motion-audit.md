@@ -48,3 +48,8 @@ The camera smoothing added above predicted the next view from how far the camera
 
 - A fork's two roads and the filler between them could each be a different tint, with a jagged shimmer where they overlapped. A fork now keeps one tint from before it parts until after it rejoins, and arms are drawn just behind the main road in depth instead of being sunk below it. Checked in Chrome on level 2 (day) and level 5 (night): one colour, clean edge.
 - The ball's lamp bleached the road white on night levels. It is about a tenth as bright now (12 at night, 34 at midnight).
+
+## Fork nose and star times (later the same day)
+
+- The sliver where two kerbs meet at a fork: kerbs now start the moment they are clear of the other road, the road filler stops once both kerbs stand between the roads, and a striped bollard caps the island's nose. Checked from above in Chrome at a rejoin, a split and a three-way fork.
+- Nick could still get five stars "basically every time" while hitting things and missing pads. The careful test driver was slower than a decent player. Added an expert driver (`ace`) that drives for time alone; five stars now means beating the quicker of the two drivers by 1.5%, and matching it earns four. Level 1 went from 43 s to 37 s for five stars. On average the expert is 3% quicker than the careful driver, 10% on level 1; on a handful of levels it is no quicker, so those tighten less.

@@ -312,15 +312,18 @@ export type StarTimes = [number, number, number, number];
 const built = new Map<string, { course: Course; starTimes: StarTimes }>();
 
 /**
- * Star times come from playing the course hands-free. Five stars means matching a good racing line; the other
- * bands are spread evenly from there towards never steering at all, which earns one star.
+ * Star times come from playing the course hands-free three ways: never steering, a careful player's line, and an
+ * expert's line driven for time alone. Five stars means beating the quicker of the two drivers; matching it earns
+ * four. The rest are spread evenly from there towards never steering at all, which earns one star.
  */
 function calibrate(course: Course, level: Level): StarTimes {
   const idle = timeCourse(course, level, 'none');
-  const best = Math.min(timeCourse(course, level, 'smart'), idle - 4);
-  const five = Math.ceil(best);
+  const best = Math.min(timeCourse(course, level, 'ace'), timeCourse(course, level, 'smart'), idle - 4);
+  const five = Math.floor(best * 0.985);
   const step = Math.max(1, (idle - five) / 4);
-  return [five, Math.round(five + step), Math.round(five + step * 2), Math.max(Math.round(five + step * 3), five + 3)];
+  const four = Math.max(Math.ceil(best), Math.round(five + step));
+  const three = Math.max(four + 1, Math.round(five + step * 2));
+  return [five, four, three, Math.max(three + 1, Math.round(five + step * 3))];
 }
 
 function prepared(level: Level) {

@@ -53,13 +53,15 @@ describe.each(LEVELS)('$name course', (level) => {
     expect(good).toBeLessThan(idle);
   });
 
-  it('gives five stars for a good line and no more than two for never steering', () => {
+  it('keeps five stars for beating the test drivers, four for matching them, and one for never steering', () => {
     const [five, four, three, two] = starTimesFor(level);
     expect(five).toBeLessThan(four);
     expect(four).toBeLessThan(three);
     expect(three).toBeLessThan(two);
-    expect(starsForTime(level, timeCourse(course, level, 'smart'))).toBe(5);
-    expect(starsForTime(level, timeCourse(course, level, 'none'))).toBeLessThanOrEqual(2);
+    const best = Math.min(timeCourse(course, level, 'ace'), timeCourse(course, level, 'smart'));
+    expect(five).toBeLessThan(best);
+    expect(starsForTime(level, best)).toBeGreaterThanOrEqual(4);
+    expect(starsForTime(level, timeCourse(course, level, 'none'))).toBe(1);
   });
 
   it('keeps solid obstacles off the stretch where a fork\'s two roads overlap', () => {
