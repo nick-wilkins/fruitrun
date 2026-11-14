@@ -238,13 +238,13 @@ function gate(track: Track, s: number, text: string, color: string): Group {
 }
 
 /** Is this point on the road surface of `track` somewhere between two distances along it? */
-function onRoad(q: Vector3, track: Track, s0: number, s1: number): boolean {
+function onRoad(q: Vector3, track: Track, s0: number, s1: number, margin = -0.1): boolean {
   const i0 = Math.max(0, Math.floor(s0 / STEP));
   const i1 = Math.min(track.frames.length - 1, Math.ceil(s1 / STEP));
   for (let i = i0; i <= i1; i += 2) {
     const f = track.frames[i];
     P.subVectors(q, f.p);
-    if (Math.abs(P.dot(f.t)) < 1.3 && Math.abs(P.dot(f.r)) < track.half - 0.1 && Math.abs(P.dot(f.u)) < 1.5) return true;
+    if (Math.abs(P.dot(f.t)) < 1.3 && Math.abs(P.dot(f.r)) < track.half + margin && Math.abs(P.dot(f.u)) < 1.5) return true;
   }
   return false;
 }
@@ -270,6 +270,11 @@ function kerbRuns(lanes: Lane[], index: number, side: 1 | -1): [number, number][
     }
   });
   if (!near.length) return [[0, track.length]];
+  // A kerb is left out while any of it would sit on the other road or on that road's kerb. On the side where
+  // an arm lies almost on top of the main route as it leaves and rejoins, the arm's kerb runs right up to the
+  // join and the main route's takes over there, so the edge is one unbroken line.
+  const from = lanes[index].from;
+  const margin = !from ? 0.75 : side === -from.side ? 1.0 : 1.05;
 
   const runs: [number, number][] = [];
   let open: number | null = null;
@@ -279,7 +284,7 @@ function kerbRuns(lanes: Lane[], index: number, side: 1 | -1): [number, number][
     const f = track.frames[i];
     // Test the kerb's outer edge: it starts the moment the whole kerb is clear of the other road, no later.
     q.copy(f.p).addScaledVector(f.r, side * (track.half + 0.9));
-    const covered = near.some((n) => s >= n.mine[0] && s <= n.mine[1] && onRoad(q, n.other, n.theirs[0], n.theirs[1]));
+    const covered = near.some((n) => s >= n.mine[0] && s <= n.mine[1] && onRoad(q, n.other, n.theirs[0], n.theirs[1], margin));
     if (!covered && open === null) open = s;
     if (covered && open !== null) {
       if (s - open > 2) runs.push([open, s]);
@@ -585,7 +590,7 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
         // anything wider would show as a patch of road on the island.
         const apart = a.p.distanceTo(b.p);
         if (apart > course.track.half * 2 + 0.9 && !nose) nose = a.p.clone().add(b.p).multiplyScalar(0.5).addScaledVector(a.u, 0.75);
-        if (apart > course.track.half * 2 + 1.7) break;
+        if (apart > course.track.half * 2 + 2.1) break;
         for (const f of [a, b]) {
           points.push(f.p.x - f.u.x * 0.02, f.p.y - f.u.y * 0.02, f.p.z - f.u.z * 0.02);
           uvs.push(f === a ? 0.3 : 0.7, d * 0.1);
