@@ -32,6 +32,8 @@ export interface Level {
   artLocked: boolean;
   /** Levels (by `n`) that lead here on the map: finishing any one of them opens this level. Empty for the first. */
   after: number[];
+  /** Stars needed here before the levels after it open. */
+  need: number;
   /** 0 (gentle) to 1 (busy): how many obstacles the course pieces lay down. */
   difficulty: number;
   /** The weather: rain and snow make the road slippery, night is dark. */
@@ -114,11 +116,16 @@ const meadow = (n: number, after: number[], fruit: string, name: string, px: num
   ...at(px, py),
   artLocked: n >= 15,
   after,
+  need: MEADOW_NEEDS[n - 1],
   difficulty: (n - 1) / 17,
   mood: MOODS[n] ?? 'sunny',
   // Specials are listed twice so the ingredients that suit this fruit turn up more often.
   bonusPool: [...BASICS, ...specials, ...specials],
 });
+
+// Stars needed to move on. Deliberately uneven: two or three to begin with, four now and then, and five just
+// once, near the end.
+const MEADOW_NEEDS = [2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3, 4, 3, 4, 3, 4, 5, 4];
 
 const MEADOW: Level[] = [
   meadow(1, [], 'apple', 'Apple Orchard', 188, 822, ['cinnamon', 'peanutbutter', 'walnut', 'ginger', 'spinach', 'maple', 'raisins', 'hazelnut', 'carrot', 'greenapple', 'pumpkinseed', 'almondbutter']),
@@ -157,7 +164,7 @@ const stop = (px: number, py: number, fruit: string, from: number): Stop => ({ p
 const EXTRAS = INGREDIENTS.filter((i) => i.cat !== 'fruit' && !BASICS.includes(i.id)).map((i) => i.id);
 const RARE = ['greenapple', 'blackberry', 'melon', 'pomegranate', 'lime', 'cranberry', 'apricot', 'fig', 'passionfruit', 'guava'];
 
-function world(index: number, first: number, entry: number, easiest: number, hardest: number, places: string[], stops: Stop[]): Level[] {
+function world(index: number, first: number, entry: number, easiest: number, hardest: number, needs: number[], places: string[], stops: Stop[]): Level[] {
   // How many levels in from the way in each stop is: side paths are a step on from where they leave the main
   // path, not as hard as their place in this list would suggest.
   const depth: number[] = [];
@@ -178,6 +185,7 @@ function world(index: number, first: number, entry: number, easiest: number, har
       ...at(s.px, s.py),
       artLocked: false,
       after: [s.from === 0 ? entry : first + s.from - 1],
+      need: needs[i],
       difficulty: easiest + ((hardest - easiest) * depth[i]) / deepest,
       mood: MOODS[n] ?? 'sunny',
       bonusPool: [...BASICS, ...specials, ...specials],
@@ -186,7 +194,7 @@ function world(index: number, first: number, entry: number, easiest: number, har
 }
 
 // Tropical Falls: a main path of 14 from the garden gate to the portal, with seven side paths to the grey stones.
-const TROPICS = world(1, 19, 18, 0.45, 0.85, ['Lagoon', 'Terrace', 'Crossing', 'Cove', 'Springs', 'Grove', 'Cascade', 'Pavilion', 'Maze', 'Glasshouse', 'Lookout', 'Canopy', 'Falls', 'Portal', 'Ledge', 'Hollow', 'Nook', 'Steps', 'Summit', 'Bluff', 'Hideaway'], [
+const TROPICS = world(1, 19, 18, 0.45, 0.85, [3, 3, 3, 4, 3, 3, 4, 3, 4, 3, 4, 4, 5, 4, 3, 3, 4, 3, 4, 3, 4], ['Lagoon', 'Terrace', 'Crossing', 'Cove', 'Springs', 'Grove', 'Cascade', 'Pavilion', 'Maze', 'Glasshouse', 'Lookout', 'Canopy', 'Falls', 'Portal', 'Ledge', 'Hollow', 'Nook', 'Steps', 'Summit', 'Bluff', 'Hideaway'], [
   stop(365, 765, 'lime', 0),
   stop(512, 712, 'melon', 1),
   stop(705, 738, 'passionfruit', 2),
@@ -212,7 +220,7 @@ const TROPICS = world(1, 19, 18, 0.45, 0.85, ['Lagoon', 'Terrace', 'Crossing', '
 
 // Blossom Village: a main path of 17 from the start arch up to the smoothie shop, with side paths to the islands
 // and the locked cave.
-const VILLAGE = world(2, 40, 32, 0.55, 1, ['Lane', 'Green', 'Fence', 'Bridge', 'Bank', 'Meadow', 'Mill', 'Rise', 'Waterfall', 'Orchard', 'Crossing', 'Arch', 'Cottage', 'Garden', 'Path', 'Market', 'Shop', 'Swing', 'Corner', 'Hill', 'Pergola', 'Stall', 'Island', 'Bench', 'Blossom', 'Treehouse', 'Lantern', 'Roots', 'Cave'], [
+const VILLAGE = world(2, 40, 32, 0.55, 1, [3, 3, 3, 4, 3, 4, 3, 4, 3, 4, 4, 3, 4, 4, 5, 5, 4, 3, 4, 3, 3, 4, 4, 5, 4, 3, 4, 4, 5], ['Lane', 'Green', 'Fence', 'Bridge', 'Bank', 'Meadow', 'Mill', 'Rise', 'Waterfall', 'Orchard', 'Crossing', 'Arch', 'Cottage', 'Garden', 'Path', 'Market', 'Shop', 'Swing', 'Corner', 'Hill', 'Pergola', 'Stall', 'Island', 'Bench', 'Blossom', 'Treehouse', 'Lantern', 'Roots', 'Cave'], [
   stop(163, 795, 'apple', 0),
   stop(342, 810, 'pear', 1),
   stop(526, 810, 'plum', 2),

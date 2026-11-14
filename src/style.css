@@ -1860,6 +1860,141 @@ button.mix-item {
   color: #8a4b00;
 }
 
+.prizes img.needed {
+  outline: 0.14em solid #ffe066;
+  outline-offset: 0.05em;
+  border-radius: 50%;
+}
+
+.goal-note {
+  font-size: 0.72em;
+  color: #fff;
+  text-shadow: 0 0.1em 0 rgba(0, 0, 0, 0.5);
+}
+
+.goal {
+  margin: 0.3em auto 0;
+  padding: 0.3em 1em;
+  font-size: 0.9em;
+  color: #fff;
+  background: #c9762a;
+  border-radius: 99em;
+}
+
+.goal.met {
+  background: linear-gradient(#8be03a, #3fa81e);
+  animation: drop-in 0.4s 1.2s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.retry-note {
+  margin: 0.7em 0 0;
+  font-size: 0.72em;
+  font-weight: 700;
+  color: #9a6a3a;
+}
+
+.need {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5em;
+  margin: 0.2em 0 0.4em;
+  font-size: 0.85em;
+}
+
+.need .stars img {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.node .short {
+  position: absolute;
+  left: 50%;
+  top: 92%;
+  transform: translateX(-50%);
+  padding: 0.25em 0.6em;
+  font-size: 1.05cqw;
+  color: #fff;
+  white-space: nowrap;
+  background: #d83a3a;
+  border: 0.14cqw solid #fff;
+  border-radius: 99em;
+  pointer-events: none;
+}
+
+/*
+ * Words in pills, badges and buttons sit dead centre. Fonts leave more room above capitals than below, so plain
+ * padding looks top-heavy; trimming each line to the height of its capitals puts the letters in the middle.
+ */
+.btn,
+.badge,
+.feat,
+.chip,
+.tab,
+.way,
+.verdict,
+.new-best,
+.super-tag,
+.page,
+.goal,
+.new-here,
+.short,
+.toast,
+.hint,
+.blend-node span,
+.book em,
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+}
+
+.new-here,
+.goal {
+  display: flex;
+  width: fit-content;
+  margin-inline: auto;
+  flex-wrap: wrap;
+  column-gap: 0.3em;
+}
+
+@supports (text-box: trim-both cap alphabetic) {
+  .btn,
+  .badge,
+  .feat,
+  .tab,
+  .way,
+  .verdict,
+  .new-best,
+  .super-tag,
+  .page,
+  .goal,
+  .new-here,
+  .short,
+  .toast,
+  .hint,
+  .blend-node span,
+  .book em {
+    text-box: trim-both cap alphabetic;
+    padding-block: 0.6em;
+  }
+
+  .btn {
+    padding-block: 0.8em;
+  }
+
+  .btn.small,
+  .book em,
+  .short {
+    padding-block: 0.5em;
+  }
+
+  .chip {
+    text-box: trim-both cap alphabetic;
+  }
+}
+
 /* ---------- motion ---------- */
 
 @keyframes fade {

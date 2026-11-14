@@ -122,9 +122,16 @@ export function clearSave(): void {
   }
 }
 
-/** A level opens once any level leading to it on the map has been finished. */
+/**
+ * A level opens once any level leading to it on the map has earned the stars that level asks for. A level that
+ * has already been played stays open whatever is asked now.
+ */
 export function isUnlocked(save: Save, level: Level): boolean {
-  return level.after.length === 0 || level.after.some((n) => Boolean(save.levels[levelByNumber(n).id]));
+  if (level.after.length === 0 || save.levels[level.id]) return true;
+  return level.after.some((n) => {
+    const before = levelByNumber(n);
+    return (save.levels[before.id]?.stars ?? 0) >= before.need;
+  });
 }
 
 export function starsForTime(level: Level, seconds: number): number {
@@ -147,12 +154,18 @@ export interface RunResult {
   possible: number;
   /** Awards earned by this run. */
   awards: Award[];
+  /** Stars this level asks for before the next ones open, and whether the best so far is enough. */
+  need: number;
+  passed: boolean;
+  /** Levels this run has just opened. */
+  opened: Level[];
 }
 
 /** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
 export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats): RunResult {
   const stars = starsForTime(level, seconds);
   const previous = save.levels[level.id];
+  const shut = LEVELS.filter((l) => !isUnlocked(save, l));
   // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.
   const comparable = previous?.courses === COURSES;
   const newBest = !previous || !comparable || seconds < previous.time;
@@ -185,7 +198,22 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   if (stars === 5 && (level.mood === 'rain' || level.mood === 'snow')) add('slipperyFive');
   if (previous && comparable && newBest) add('newBests');
 
-  return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous, perfect, clean, pickups: feats?.pickups ?? 0, possible: feats?.possible ?? 0, awards: claimAwards(save) };
+  return {
+    stars,
+    time: seconds,
+    fruits: stars,
+    bonuses,
+    newBest,
+    firstClear: !previous,
+    perfect,
+    clean,
+    pickups: feats?.pickups ?? 0,
+    possible: feats?.possible ?? 0,
+    awards: claimAwards(save),
+    need: level.need,
+    passed: save.levels[level.id].stars >= level.need,
+    opened: shut.filter((l) => isUnlocked(save, l)),
+  };
 }
 
 /** The super blender stands at the end of the side path on the first map: finish that path to use it. */

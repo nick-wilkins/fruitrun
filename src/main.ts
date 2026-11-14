@@ -1,7 +1,7 @@
 import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
-import { clearSave, completeLevel, isUnlocked, loadSave, newSave, storeSave, type RunResult } from './core/progress';
+import { clearSave, completeLevel, isUnlocked, loadSave, newSave, storeSave, type RunResult, type Save } from './core/progress';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
 import { Run } from './game/run';
@@ -60,7 +60,13 @@ const app: App = {
       pause: (paused) => run?.setPaused(paused),
       restart: () => app.play(level),
       quit: () => app.show('map'),
-      blend: () => app.show('blender'),
+      blend: () => {
+        if (draft) {
+          app.save = draft;
+          app.persist();
+        }
+        app.show('blender');
+      },
       muted: () => app.save.muted,
       toggleSound: () => {
         app.save.muted = !app.save.muted;
@@ -72,14 +78,17 @@ const app: App = {
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');
     let result: RunResult | null = null;
+    let draft: Save | null = null;
     // Night levels get their own dreamy tune.
     musicFor(level.mood === 'night' || level.mood === 'midnight' ? asset('assets/audio/track4.m4a') : null);
     run = new Run(renderer, courseFor(level), level, {
       hud: (state) => hud.update(state),
       pickup: (id) => hud.pickup(id),
       finish: (time, bonuses, feats) => {
-        result = completeLevel(app.save, level, time, bonuses, feats);
-        app.persist();
+        // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
+        // retrying throws the whole run away, fruit, stars and all.
+        draft = structuredClone(app.save);
+        result = completeLevel(draft, level, time, bonuses, feats);
         hud.finished();
       },
       results: () => result && hud.results(result),

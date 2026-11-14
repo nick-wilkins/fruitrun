@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, completeLevel, isUnlocked, newSave, starsForTime, superBlenderOpen } from '../src/core/progress';
+import { blend, completeLevel, isUnlocked, newSave, starsForTime, superBlenderOpen, type Save } from '../src/core/progress';
 import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
@@ -38,6 +38,9 @@ describe('completeLevel', () => {
   });
 });
 
+/** Finish a level fast enough for five stars. */
+const pass = (save: Save, n: number) => completeLevel(save, levelByNumber(n), starTimesFor(levelByNumber(n))[0] - 1, []);
+
 describe('the map', () => {
   const byNumber = levelByNumber;
 
@@ -48,17 +51,61 @@ describe('the map', () => {
 
   it('offers three ways on after level 4, as the paths on the map do', () => {
     const save = newSave();
-    for (const n of [1, 2, 3, 4]) completeLevel(save, byNumber(n), 9999, []);
+    for (const n of [1, 2, 3, 4]) pass(save, n);
     const open = LEVELS.filter((l) => isUnlocked(save, l) && !save.levels[l.id]).map((l) => l.n);
     expect(open).toEqual([5, 6, 13]);
   });
 
   it('follows each branch on its own', () => {
     const save = newSave();
-    for (const n of [1, 2, 3, 4, 13]) completeLevel(save, byNumber(n), 9999, []);
+    for (const n of [1, 2, 3, 4, 13]) pass(save, n);
     expect(isUnlocked(save, byNumber(14))).toBe(true);
     expect(isUnlocked(save, byNumber(7))).toBe(false);
     expect(isUnlocked(save, byNumber(10))).toBe(false);
+  });
+});
+
+describe('stars needed to move on', () => {
+  const byNumber = levelByNumber;
+
+  it('keeps the next level shut until this one has enough stars, and says how many', () => {
+    const save = newSave();
+    const first = byNumber(1);
+    const slow = completeLevel(save, first, 9999, []);
+    expect(slow.stars).toBe(1);
+    expect(slow.need).toBe(first.need);
+    expect(slow.passed).toBe(false);
+    expect(slow.opened).toEqual([]);
+    expect(isUnlocked(save, byNumber(2))).toBe(false);
+
+    const quick = completeLevel(save, first, starTimesFor(first)[0] - 1, []);
+    expect(quick.passed).toBe(true);
+    expect(quick.opened.map((l) => l.n)).toEqual([2]);
+    expect(isUnlocked(save, byNumber(2))).toBe(true);
+    // Passing again opens nothing new.
+    expect(completeLevel(save, first, starTimesFor(first)[0] - 1, []).opened).toEqual([]);
+  });
+
+  it('asks for two or three early on, four sometimes, and five now and again near the end of a world', () => {
+    for (let world = 0; world < 3; world++) {
+      const needs = LEVELS.filter((l) => l.world === world).map((l) => l.need);
+      expect(Math.min(...needs)).toBe(2 + Math.min(world, 1));
+      expect(needs.slice(0, 3).every((n) => n <= 3)).toBe(true);
+      expect(needs).toContain(4);
+      expect(needs.filter((n) => n === 5).length).toBeGreaterThanOrEqual(1);
+      expect(needs.filter((n) => n === 5).length).toBeLessThanOrEqual(4);
+    }
+    // It goes up and down rather than climbing steadily.
+    const meadow = LEVELS.filter((l) => l.world === 0).map((l) => l.need);
+    expect(meadow.some((n, i) => i > 0 && n < meadow[i - 1])).toBe(true);
+  });
+
+  it('never locks a level that has already been played', () => {
+    const save = newSave();
+    save.levels[byNumber(1).id] = { stars: 1, time: 99 };
+    save.levels[byNumber(2).id] = { stars: 1, time: 99 };
+    expect(isUnlocked(save, byNumber(2))).toBe(true);
+    expect(isUnlocked(save, byNumber(3))).toBe(false);
   });
 });
 
@@ -68,10 +115,12 @@ describe('worlds', () => {
   it('opens the second world from the castle and the third from the portal', () => {
     const save = newSave();
     expect(isUnlocked(save, byNumber(19))).toBe(false);
-    save.levels[byNumber(18).id] = { stars: 1, time: 99 };
+    save.levels[byNumber(18).id] = { stars: byNumber(18).need - 1, time: 99 };
+    expect(isUnlocked(save, byNumber(19))).toBe(false);
+    save.levels[byNumber(18).id] = { stars: byNumber(18).need, time: 99 };
     expect(isUnlocked(save, byNumber(19))).toBe(true);
     expect(isUnlocked(save, byNumber(40))).toBe(false);
-    save.levels[byNumber(32).id] = { stars: 1, time: 99 };
+    save.levels[byNumber(32).id] = { stars: 5, time: 99 };
     expect(isUnlocked(save, byNumber(40))).toBe(true);
   });
 

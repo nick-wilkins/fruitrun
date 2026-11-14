@@ -26,6 +26,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
   const record = app.save.levels[level.id];
   const fruit = ingredient(level.fruit);
   const fresh = newOn(level);
+  const leadsOn = LEVELS.some((l) => l.after.includes(level.n));
   const targets = el('div.targets');
   starTimesFor(level).forEach((limit, i) => {
     targets.append(el('div.target', {}, stars(5 - i, 5), el('span', {}, `under ${formatTime(limit).slice(0, -2)}`)));
@@ -42,6 +43,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('h2', {}, level.name),
       record ? el('div.best', {}, stars(record.stars), record.courses === COURSES ? el('span', {}, `Best ${formatTime(record.time)}`) : null) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
+      leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
       targets,
       el(
         'button.btn.green.big',
@@ -82,6 +84,8 @@ export function mapScreen(app: App): HTMLElement {
       node.append(el('img.prize', { src: asset(fruit.img), alt: fruit.name, title: fruit.name, draggable: false }));
     }
     if (record) node.append(stars(record.stars));
+    // Played, but not yet with enough stars to open what comes next.
+    if (record && record.stars < level.need && LEVELS.some((l) => l.after.includes(level.n))) node.append(el('div.short', {}, `needs ${level.need}★`));
     // Every level waiting to be played pulses, so a fork in the path reads as a choice.
     if (!locked && !record) node.classList.add('open');
     if (level.id === here) {
@@ -96,7 +100,10 @@ export function mapScreen(app: App): HTMLElement {
         node.classList.add('shake');
         const before = level.after.map(levelByNumber);
         const elsewhere = before.find((l) => l.world !== level.world);
-        app.toast(elsewhere ? `Finish ${WORLDS[elsewhere.world].name} first!` : `Finish level ${before.map((l) => l.label).join(' or ')} first!`);
+        const gate = before[0];
+        const got = save.levels[gate.id]?.stars ?? 0;
+        const where = elsewhere ? `the last level of ${WORLDS[elsewhere.world].name}` : `level ${before.map((l) => l.label).join(' or ')}`;
+        app.toast(got ? `Get ${gate.need} stars on ${where} to open this. You have ${got}.` : `Get ${gate.need} stars on ${where} first!`);
       } else {
         sfx.tap();
         const card = levelCard(app, level, () => card.remove());

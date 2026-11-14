@@ -33,6 +33,9 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   const prizes = el('div.prizes');
   const prizeIcons = Array.from({ length: 5 }, () => el('img', { src: asset(fruit.img), alt: '', draggable: false }));
   prizes.append(...prizeIcons);
+  // The star the player has to keep to move on is ringed.
+  prizeIcons[level.need - 1].classList.add('needed');
+  const goalNote = el('div.goal-note', {}, `Keep ${level.need} to move on`);
   const progressFill = el('div.fill');
   const progress = el('div.progress', {}, progressFill, el('div.flag', {}, '🏁'));
   const speedFill = el('div.fill');
@@ -75,7 +78,7 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   };
   onTap(pauseButton, () => setPaused(true));
 
-  root.append(el('div.hud-top', {}, timer, prizes, progress), speed, bag, count, hint, pauseButton, pauseMenu);
+  root.append(el('div.hud-top', {}, timer, prizes, goalNote, progress), speed, bag, count, hint, pauseButton, pauseMenu);
 
   let lastStars = 5;
   let lastCount = '';
@@ -134,6 +137,14 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
           el('div.extra', { title: item.name, style: `animation-delay:${1.8 + i * 0.07}s` }, el('img', { src: asset(item.img), alt: item.name }), n > 1 ? el('b', {}, `×${n}`) : null),
         );
       });
+      // Whether this is enough to move on.
+      const best = Math.max(result.stars, 0);
+      const goal = result.opened.length
+        ? el('div.goal.met', {}, `★ ${result.opened.length > 1 ? 'New levels' : 'Next level'} open!`)
+        : result.passed
+          ? null
+          : el('div.goal', {}, `You need ${result.need} stars here to open the next level. You got ${best}.`);
+
       // What made this run special, and any awards it earned.
       const feats = el('div.feats');
       if (result.perfect) feats.append(el('div.feat.gold', {}, '★ Perfect run! Every pickup collected'));
@@ -157,16 +168,17 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
           starRow,
           el('div.kicker', {}, `You won ${countOf(result.fruits, fruit.name)}!`),
           loot,
+          goal,
           feats,
           counts.size ? el('div.kicker.small', {}, 'Extras you picked up') : null,
           counts.size ? extras : null,
           el(
             'div.row',
             {},
-            el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Again'),
-            el('button.btn.purple', { onclick: () => handlers.quit() }, 'Map'),
-            el('button.btn.green', { onclick: () => handlers.blend() }, '🥤 Blend!'),
+            el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Retry'),
+            el('button.btn.green.big', { onclick: () => handlers.blend() }, 'Keep and blend ▶'),
           ),
+          el('p.retry-note', {}, 'Retry starts the level again. This run\'s fruit and stars are only kept if you blend.'),
         ),
       );
       root.append(card);
