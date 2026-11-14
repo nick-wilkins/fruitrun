@@ -32,7 +32,7 @@ describe.each(LEVELS)('$name course', (level) => {
       const track = course.lanes[o.lane].track;
       expect(o.s).toBeGreaterThan(o.lane === 0 ? 10 : 0);
       expect(o.s).toBeLessThan(o.lane === 0 ? course.finishS - 5 : track.length);
-      if (o.kind !== 'spinner') expect(Math.abs(o.x) + (o.amp ?? 0)).toBeLessThanOrEqual(track.half - 0.5);
+      if (o.kind !== 'spinner') expect(Math.abs(o.x) + (o.amp ?? 0)).toBeLessThanOrEqual(track.halfAt(o.s) - 0.5);
     }
   });
 

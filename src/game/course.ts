@@ -1,7 +1,7 @@
 import type { Theme } from './themes';
 import { STEP, Track, type Segment, type Span } from './track';
 
-export type ObjKind = 'pad' | 'crate' | 'slider' | 'pendulum' | 'spinner' | 'windmill' | 'pin' | 'goo' | 'pickup' | 'jump' | 'ring';
+export type ObjKind = 'pad' | 'turbo' | 'crate' | 'slider' | 'pendulum' | 'spinner' | 'windmill' | 'pin' | 'goo' | 'pickup' | 'jump' | 'ring';
 
 /** Pickups marked with this become the level's own fruit rather than a random extra. */
 export const LEVEL_FRUIT = '@fruit';
@@ -28,6 +28,12 @@ export interface CourseObj {
 
 export type LaneSpan = Span & { lane: number };
 
+/** The weather on a course. Rain and snow make the road slippery. */
+export type Mood = 'sunny' | 'night' | 'rain' | 'snow';
+
+/** How quickly the ball answers the controls in each mood, in changes per second. Sunny and night are instant. */
+export const GRIP: Record<Mood, number> = { sunny: Infinity, night: Infinity, rain: 5.5, snow: 3 };
+
 export interface Lane {
   track: Track;
   /** For a fork arm: where it leaves and rejoins the main route, and who takes it. */
@@ -48,6 +54,7 @@ export interface Course {
   lifts: LaneSpan[];
   finishS: number;
   theme: Theme;
+  mood: Mood;
 }
 
 interface Arm {
@@ -80,8 +87,8 @@ export interface Snapshot {
 const rad = (deg: number) => (deg * Math.PI) / 180;
 const snap = (len: number) => Math.max(1, Math.round(len / STEP)) * STEP;
 
-/** Closest two unrelated bits of track may pass. */
-const CLEARANCE = 12;
+/** Air two unrelated bits of track must leave between their edges. At the normal width that is 12 between centres. */
+const MARGIN = 2;
 
 /** Lays a course out piece by piece; objects are placed a distance ahead of the current end. */
 export class CourseBuilder {
@@ -112,6 +119,11 @@ export class CourseBuilder {
 
   straight(len: number): this {
     return this.push({ len });
+  }
+
+  /** Squeeze or spread the road to a new half-width over `len` (5 is normal). It stays that wide until changed. */
+  width(half: number, len = 16): this {
+    return this.push({ len, half });
   }
 
   /** Positive degrees turn right. `bank` overrides the gentle default, e.g. 1 for a wall-ride. */
@@ -202,6 +214,11 @@ export class CourseBuilder {
 
   pad(ahead: number, x: number): this {
     return this.add('pad', ahead, x);
+  }
+
+  /** A turbo pad: far faster than a speed pad, for a couple of seconds. */
+  turbo(ahead: number, x: number): this {
+    return this.add('turbo', ahead, x);
   }
 
   crates(ahead: number, ...xs: number[]): this {
@@ -295,7 +312,7 @@ export class CourseBuilder {
     return findClash(this.layout(), since.s, since.arms + 1) !== null;
   }
 
-  build(theme: Theme): Course {
+  build(theme: Theme, mood: Mood = 'sunny'): Course {
     const lanes = this.layout();
     const track = lanes[0].track;
     return {
@@ -307,11 +324,13 @@ export class CourseBuilder {
       lifts: this.shared.lifts,
       finishS: track.length - 34,
       theme,
+      mood,
     };
   }
 }
 
 interface Sample {
+  half: number;
   x: number;
   y: number;
   z: number;
@@ -320,18 +339,19 @@ interface Sample {
 }
 
 /**
- * Look for two unrelated bits of track closer than CLEARANCE. Only samples on the main route from `fromS`, or on
+ * Look for two unrelated bits of track with less than MARGIN between their edges. Only samples on the main route from `fromS`, or on
  * arms from lane `fromLane`, are tested (against everything), so a builder can check just what it has added.
  */
 export function findClash(lanes: Lane[], fromS = 0, fromLane = 1): string | null {
-  const cell = CLEARANCE;
+  // Big enough that anything too close to a sample is in its own grid cell or the next one, even on wide road.
+  const cell = 24;
   const grid = new Map<string, Sample[]>();
   const fresh: Sample[] = [];
   lanes.forEach((lane, index) => {
     const frames = lane.track.frames;
     for (let i = 0; i < frames.length; i += 2) {
       const p = frames[i].p;
-      const sample = { x: p.x, y: p.y, z: p.z, lane: index, s: i * STEP };
+      const sample = { half: lane.track.halfOf(i), x: p.x, y: p.y, z: p.z, lane: index, s: i * STEP };
       const key = `${Math.floor(p.x / cell)},${Math.floor(p.z / cell)}`;
       const bucket = grid.get(key);
       if (bucket) bucket.push(sample);
@@ -364,7 +384,7 @@ export function findClash(lanes: Lane[], fromS = 0, fromLane = 1): string | null
         for (const b of grid.get(`${cx + dx},${cz + dz}`) ?? []) {
           if (related(a, b)) continue;
           const d = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
-          if (d < CLEARANCE) return `lane ${a.lane} s=${a.s} is ${d.toFixed(1)} from lane ${b.lane} s=${b.s}`;
+          if (d < a.half + b.half + MARGIN) return `lane ${a.lane} s=${a.s} is ${d.toFixed(1)} from lane ${b.lane} s=${b.s}`;
         }
       }
     }

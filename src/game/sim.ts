@@ -1,12 +1,15 @@
 import { Vector3 } from 'three';
 import type { Level } from '../data/levels';
-import { LEVEL_FRUIT, type Course, type CourseObj } from './course';
+import { GRIP, LEVEL_FRUIT, type Course, type CourseObj } from './course';
 import { makeFrame, type Frame } from './track';
 
 export const BALL_RADIUS = 1;
 export const CRUISE = 26;
 export const MIN_SPEED = 12;
 export const MAX_SPEED = 56;
+/** A turbo pad's speed, and how long it holds. */
+export const TURBO_SPEED = 86;
+const TURBO_TIME = 2.2;
 const GRAVITY = 11;
 const COUNTDOWN = 3;
 const START_S = 12;
@@ -24,7 +27,7 @@ export type Autopilot = 'none' | 'smart';
 
 export type SimEvent =
   | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' }
-  | { type: 'boost' | 'crate' | 'pin' | 'bump' | 'ring' | 'jump'; index: number }
+  | { type: 'boost' | 'turbo' | 'crate' | 'pin' | 'bump' | 'ring' | 'jump'; index: number }
   | { type: 'pickup'; index: number; id: string };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -52,7 +55,8 @@ export class Sim {
   readonly done: boolean[];
   /** Per course object: the ingredient a pickup holds. */
   readonly items: (string | undefined)[];
-  readonly limit: number;
+  /** Seconds of turbo left. */
+  turboT = 0;
 
   /** The fork arm the ball has just come off, while it is still close behind. */
   private cameFrom = 0;
@@ -84,7 +88,11 @@ export class Sim {
     );
     this.byLane = course.lanes.map(() => []);
     course.objects.forEach((o, i) => this.byLane[o.lane].push(i));
-    this.limit = course.track.half - BALL_RADIUS;
+  }
+
+  /** How far from the centre the ball can go where it is now: the road narrows and widens. */
+  get limit(): number {
+    return this.course.lanes[this.lane].track.halfAt(Math.max(0, this.s)) - BALL_RADIUS;
   }
 
   /** Jump straight to racing. */
@@ -172,7 +180,8 @@ export class Sim {
       else if (o.kind !== 'pin' && ahead < 26 && (o.y ?? 0) < 3) wants.push(o.x);
     }
     this.frameAt(this.s + 8, this.ahead);
-    wants.push(clamp(this.ahead.k * 160, -3.4, 3.4), this.x);
+    const edge = this.limit - 0.6;
+    wants.push(clamp(this.ahead.k * 160, -edge, edge), this.x);
     const safe = (x: number) => hazards.every((h) => h.s > 20 || Math.abs(h.x - x) > h.wide);
     const pick = wants.find(safe);
     if (pick !== undefined) return pick;
@@ -206,12 +215,20 @@ export class Sim {
     this.riding = riding;
     const wanted = riding ? 0 : this.autopilot === 'smart' ? this.smartLine() : this.steer;
     const target = this.finished || this.knockT > 0 ? null : wanted;
-    if (target !== null) this.xv = clamp((target - this.x) * (riding ? 2.5 : 9), -16, 16);
-    else this.xv *= Math.exp(-8 * dt);
+    // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
+    const grip = GRIP[this.course.mood];
+    if (target !== null) {
+      const wanted = clamp((target - this.x) * (riding ? 2.5 : 9), -16, 16);
+      this.xv += (wanted - this.xv) * Math.min(1, dt * grip);
+    } else {
+      this.xv *= Math.exp(-Math.min(8, grip * 0.5) * dt);
+    }
     this.x += this.xv * dt;
-    if (Math.abs(this.x) > this.limit) {
-      this.x = Math.sign(this.x) * this.limit;
-      if (target !== null && Math.abs(target) > this.limit && this.v > CRUISE * 0.75) {
+    const limit = this.limit;
+    if (Math.abs(this.x) > limit) {
+      this.x = Math.sign(this.x) * limit;
+      if (this.xv * this.x > 0) this.xv = 0;
+      if (target !== null && Math.abs(target) > limit && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
         this.scrapeT -= dt;
         if (this.scrapeT <= 0) {
@@ -231,7 +248,11 @@ export class Sim {
       if (this.v < CRUISE) this.v += 10 * dt;
       else this.v -= (this.v - CRUISE) * 0.24 * dt;
       this.v -= GRAVITY * f.t.y * dt;
-      this.v = clamp(this.v, MIN_SPEED, MAX_SPEED);
+      // Turbo holds a speed far above the usual limit, then it bleeds off quickly.
+      this.turboT -= dt;
+      if (this.turboT > 0) this.v = Math.max(this.v, TURBO_SPEED);
+      else if (this.v > MAX_SPEED) this.v -= (this.v - MAX_SPEED) * 2.5 * dt;
+      this.v = clamp(this.v, MIN_SPEED, TURBO_SPEED);
       this.time += dt;
     }
     this.boostT -= dt;
@@ -308,7 +329,8 @@ export class Sim {
   }
 
   private slow(factor: number): void {
-    this.v = Math.max(MIN_SPEED, this.v * factor);
+    this.turboT = 0;
+    this.v = Math.max(MIN_SPEED, Math.min(this.v, MAX_SPEED) * factor);
   }
 
   private touch(o: CourseObj, index: number, before: number): void {
@@ -320,9 +342,18 @@ export class Sim {
       case 'pad':
         if (Math.abs(ds) < 3 && dx < 1.9 && this.h < 0.6 && ready) {
           this.readyAt[index] = Infinity;
-          this.v = Math.min(MAX_SPEED, Math.max(this.v, CRUISE) + 13);
+          this.v = Math.max(this.v, Math.min(MAX_SPEED, Math.max(this.v, CRUISE) + 13));
           this.boostT = 1.1;
           this.emit({ type: 'boost', index });
+        }
+        break;
+      case 'turbo':
+        if (Math.abs(ds) < 4 && dx < 2.6 && this.h < 0.6 && ready) {
+          this.readyAt[index] = Infinity;
+          this.turboT = TURBO_TIME;
+          this.v = TURBO_SPEED;
+          this.boostT = TURBO_TIME;
+          this.emit({ type: 'turbo', index });
         }
         break;
       case 'crate':
@@ -335,7 +366,7 @@ export class Sim {
       case 'pin':
         if (Math.abs(ds) < 0.9 && dx < 0.4 + BALL_RADIUS * 0.9 && this.h < 1.2) {
           this.done[index] = true;
-          this.slow(0.97);
+          this.v *= 0.97;
           this.emit({ type: 'pin', index });
         }
         break;
@@ -391,7 +422,7 @@ export class Sim {
       case 'ring':
         if (crossed && dx < 1.75 && Math.abs(this.h + BALL_RADIUS - (o.y ?? 2)) < 2.4) {
           this.done[index] = true;
-          this.v = Math.min(MAX_SPEED, this.v + 6);
+          this.v = Math.max(this.v, Math.min(MAX_SPEED, this.v + 6));
           this.boostT = 0.5;
           this.emit({ type: 'ring', index });
         }
@@ -400,7 +431,7 @@ export class Sim {
         if (crossed && dx < 2.3 && this.h === 0) {
           this.vh = o.power ?? 11.5;
           this.h = 0.01;
-          this.v = Math.min(MAX_SPEED, this.v + 3);
+          this.v = Math.max(this.v, Math.min(MAX_SPEED, this.v + 3));
           this.emit({ type: 'jump', index });
         }
         break;

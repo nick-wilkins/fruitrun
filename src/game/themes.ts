@@ -184,3 +184,17 @@ export function themeFor(level: { id: string; world: number; label: number; frui
     goo: darken(fruitColor, 0.3),
   });
 }
+
+/** Repaint a level's look for its weather. */
+export function inMood(look: Theme, mood: 'sunny' | 'night' | 'rain' | 'snow'): Theme {
+  switch (mood) {
+    case 'night':
+      return { ...look, skyTop: '#070b26', skyBottom: '#2a2f6e', fog: '#1a1f4f', ground: darken(look.ground, 0.55), groundDark: darken(look.groundDark, 0.6), cloud: '#4a4f8a', canopy: look.canopy.map((c) => darken(c, 0.45)), light: 0.5 };
+    case 'rain':
+      return { ...look, skyTop: '#4f6378', skyBottom: '#a9b8c6', fog: '#93a5b6', ground: darken(look.ground, 0.22), groundDark: darken(look.groundDark, 0.25), cloud: '#7f8b99', light: 0.74 };
+    case 'snow':
+      return { ...look, skyTop: '#8fbfe6', skyBottom: '#eef7ff', fog: '#e3effa', ground: '#f4f9ff', groundDark: '#d3e4f4', road: '#dcecfb', roadStyle: 'plain', canopy: ['#f2f8ff', '#cfe6f7', '#7fb8a8'], cloud: '#ffffff', scenery: 'pine', light: 1.05 };
+    default:
+      return look;
+  }
+}

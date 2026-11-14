@@ -436,6 +436,115 @@ export const PIECES = {
     );
     b.straight(12);
   },
+
+  /** A turbo pad and a long clear run to enjoy it. */
+  turboRun(b, r) {
+    b.straight(10);
+    b.turbo(6, 0);
+    for (let at = 50; at < 250; at += 50) b.ring(at, lane(r) * 0.6);
+    b.fruit(150, 0).pickup(240, lane(r));
+    b.straight(270);
+  },
+
+  /** Turbo straight off the end of the road: the longest jump in the game. */
+  turboJump(b) {
+    b.pad(2, 0).straight(12);
+    b.turbo(6, 0).straight(40);
+    b.gap(0, 90);
+    b.ring(22, 0, 7).fruit(45, 0, 9).ring(68, 0, 7);
+    b.straight(90);
+    b.pickup(60, 0).pad(120, 0);
+    b.straight(150);
+  },
+
+  /** The road squeezes down to a beam with barely room for the ball. */
+  tightrope(b) {
+    b.pad(4, 0).width(2.3, 18);
+    b.pickup(14, 0).ring(30, 0).fruit(46, 0).ring(62, 0).pad(74, 0);
+    b.straight(80);
+    b.width(5, 18);
+  },
+
+  /** The road opens out into a wide square scattered with skittles, crates and treats. */
+  plaza(b, r, d) {
+    b.width(9.5, 20);
+    const lanes = [-7, -3.5, 0, 3.5, 7];
+    const rows = 4 + Math.round(d * 2);
+    for (let i = 0; i < rows; i++) {
+      const at = 12 + i * 22;
+      const first = Math.floor(r() * 5);
+      b.pins(at, lanes[first]).crates(at + 4, lanes[(first + 2) % 5]).pickup(at, lanes[(first + 3) % 5]);
+      if (i % 2) b.pad(at + 10, lanes[(first + 1) % 5]);
+      else b.fruit(at + 10, lanes[(first + 4) % 5]);
+    }
+    b.straight(rows * 22 + 14);
+    b.width(5, 20);
+  },
+
+  /** A split where both ways loop the loop, twice, side by side. */
+  forkTwinLoops(b, r) {
+    const loops = (m: CourseBuilder, out: 1 | -1, treats: boolean) => {
+      m.pad(2, 0).straight(18);
+      treats ? m.fruit(Math.PI * 10, 0) : m.ring(Math.PI * 10, 0, 2);
+      m.loop(10, out);
+      m.pad(4, 0).pad(24, lane(r)).straight(40);
+      treats ? m.fruit(Math.PI * 10, 0) : m.pickup(Math.PI * 10, 0);
+      m.loop(10, -out as 1 | -1);
+      m.straight(18);
+    };
+    b.straight(12);
+    b.ring(-6, -3.2).ring(-6, 3.2);
+    b.fork(
+      -1,
+      (arm) => bulge(arm, -1, (m) => loops(m, -1, false)),
+      (main) => bulge(main, 1, (m) => loops(m, 1, true)),
+    );
+    b.straight(12);
+  },
+
+  /** A long parting of the ways: thrills on the left (twist, loops, a leap), a winding garden path on the right. */
+  forkLong(b, r, d) {
+    // Each bend pair swings out and back, covering this much ground in a straight line.
+    const wiggle = 4 * 40 * Math.sin(rad(25));
+    // The thrill route, measured flat: twist 116, loops 76, leap 116.
+    const total = 308;
+    b.straight(12);
+    b.pad(-6, -3.2).pickup(-6, 3.2);
+    b.fork(
+      -1,
+      (arm) =>
+        bulge(arm, -1, (m) => {
+          m.pad(4, 0).straight(16);
+          m.tunnel(8, 74).pickup(20, 0).fruit(60, 0).twist(90, 1);
+          m.straight(10);
+          m.pad(2, 0).straight(18);
+          m.ring(Math.PI * 10, 0, 2).loop(10, -1);
+          m.pad(4, 0).pad(24, 0).straight(40);
+          m.fruit(Math.PI * 10, 0).loop(10, 1);
+          m.straight(18);
+          m.pad(4, 0).pad(16, 0).straight(26);
+          m.gap(0, 60);
+          m.ring(15, 0, 6.5).fruit(30, 0, 8.3).ring(45, 0, 6.5);
+          m.straight(60);
+          m.pad(8, 0).straight(30);
+        }),
+      (main) =>
+        bulge(main, 1, (m) => {
+          const bends = () => {
+            m.pickup(10, 3).turn(25, 40);
+            m.fruit(8, -3).turn(-25, 40);
+            m.pickup(8, -3).turn(-25, 40);
+            m.pickup(8, 3).turn(25, 40);
+          };
+          bends();
+          const rest = total - wiggle * 2;
+          m.pendulum(22, 3.4, 1.5 + d * 0.5).pad(36, lane(r)).pickup(52, lane(r)).pendulum(76, 3.4, 1.5 + d * 0.5, 2).fruit(96, 0).pad(120, lane(r)).pickup(140, lane(r));
+          m.straight(rest);
+          bends();
+        }),
+    );
+    b.straight(12);
+  },
 } satisfies Record<string, Piece>;
 
 export type PieceName = keyof typeof PIECES;

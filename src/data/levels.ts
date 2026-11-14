@@ -34,6 +34,8 @@ export interface Level {
   after: number[];
   /** 0 (gentle) to 1 (busy): how many obstacles the course pieces lay down. */
   difficulty: number;
+  /** The weather: rain and snow make the road slippery, night is dark. */
+  mood: 'sunny' | 'night' | 'rain' | 'snow';
   /** Bonus ingredients that can appear on this course. */
   bonusPool: string[];
 }
@@ -47,6 +49,29 @@ export const WORLDS: World[] = [
   { id: 'tropics', name: 'Tropical Falls', art: 'assets/map-tropics.webp', nodes: 'blue', blender: at(1545, 690) },
   { id: 'village', name: 'Blossom Village', art: 'assets/map-village.webp', nodes: 'yellow', blender: at(800, 118) },
 ];
+
+/** Levels with weather, by level number. Everything else is sunny. */
+const MOODS: Record<number, Level['mood']> = {
+  // Sunny Meadow
+  10: 'rain',
+  11: 'night',
+  17: 'night',
+  // Tropical Falls: storms and warm nights
+  22: 'rain',
+  27: 'night',
+  31: 'rain',
+  35: 'night',
+  38: 'rain',
+  // Blossom Village: frost, showers and the dark cave
+  45: 'snow',
+  48: 'rain',
+  50: 'night',
+  54: 'snow',
+  58: 'rain',
+  63: 'snow',
+  67: 'night',
+  68: 'night',
+};
 
 /** Staples that turn up everywhere. */
 const BASICS = ['oats', 'honey', 'milk', 'yogurt', 'chia', 'almond', 'ice', 'granola', 'vanilla', 'dates', 'flax', 'oatmilk'];
@@ -65,6 +90,7 @@ const meadow = (n: number, after: number[], fruit: string, name: string, px: num
   artLocked: n >= 15,
   after,
   difficulty: (n - 1) / 17,
+  mood: MOODS[n] ?? 'sunny',
   // Specials are listed twice so the ingredients that suit this fruit turn up more often.
   bonusPool: [...BASICS, ...specials, ...specials],
 });
@@ -128,6 +154,7 @@ function world(index: number, first: number, entry: number, easiest: number, har
       artLocked: false,
       after: [s.from === 0 ? entry : first + s.from - 1],
       difficulty: easiest + ((hardest - easiest) * depth[i]) / deepest,
+      mood: MOODS[n] ?? 'sunny',
       bonusPool: [...BASICS, ...specials, ...specials],
     };
   });

@@ -22,6 +22,8 @@ import {
   Object3D,
   OctahedronGeometry,
   PlaneGeometry,
+  Points,
+  PointsMaterial,
   Scene,
   SphereGeometry,
   Sprite,
@@ -447,14 +449,15 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
     const dip = index === 0 ? 0 : -0.04;
     const solid = solidRuns(course, index);
     for (const [s0, s1] of solid) {
-      scene.add(new Mesh(extrude(track, [[-half, dip], [half, dip]], { s0, s1, vScale: 0.1 }), roadMaterial));
-      scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip], [half * 0.55, -1.5 + dip], [-half * 0.55, -1.5 + dip], [-half - 0.9, -0.6 + dip]], { s0, s1, stride: 2 }), underMaterial));
+      // The third number ties a point to the road's edge, so it follows where the road widens or narrows.
+      scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0, s1, vScale: 0.1 }), roadMaterial));
+      scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip, 1], [half * 0.55, -1.5 + dip, 1], [-half * 0.55, -1.5 + dip, -1], [-half - 0.9, -0.6 + dip, -1]], { s0, s1, stride: 2 }), underMaterial));
     }
     for (const [s0, s1] of clip(kerbRuns(course.lanes, index, -1), solid)) {
-      scene.add(new Mesh(extrude(track, [[-half - 0.9, -0.6], [-half - 0.9, 0.6], [-half, 0.6], [-half, 0]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
+      scene.add(new Mesh(extrude(track, [[-half - 0.9, -0.6, -1], [-half - 0.9, 0.6, -1], [-half, 0.6, -1], [-half, 0, -1]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
     }
     for (const [s0, s1] of clip(kerbRuns(course.lanes, index, 1), solid)) {
-      scene.add(new Mesh(extrude(track, [[half, 0], [half, 0.6], [half + 0.9, 0.6], [half + 0.9, -0.6]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
+      scene.add(new Mesh(extrude(track, [[half, 0, 1], [half, 0.6, 1], [half + 0.9, 0.6, 1], [half + 0.9, -0.6, 1]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
     }
   });
 
@@ -492,8 +495,26 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   sun.position.set(0.5, 1, 0.35);
   scene.add(sun);
 
+  // Stars on a night course: they ride with the sky dome so they never get nearer.
+  let stars: Points | null = null;
+  if (course.mood === 'night') {
+    const rand = seeded(5);
+    const dots = new Float32Array(420 * 3);
+    for (let i = 0; i < 420; i++) {
+      const a = rand() * Math.PI * 2;
+      const up = 0.08 + rand() * 0.9;
+      const flat = Math.sqrt(1 - up * up);
+      dots.set([Math.cos(a) * flat * 900, up * 900, Math.sin(a) * flat * 900], i * 3);
+    }
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute(dots, 3));
+    stars = new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 3.2, sizeAttenuation: false, fog: false, depthWrite: false }));
+    stars.renderOrder = -9;
+  }
+
   const sky = new Mesh(new SphereGeometry(1000, 24, 16), new MeshBasicMaterial({ map: skyTexture(theme), side: BackSide, fog: false, depthWrite: false }));
   sky.renderOrder = -10;
+  if (stars) sky.add(stars);
   scene.add(sky);
 
   let lowest = Infinity;
@@ -530,7 +551,8 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   const lipMaterial = new MeshLambertMaterial({ map: stripeTexture('#ff7a1a', '#ffffff'), side: DoubleSide });
   for (const gap of course.gaps) {
     const lip = new Mesh(lipGeometry, lipMaterial);
-    place(lip, standing(lanes[gap.lane].track, gap.s0 - 2.6, 0, 0));
+    const on = lanes[gap.lane].track;
+    place(lip, standing(on, gap.s0 - 2.6, 0, 0).scale(X.set(on.halfAt(gap.s0) / half, 1, 1)));
     scene.add(lip);
   }
   const beltMaterial = new MeshBasicMaterial({ map: padMap, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -558,6 +580,8 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   const count = (kind: CourseObj['kind']) => Math.max(1, course.objects.filter((o) => o.kind === kind).length);
   const decal = { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
   const pads = new InstancedMesh(new PlaneGeometry(3.4, 6), new MeshBasicMaterial({ map: padMap, ...decal }), count('pad'));
+  // Turbo pads share the scrolling chevrons, bigger and tinted hot.
+  const turbos = new InstancedMesh(new PlaneGeometry(5.4, 10), new MeshBasicMaterial({ map: padMap, color: '#ff5a2a', ...decal }), count('turbo'));
   const goo = new InstancedMesh(new PlaneGeometry(3.7, 8), new MeshBasicMaterial({ map: gooTexture(theme.goo), ...decal }), count('goo'));
   const crates = new InstancedMesh(new BoxGeometry(2.3, 2.1, 2.1), new MeshLambertMaterial({ map: crateTexture() }), count('crate'));
   const pinMap = bumperTexture('#ff3d3d', '#ffffff');
@@ -586,7 +610,7 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
 
   const instance: number[] = [];
   const pickups = new Map<number, PickupVisual>();
-  const used = { pad: 0, goo: 0, crate: 0, pin: 0, slider: 0, spinner: 0, pendulum: 0, ring: 0 };
+  const used = { pad: 0, turbo: 0, goo: 0, crate: 0, pin: 0, slider: 0, spinner: 0, pendulum: 0, ring: 0 };
   const stretch = new Matrix4();
   course.objects.forEach((o, i) => {
     const on = lanes[o.lane].track;
@@ -594,6 +618,9 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
     switch (o.kind) {
       case 'pad':
         pads.setMatrixAt(used.pad++, lying(on, o.s, o.x, 0.05));
+        break;
+      case 'turbo':
+        turbos.setMatrixAt(used.turbo++, lying(on, o.s, o.x, 0.055));
         break;
       case 'goo':
         goo.setMatrixAt(used.goo++, lying(on, o.s, o.x, 0.045).multiply(stretch.makeScale(1, (o.len ?? 8) / 8, 1)));
@@ -666,6 +693,7 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
     }
   });
   pads.count = used.pad;
+  turbos.count = used.turbo;
   goo.count = used.goo;
   crates.count = used.crate;
   pins.count = used.pin;
@@ -675,7 +703,7 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   rings.count = used.ring;
   // Moving things can stray outside the bounds they were first given.
   for (const mesh of [crates, pins, sliders, spinners, balls, rods]) mesh.frustumCulled = false;
-  scene.add(pads, goo, crates, pins, sliders, spinners, hubs, balls, rods, rings);
+  scene.add(pads, turbos, goo, crates, pins, sliders, spinners, hubs, balls, rods, rings);
 
   const dispose = () => {
     const shared = new Set(iconCache.values());

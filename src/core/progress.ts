@@ -15,7 +15,7 @@ export interface Sip {
 const HISTORY = 12;
 
 /** Bump when courses are re-laid, so best times set on the old layouts stop counting against the new ones. */
-export const COURSES = 2;
+export const COURSES = 3;
 
 export interface LevelRecord {
   stars: number;

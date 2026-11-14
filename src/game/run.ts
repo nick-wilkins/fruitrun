@@ -3,6 +3,8 @@ import {
   BufferGeometry,
   Color,
   Float32BufferAttribute,
+  LineBasicMaterial,
+  LineSegments,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
@@ -122,6 +124,50 @@ class Sparks {
   }
 }
 
+/** Rain streaks or snowflakes in a box that travels with the camera. */
+class Weather {
+  readonly object: LineSegments | Points;
+  private readonly count: number;
+  private readonly at: Float32Array;
+  private readonly fall: number;
+  private readonly snow: boolean;
+
+  constructor(mood: 'rain' | 'snow') {
+    this.snow = mood === 'snow';
+    this.count = this.snow ? 420 : 520;
+    this.fall = this.snow ? 7 : 58;
+    this.at = new Float32Array(this.count * 3);
+    for (let i = 0; i < this.count; i++) this.at.set([(Math.random() - 0.5) * 70, Math.random() * 44 - 14, (Math.random() - 0.5) * 70], i * 3);
+    const geometry = new BufferGeometry();
+    if (this.snow) {
+      geometry.setAttribute('position', new Float32BufferAttribute(this.at, 3));
+      this.object = new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 0.45, map: blobTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'), transparent: true, depthWrite: false }));
+    } else {
+      geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(this.count * 6), 3));
+      this.object = new LineSegments(geometry, new LineBasicMaterial({ color: '#d6ecff', transparent: true, opacity: 0.5, depthWrite: false }));
+    }
+    this.object.frustumCulled = false;
+  }
+
+  update(dt: number, clock: number, camera: Vector3): void {
+    const position = this.object.geometry.attributes.position;
+    for (let i = 0; i < this.count; i++) {
+      const o = i * 3;
+      this.at[o + 1] -= this.fall * dt;
+      if (this.at[o + 1] < -14) this.at[o + 1] += 44;
+      if (this.snow) {
+        this.at[o] += Math.sin(clock * 1.3 + i) * dt * 1.4;
+      } else {
+        // Each streak is a short line slanting with the wind.
+        position.setXYZ(i * 2, this.at[o], this.at[o + 1], this.at[o + 2]);
+        position.setXYZ(i * 2 + 1, this.at[o] + 0.25, this.at[o + 1] - 1.7, this.at[o + 2]);
+      }
+    }
+    position.needsUpdate = true;
+    this.object.position.copy(camera);
+  }
+}
+
 /** One attempt at a course: the rules live in Sim; this draws them, plays the sounds and reads the controls. */
 export class Run {
   readonly sim: Sim;
@@ -132,6 +178,7 @@ export class Run {
   private readonly sparks = new Sparks();
   private readonly canvas: HTMLCanvasElement;
   private readonly flying: Flying[] = [];
+  private readonly weather: Weather | null;
 
   private pointerSteer: number | null = null;
   private pointerId: number | null = null;
@@ -187,6 +234,8 @@ export class Run {
     );
     this.shadow.matrixAutoUpdate = false;
     this.world.scene.add(this.shadow, this.sparks.points);
+    this.weather = course.mood === 'rain' || course.mood === 'snow' ? new Weather(course.mood) : null;
+    if (this.weather) this.world.scene.add(this.weather.object);
 
     this.canvas.addEventListener('pointerdown', this.onPointer);
     this.canvas.addEventListener('pointermove', this.onPointer);
@@ -214,7 +263,7 @@ export class Run {
     const rect = this.canvas.getBoundingClientRect();
     const across = (e.clientX - rect.left) / rect.width - 0.5;
     const reach = this.sim.limit + PUSH;
-    this.pointerSteer = clamp(across * 2 * this.course.track.half * 1.35, -reach, reach);
+    this.pointerSteer = clamp(across * 2 * (this.sim.limit + BALL_RADIUS) * 1.35, -reach, reach);
     e.preventDefault();
   };
 
@@ -340,6 +389,11 @@ export class Run {
         sfx.boost();
         this.sparks.burst(this.ballAt(0.5, this.v1), 12, ['#eaff3d', '#7dffb0'], 5);
         break;
+      case 'turbo':
+        sfx.turbo();
+        this.shake = 0.35;
+        this.sparks.burst(this.ballAt(0.5, this.v1), 30, ['#ff5a2a', '#ffd23f', '#ffffff'], 9);
+        break;
       case 'crate':
         this.shake = 0.5;
         sfx.hit();
@@ -426,7 +480,7 @@ export class Run {
     this.shadow.visible = !sim.overGap();
 
     // Chase camera, riding the track a little way behind so it loops, twists and corkscrews with the ball.
-    const back = 8.2 + clamp((sim.v - CRUISE) * 0.07, 0, 2.4);
+    const back = 8.2 + clamp((sim.v - CRUISE) * 0.07, 0, 4.2);
     const fc = sim.frameAt(sim.s - back, this.fc);
     this.camPos.copy(fc.p).addScaledVector(fc.u, 4 + sim.h * 0.8).addScaledVector(fc.r, sim.x * 0.55);
     const fl = sim.frameAt(sim.s + 7, this.fl);
@@ -468,7 +522,8 @@ export class Run {
     this.pip.body.rotation.z = clamp(sim.xv * 0.035, -0.5, 0.5);
     this.pip.body.position.y = sim.finished ? Math.abs(Math.sin(sim.clock * 7)) * 0.18 - 0.05 : Math.sin(sim.clock * 15) * 0.025 * pace - 0.05;
 
-    const target = 62 + clamp((sim.v - CRUISE) / 26, 0, 1) * 16;
+    // The view widens with speed, and stretches right out under turbo.
+    const target = 62 + clamp((sim.v - CRUISE) / 26, 0, 1) * 16 + clamp((sim.v - MAX_SPEED) / 30, 0, 1) * 16;
     this.fov += (target - this.fov) * Math.min(1, dt * 4);
     if (Math.abs(this.camera.fov - this.fov) > 0.05) {
       this.camera.fov = this.fov;
@@ -535,10 +590,12 @@ export class Run {
     }
 
     if (sim.boostT > 0 && racing) {
-      this.sparks.burst(sim.point(sim.s - 0.6, sim.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), 1, ['#eaff3d', '#ffffff'], 2);
+      const hot = sim.turboT > 0;
+      this.sparks.burst(sim.point(sim.s - 0.6, sim.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), hot ? 3 : 1, hot ? ['#ff5a2a', '#ffd23f'] : ['#eaff3d', '#ffffff'], 2);
     }
     this.sparks.update(dt);
     this.place();
+    this.weather?.update(dt, sim.clock, this.camPos);
   }
 
   /** Render a single frame without advancing time. */

@@ -4,7 +4,7 @@ import { CourseBuilder, type Course } from './course';
 import { PIECES, type PieceName, type Rng } from './pieces';
 import { timeCourse } from './sim';
 import { seeded } from './random';
-import { themeFor } from './themes';
+import { inMood, themeFor } from './themes';
 
 /** Level 1, Apple Orchard: laid out by hand as a gentle tour of the basics. */
 function appleOrchard(): CourseBuilder {
@@ -92,22 +92,22 @@ function appleOrchard(): CourseBuilder {
 /** What each level of the first world is made of, in order. Each leans on one or two signature pieces. */
 const RECIPES: Record<string, PieceName[]> = {
   'level-2': ['sweeper', 'forkDiamond', 'sBends', 'hairpinWall', 'escalatorHill', 'bigDrop', 'loopOne', 'sweeper', 'crateField', 'corkscrewDown', 'jumpLine'],
-  'level-3': ['pinAlley', 'sBends', 'gooField', 'cliffFall', 'sweeper', 'pinAlley', 'tightLoops', 'forkDiamond', 'waves', 'megaJump'],
-  'level-4': ['spinnerRun', 'sweeper', 'windmills', 'loopOne', 'forkShortcut', 'superJump', 'hairpinWall', 'loopDouble', 'sBends', 'windmills', 'jumpLine'],
-  'level-5': ['tightCorkscrew', 'twist', 'forkLoops', 'helixUp', 'sliderTunnel', 'corkscrewDown', 'cliffFall', 'twist', 'pinAlley', 'tightCorkscrew', 'loopOne'],
+  'level-3': ['pinAlley', 'sBends', 'gooField', 'cliffFall', 'sweeper', 'plaza', 'tightLoops', 'forkDiamond', 'waves', 'megaJump'],
+  'level-4': ['spinnerRun', 'turboRun', 'windmills', 'loopOne', 'forkShortcut', 'superJump', 'hairpinWall', 'loopDouble', 'sBends', 'windmills', 'jumpLine'],
+  'level-5': ['tightCorkscrew', 'twist', 'forkTwinLoops', 'helixUp', 'sliderTunnel', 'corkscrewDown', 'cliffFall', 'twist', 'pinAlley', 'tightCorkscrew', 'loopOne'],
   'level-6': ['waves', 'forkShortcut', 'gooField', 'superJump', 'sweeper', 'pendulumBridge', 'tightLoops', 'escalatorHill', 'megaJump', 'forkThree', 'crateField'],
-  'level-7': ['waves', 'hairpinWall', 'superJump', 'gooField', 'cliffFall', 'hairpinWall', 'twist', 'crateField', 'megaJump', 'loopDouble', 'forkHill', 'superJump'],
+  'level-7': ['waves', 'hairpinWall', 'superJump', 'gooField', 'cliffFall', 'hairpinWall', 'twist', 'crateField', 'megaJump', 'loopDouble', 'forkHill', 'turboJump'],
   'level-8': ['cliffFall', 'sliderTunnel', 'pendulumBridge', 'forkLift', 'escalatorHill', 'bigDrop', 'tightCorkscrew', 'spinnerRun', 'cliffFall', 'loopOne', 'twist', 'bigDrop'],
-  'level-9': ['escalatorHill', 'tightLoops', 'helixUp', 'bigDrop', 'forkDiamond', 'corkscrewDown', 'pinAlley', 'superJump', 'escalatorHill', 'cliffFall', 'loopDouble'],
+  'level-9': ['escalatorHill', 'tightLoops', 'helixUp', 'bigDrop', 'forkLong', 'corkscrewDown', 'pinAlley', 'superJump', 'escalatorHill', 'cliffFall', 'loopDouble'],
   'level-10': ['cliffFall', 'twist', 'forkThree', 'gooField', 'escalatorHill', 'cliffFall', 'forkShortcut', 'waves', 'tightLoops', 'pendulumBridge', 'forkHill', 'cliffFall'],
   'level-11': ['windmills', 'twist', 'sBends', 'spinnerRun', 'tightLoops', 'pendulumBridge', 'forkLoops', 'hairpinWall', 'superJump', 'tightCorkscrew', 'sliderTunnel', 'windmills'],
-  'level-12': ['escalatorHill', 'helixUp', 'superJump', 'cliffFall', 'tightLoops', 'megaJump', 'forkLift', 'corkscrewDown', 'bigDrop', 'spinnerRun', 'waves'],
-  'level-13': ['forkThree', 'pendulumBridge', 'forkLoops', 'sweeper', 'forkLift', 'windmills', 'forkDiamond', 'gooField', 'megaJump', 'forkShortcut', 'twist', 'forkHill'],
+  'level-12': ['escalatorHill', 'tightrope', 'turboRun', 'cliffFall', 'tightLoops', 'megaJump', 'forkLift', 'corkscrewDown', 'bigDrop', 'spinnerRun', 'waves'],
+  'level-13': ['forkThree', 'pendulumBridge', 'forkTwinLoops', 'sweeper', 'forkLong', 'windmills', 'forkDiamond', 'gooField', 'megaJump', 'forkShortcut', 'twist', 'forkHill'],
   'level-14': ['twist', 'sliderTunnel', 'tightCorkscrew', 'windmills', 'forkHill', 'pendulumBridge', 'loopDouble', 'twist', 'cliffFall', 'spinnerRun', 'tightLoops'],
-  'level-15': ['crateField', 'windmills', 'pendulumBridge', 'forkThree', 'gooField', 'sliderTunnel', 'cliffFall', 'pinAlley', 'tightLoops', 'spinnerRun', 'superJump', 'corkscrewDown'],
-  'level-16': ['superJump', 'jumpLine', 'forkLift', 'waves', 'megaJump', 'hairpinWall', 'forkThree', 'loopOne', 'superJump', 'cliffFall', 'twist', 'forkHill'],
-  'level-17': ['pinAlley', 'escalatorHill', 'superJump', 'hairpinWall', 'forkLoops', 'windmills', 'bigDrop', 'megaJump', 'pinAlley', 'tightCorkscrew', 'forkLift', 'pendulumBridge'],
-  'level-18': ['escalatorHill', 'twist', 'forkThree', 'windmills', 'tightLoops', 'cliffFall', 'pendulumBridge', 'superJump', 'tightCorkscrew', 'forkLift', 'twist', 'forkLoops', 'bigDrop', 'megaJump'],
+  'level-15': ['plaza', 'windmills', 'pendulumBridge', 'forkThree', 'gooField', 'sliderTunnel', 'cliffFall', 'pinAlley', 'tightLoops', 'spinnerRun', 'superJump', 'corkscrewDown'],
+  'level-16': ['turboJump', 'jumpLine', 'forkLift', 'waves', 'megaJump', 'hairpinWall', 'forkThree', 'loopOne', 'superJump', 'cliffFall', 'twist', 'forkHill'],
+  'level-17': ['plaza', 'escalatorHill', 'superJump', 'hairpinWall', 'forkLoops', 'windmills', 'bigDrop', 'megaJump', 'pinAlley', 'tightCorkscrew', 'forkLift', 'pendulumBridge'],
+  'level-18': ['escalatorHill', 'tightrope', 'forkLong', 'windmills', 'turboRun', 'cliffFall', 'pendulumBridge', 'superJump', 'tightCorkscrew', 'forkLift', 'twist', 'forkLoops', 'bigDrop', 'megaJump'],
 };
 
 type Link = (b: CourseBuilder, r: Rng) => void;
@@ -142,13 +142,13 @@ const LINKS: Link[] = [
 
 /** Pieces grouped by what they feel like, for writing a recipe automatically. */
 const FAMILIES: Record<string, PieceName[]> = {
-  speed: ['sweeper', 'hairpinWall', 'sBends', 'padStraight'],
-  air: ['megaJump', 'superJump', 'cliffFall', 'jumpLine'],
+  speed: ['sweeper', 'hairpinWall', 'sBends', 'turboRun'],
+  air: ['megaJump', 'superJump', 'cliffFall', 'jumpLine', 'turboJump'],
   loops: ['loopOne', 'loopDouble', 'tightLoops'],
   spirals: ['corkscrewDown', 'tightCorkscrew', 'helixUp'],
-  hazards: ['crateField', 'pinAlley', 'spinnerRun', 'windmills', 'pendulumBridge', 'gooField', 'sliderTunnel'],
-  hills: ['waves', 'bigDrop', 'escalatorHill', 'twist'],
-  forks: ['forkDiamond', 'forkShortcut', 'forkHill', 'forkThree', 'forkLoops', 'forkLift'],
+  hazards: ['crateField', 'pinAlley', 'spinnerRun', 'windmills', 'pendulumBridge', 'gooField', 'sliderTunnel', 'plaza'],
+  hills: ['waves', 'bigDrop', 'escalatorHill', 'twist', 'tightrope'],
+  forks: ['forkDiamond', 'forkShortcut', 'forkHill', 'forkThree', 'forkLoops', 'forkLift', 'forkTwinLoops', 'forkLong'],
 };
 const RHYTHM = ['speed', 'hazards', 'forks', 'air', 'loops', 'hazards', 'hills', 'spirals', 'forks', 'air', 'hazards', 'hills'];
 
@@ -245,7 +245,7 @@ function calibrate(course: Course, level: Level): StarTimes {
 function prepared(level: Level) {
   let entry = built.get(level.id);
   if (!entry) {
-    const course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(themeFor(level, ingredient(level.fruit).color));
+    const course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(inMood(themeFor(level, ingredient(level.fruit).color), level.mood), level.mood);
     entry = { course, starTimes: calibrate(course, level) };
     built.set(level.id, entry);
   }

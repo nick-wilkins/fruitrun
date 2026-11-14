@@ -27,6 +27,8 @@ export interface Segment {
   roll?: number;
   /** Sideways drift across the segment, used to stop a loop meeting itself. Positive is right. */
   shift?: number;
+  /** Half-width of the road to ease to by the end of this segment. It stays that wide until changed again. */
+  half?: number;
   kind?: 'loop' | 'spiral' | 'twist';
 }
 
@@ -60,6 +62,8 @@ export class Track {
   private readonly yaws: number[] = [];
   private readonly pitches: number[] = [];
   private readonly rolls: number[] = [];
+  /** Half-width of the road at each sample. */
+  private readonly halves: number[] = [];
 
   constructor(
     segments: Segment[],
@@ -70,6 +74,7 @@ export class Track {
     let yaw = start?.yaw ?? 0;
     let pitch = start?.pitch ?? 0;
     let roll = start?.roll ?? 0;
+    let wide = half;
     let s = 0;
     const push = (bank: number, k: number) => {
       const sy = Math.sin(yaw);
@@ -87,6 +92,7 @@ export class Track {
       this.yaws.push(yaw);
       this.pitches.push(pitch);
       this.rolls.push(roll);
+      this.halves.push(wide);
     };
 
     push(roll, 0);
@@ -99,8 +105,10 @@ export class Track {
       const shiftDir = new Vector3(-Math.cos(yaw), 0, Math.sin(yaw));
       if (seg.kind) this.spans.push({ kind: seg.kind, s0: s, s1: s + len });
       let shifted = 0;
+      const from = wide;
       for (let i = 0; i < n; i++) {
         const at = (i + 1) / n;
+        if (seg.half !== undefined) wide = from + (seg.half - from) * smooth(at);
         yaw += dYaw;
         pitch += dPitch;
         roll += dRoll;
@@ -132,6 +140,18 @@ export class Track {
       f.u.addScaledVector(f.t, -f.u.dot(f.t)).normalize();
       f.r.crossVectors(f.t, f.u).normalize();
     }
+  }
+
+  /** Half-width of the road at distance `s`. */
+  halfAt(s: number): number {
+    const x = Math.min(this.halves.length - 1.001, Math.max(0, s / STEP));
+    const i = Math.floor(x);
+    return this.halves[i] + (this.halves[i + 1] - this.halves[i]) * (x - i);
+  }
+
+  /** Half-width at a stored sample. */
+  halfOf(index: number): number {
+    return this.halves[index];
   }
 
   /** The pose to start another track from at distance `s`. */
@@ -189,10 +209,13 @@ export interface ExtrudeOptions {
 }
 
 /**
- * Sweep a cross-section along the track. Profile points are [right, up] offsets; walk the outline clockwise
- * (left to right across the top) so faces point outwards.
+ * Sweep a cross-section along the track. Profile points are [right, up] offsets for a road of the standard width,
+ * with an optional third number: -1 or 1 ties the point to the left or right edge, so it moves out and in as the
+ * road widens and narrows. Walk the outline clockwise (left to right across the top) so faces point outwards.
  */
-export function extrude(track: Track, profile: [number, number][], options: ExtrudeOptions = {}): BufferGeometry {
+export type ProfilePoint = [number, number] | [number, number, number];
+
+export function extrude(track: Track, profile: ProfilePoint[], options: ExtrudeOptions = {}): BufferGeometry {
   const stride = options.stride ?? 1;
   const vScale = options.vScale ?? 0.1;
   const i0 = Math.max(0, Math.round((options.s0 ?? 0) / STEP));
@@ -208,7 +231,7 @@ export function extrude(track: Track, profile: [number, number][], options: Extr
   const total = lengths[lengths.length - 1] || 1;
 
   // Flat shading needs each profile edge to own its two corners.
-  const columns: { point: [number, number]; u: number }[] = [];
+  const columns: { point: ProfilePoint; u: number }[] = [];
   if (options.smooth) {
     profile.forEach((point, j) => columns.push({ point, u: lengths[j] / total }));
   } else {
@@ -224,7 +247,8 @@ export function extrude(track: Track, profile: [number, number][], options: Extr
   rows.forEach((frameIndex, row) => {
     const f = track.frames[frameIndex];
     columns.forEach((column, c) => {
-      v.copy(f.p).addScaledVector(f.r, column.point[0]).addScaledVector(f.u, column.point[1]);
+      const x = column.point[0] + (column.point[2] ?? 0) * (track.halfOf(frameIndex) - track.half);
+      v.copy(f.p).addScaledVector(f.r, x).addScaledVector(f.u, column.point[1]);
       const o = (row * perRow + c) * 3;
       positions[o] = v.x;
       positions[o + 1] = v.y;

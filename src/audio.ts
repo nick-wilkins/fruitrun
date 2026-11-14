@@ -245,6 +245,14 @@ export const sfx = {
     if (rating >= 4) tone(notes[notes.length - 1] * 2, 0.8, { volume: 0.16, delay: notes.length * 0.12, wobble: [7, 12] });
     if (rating === 5) noise(1, 0.1, 5000, 0.5, 9000, 'highpass');
   },
+  /** Turbo pad: a rocket taking off. */
+  turbo: () => {
+    duck(1.6);
+    tone(110, 1.3, { type: 'sawtooth', volume: 0.3, to: 1760 });
+    tone(165, 1.3, { type: 'square', volume: 0.12, to: 2640, wobble: [14, 30] });
+    noise(1.5, 0.4, 300, 0, 9000, 'bandpass');
+    run([523, 659, 784, 1047, 1319, 1568], 0.05, 0.14, { type: 'triangle', volume: 0.2, delay: 0.1 });
+  },
   /** Flung off the end of the road. */
   launch: () => {
     tone(260, 0.6, { volume: 0.32, to: 1400 });
