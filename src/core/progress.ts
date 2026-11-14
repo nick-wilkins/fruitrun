@@ -1,10 +1,15 @@
-import { LEVELS, type Level } from '../data/levels';
+import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
+
+/** Bump when courses are re-laid, so best times set on the old layouts stop counting against the new ones. */
+export const COURSES = 2;
 
 export interface LevelRecord {
   stars: number;
   time: number;
+  /** Which set of course layouts the time was set on. Missing on saves from before layouts were versioned. */
+  courses?: number;
 }
 
 export interface Save {
@@ -40,8 +45,17 @@ export function loadSave(): Save | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Save;
-    return parsed.version === 1 ? { ...newSave(), ...parsed } : null;
+    const parsed = JSON.parse(raw) as Save & { unlocked?: number };
+    if (parsed.version !== 1) return null;
+    delete parsed.unlocked;
+    const save = { ...newSave(), ...parsed };
+    // Pip stands on the level last played. Older saves did not record it, and a level may since have gone:
+    // fall back to the furthest level finished.
+    if (!save.last || !LEVELS.some((l) => l.id === save.last)) {
+      const done = LEVELS.filter((l) => save.levels[l.id]);
+      save.last = done.length ? done[done.length - 1].id : null;
+    }
+    return save;
   } catch {
     return null;
   }
@@ -65,7 +79,7 @@ export function clearSave(): void {
 
 /** A level opens once any level leading to it on the map has been finished. */
 export function isUnlocked(save: Save, level: Level): boolean {
-  return level.after.length === 0 || level.after.some((n) => LEVELS.some((l) => l.n === n && save.levels[l.id]));
+  return level.after.length === 0 || level.after.some((n) => Boolean(save.levels[levelByNumber(n).id]));
 }
 
 export function starsForTime(level: Level, seconds: number): number {
@@ -86,10 +100,13 @@ export interface RunResult {
 export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[]): RunResult {
   const stars = starsForTime(level, seconds);
   const previous = save.levels[level.id];
-  const newBest = !previous || seconds < previous.time;
+  // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.
+  const comparable = previous?.courses === COURSES;
+  const newBest = !previous || !comparable || seconds < previous.time;
   save.levels[level.id] = {
     stars: Math.max(stars, previous?.stars ?? 0),
     time: newBest ? seconds : previous.time,
+    courses: COURSES,
   };
   save.inventory[level.fruit] = (save.inventory[level.fruit] ?? 0) + stars;
   for (const id of bonuses) save.inventory[id] = (save.inventory[id] ?? 0) + 1;

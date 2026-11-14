@@ -1,7 +1,7 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
-import { isUnlocked } from '../core/progress';
-import { LEVELS, WORLDS, type Level } from '../data/levels';
+import { COURSES, isUnlocked } from '../core/progress';
+import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
@@ -26,7 +26,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('img.big-fruit', { src: asset(fruit.img), alt: fruit.name, draggable: false }),
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
-      record ? el('div.best', {}, stars(record.stars), el('span', {}, `Best ${formatTime(record.time)}`)) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
+      record ? el('div.best', {}, stars(record.stars), record.courses === COURSES ? el('span', {}, `Best ${formatTime(record.time)}`) : null) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
       targets,
       el(
         'button.btn.green.big',
@@ -77,7 +77,7 @@ export function mapScreen(app: App): HTMLElement {
         node.classList.remove('shake');
         void node.offsetWidth;
         node.classList.add('shake');
-        const before = level.after.map((n) => LEVELS.find((l) => l.n === n)!);
+        const before = level.after.map(levelByNumber);
         const elsewhere = before.find((l) => l.world !== level.world);
         app.toast(elsewhere ? `Finish ${WORLDS[elsewhere.world].name} first!` : `Finish level ${before.map((l) => l.label).join(' or ')} first!`);
       } else {

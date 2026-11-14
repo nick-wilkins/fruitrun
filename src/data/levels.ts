@@ -107,6 +107,11 @@ const EXTRAS = INGREDIENTS.filter((i) => i.cat !== 'fruit' && !BASICS.includes(i
 const RARE = ['greenapple', 'blackberry', 'melon', 'pomegranate', 'lime', 'cranberry', 'apricot', 'fig', 'passionfruit', 'guava'];
 
 function world(index: number, first: number, entry: number, easiest: number, hardest: number, places: string[], stops: Stop[]): Level[] {
+  // How many levels in from the way in each stop is: side paths are a step on from where they leave the main
+  // path, not as hard as their place in this list would suggest.
+  const depth: number[] = [];
+  stops.forEach((s, i) => (depth[i] = s.from === 0 ? 0 : depth[s.from - 1] + 1));
+  const deepest = Math.max(...depth);
   return stops.map((s, i) => {
     const n = first + i;
     const random = seeded(n * 2053);
@@ -122,7 +127,7 @@ function world(index: number, first: number, entry: number, easiest: number, har
       ...at(s.px, s.py),
       artLocked: false,
       after: [s.from === 0 ? entry : first + s.from - 1],
-      difficulty: easiest + ((hardest - easiest) * i) / (stops.length - 1),
+      difficulty: easiest + ((hardest - easiest) * depth[i]) / deepest,
       bonusPool: [...BASICS, ...specials, ...specials],
     };
   });
@@ -188,6 +193,14 @@ const VILLAGE = world(2, 40, 32, 0.55, 1, ['Lane', 'Green', 'Fence', 'Bridge', '
 ]);
 
 export const LEVELS: Level[] = [...MEADOW, ...TROPICS, ...VILLAGE];
+
+const BY_NUMBER = new Map(LEVELS.map((l) => [l.n, l]));
+
+export function levelByNumber(n: number): Level {
+  const found = BY_NUMBER.get(n);
+  if (!found) throw new Error(`Unknown level number: ${n}`);
+  return found;
+}
 
 export function levelById(id: string): Level {
   const found = LEVELS.find((l) => l.id === id);

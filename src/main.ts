@@ -1,9 +1,9 @@
 import { WebGLRenderer } from 'three';
 import { setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
-import { clearSave, completeLevel, loadSave, newSave, storeSave, type RunResult } from './core/progress';
-import { levelById, type Level } from './data/levels';
-import { courseFor } from './game/courses';
+import { clearSave, completeLevel, isUnlocked, loadSave, newSave, storeSave, type RunResult } from './core/progress';
+import { LEVELS, levelById, type Level } from './data/levels';
+import { courseFor, warmCourses } from './game/courses';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import type { App, Screen } from './ui/app';
@@ -102,6 +102,9 @@ document.addEventListener('visibilitychange', () => {
 });
 
 app.show('menu');
+
+// Lay out courses in the background, starting with the ones the player can reach.
+warmCourses([...LEVELS].sort((a, b) => Number(isUnlocked(app.save, b)) - Number(isUnlocked(app.save, a))));
 
 if (import.meta.env.DEV) {
   // Console helpers for tuning and testing.

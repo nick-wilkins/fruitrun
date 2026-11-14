@@ -143,6 +143,11 @@ export class Sim {
     return out;
   }
 
+  /** Is the ball over a stretch with no road? */
+  overGap(): boolean {
+    return this.course.gaps.some((g) => g.lane === this.lane && this.s > g.s0 && this.s < g.s1);
+  }
+
   /** Is the ball on an escalator? */
   onLift(): boolean {
     return this.course.lifts.some((l) => l.lane === this.lane && this.s >= l.s0 && this.s <= l.s1);
@@ -259,8 +264,10 @@ export class Sim {
     for (const gap of this.course.gaps) {
       if (gap.lane !== this.lane) continue;
       if (before < gap.s0 && this.s >= gap.s0) {
-        this.v = clamp(this.v, 40, 46);
-        this.vh = (13 * (gap.s1 - gap.s0 + 4)) / this.v;
+        // The arc is the same height every time, so rings and fruit hang where they can be reached, but speed is
+        // kept: a boosted ball lands further on, and a slow one comes down short and has to skip the rest.
+        this.v = Math.max(this.v, 30);
+        this.vh = (13 * (gap.s1 - gap.s0 + 4)) / 43;
         this.h = Math.max(this.h, 0.01);
         this.emit({ type: 'launch' });
       } else if (this.h === 0 && this.s > gap.s0 && this.s < gap.s1 - 1) {

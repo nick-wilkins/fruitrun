@@ -17,7 +17,7 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 
 ## Where things are
 
-- `src/data/` ingredients (28 fruits, 58 extras) and the 18 map levels with their bonus pools
+- `src/data/` ingredients (28 fruits, 58 extras); `levels.ts` has the three worlds and their 68 levels: where each sits on its map, its fruit, and which level leads to it
 - `src/core/` smoothie scoring and save/progress rules (localStorage key `fruitrun.save.v1`)
 - `src/game/sim.ts` the rules of a run, with no rendering: steering, speed, forks, every obstacle
 - `src/game/pieces.ts` the library of course pieces; `courses.ts` the recipe for each level and the generator
@@ -28,6 +28,8 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 
 ## Changing levels
 
-A level is a list of piece names in `RECIPES` in `src/game/courses.ts`. Reorder, swap or add pieces and the generator fits them together; `npm test` proves the result does not hit itself and can be finished. Star times set themselves from a hands-free test run. New piece types go in `src/game/pieces.ts`.
+World 1 levels are a list of piece names in `RECIPES` in `src/game/courses.ts`; levels in worlds 2 and 3 get a recipe written for them automatically. Reorder, swap or add pieces and the generator fits them together; `npm test` proves the result does not hit itself and can be finished. Star times set themselves from a hands-free test run. New piece types go in `src/game/pieces.ts`.
+
+If you change layouts, bump `COURSES` in `src/core/progress.ts` so best times set on the old ones stop counting.
 
 In dev, the browser console has `__fr.play(7)` to jump into a level and `__fr.sim('smart', 'level-7')` for a good-line finish time.

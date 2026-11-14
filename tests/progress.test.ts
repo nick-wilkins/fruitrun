@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blend, completeLevel, isUnlocked, newSave, starsForTime } from '../src/core/progress';
-import { LEVELS } from '../src/data/levels';
+import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
 const level = LEVELS[0];
@@ -39,7 +39,7 @@ describe('completeLevel', () => {
 });
 
 describe('the map', () => {
-  const byNumber = (n: number) => LEVELS.find((l) => l.n === n)!;
+  const byNumber = levelByNumber;
 
   it('starts with only level 1 open', () => {
     const save = newSave();
@@ -63,7 +63,7 @@ describe('the map', () => {
 });
 
 describe('worlds', () => {
-  const byNumber = (n: number) => LEVELS.find((l) => l.n === n)!;
+  const byNumber = levelByNumber;
 
   it('opens the second world from the castle and the third from the portal', () => {
     const save = newSave();
@@ -78,8 +78,19 @@ describe('worlds', () => {
   it('gives every level a way in from a level that exists', () => {
     for (const level of LEVELS.slice(1)) {
       expect(level.after.length, level.id).toBeGreaterThan(0);
-      for (const n of level.after) expect(byNumber(n), `${level.id} after ${n}`).toBeDefined();
+      for (const n of level.after) expect(() => byNumber(n), `${level.id} after ${n}`).not.toThrow();
     }
+  });
+});
+
+describe('old saves', () => {
+  it('lets the first run on a re-laid course replace a best time set on the old layout', () => {
+    const save = newSave();
+    save.levels[level.id] = { stars: 5, time: 10 };
+    const result = completeLevel(save, level, 50, []);
+    expect(result.newBest).toBe(true);
+    expect(save.levels[level.id].time).toBe(50);
+    expect(save.levels[level.id].stars).toBe(5);
   });
 });
 

@@ -152,14 +152,14 @@ const FAMILIES: Record<string, PieceName[]> = {
 };
 const RHYTHM = ['speed', 'hazards', 'forks', 'air', 'loops', 'hazards', 'hills', 'spirals', 'forks', 'air', 'hazards', 'hills'];
 
-/** A recipe for a level that has none written by hand: one piece from each family in a set rhythm, never the same twice running. */
+/** A recipe for a level that has none written by hand: one piece from each family in a set rhythm, no piece more than twice. */
 function autoRecipe(r: Rng): PieceName[] {
   const start = Math.floor(r() * RHYTHM.length);
   const recipe: PieceName[] = [];
   for (let i = 0; i < RHYTHM.length; i++) {
     const family = FAMILIES[RHYTHM[(start + i) % RHYTHM.length]];
     let piece = family[Math.floor(r() * family.length)];
-    if (piece === recipe[recipe.length - 1] || recipe.filter((p) => p === piece).length >= 2) piece = family[(family.indexOf(piece) + 1) % family.length];
+    if (recipe.filter((p) => p === piece).length >= 2) piece = family[(family.indexOf(piece) + 1) % family.length];
     recipe.push(piece);
   }
   return recipe;
@@ -185,7 +185,7 @@ function generate(level: Level, attempt = 0): CourseBuilder {
   b.straight(80);
 
   // Depth-first: if a later piece cannot be fitted, go back and lay the earlier one a different way.
-  let budget = 2000;
+  let budget = 900;
   const place = (index: number): boolean => {
     if (index === recipe.length) {
       // The sprint to the line has to fit too, or the last piece is laid again a different way.
@@ -216,7 +216,7 @@ function generate(level: Level, attempt = 0): CourseBuilder {
   };
   if (!place(0)) {
     // Boxed in: start again with different luck.
-    if (attempt < 6) return generate(level, attempt + 1);
+    if (attempt < 8) return generate(level, attempt + 1);
     throw new Error(`${level.id}: could not lay out the course`);
   }
 
@@ -256,3 +256,18 @@ function prepared(level: Level) {
 export const courseFor = (level: Level): Course => prepared(level).course;
 
 export const starTimesFor = (level: Level): StarTimes => prepared(level).starTimes;
+
+/**
+ * Build courses a few at a time while nothing else is happening, so opening a level never has to wait for one.
+ * `order` is the levels to prepare, soonest-needed first.
+ */
+export function warmCourses(order: Level[]): void {
+  const queue = order.filter((level) => !built.has(level.id));
+  const next = () => {
+    const level = queue.shift();
+    if (!level) return;
+    prepared(level);
+    window.setTimeout(next, 30);
+  };
+  window.setTimeout(next, 600);
+}

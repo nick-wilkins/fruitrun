@@ -422,6 +422,8 @@ export class Run {
     this.v3.copy(f.p).addScaledVector(f.r, sim.x).addScaledVector(f.u, 0.06);
     this.shadow.matrix.makeBasis(f.r, f.t, f.u).scale(this.camUp.set(shrink, shrink, 1)).setPosition(this.v3);
     this.shadow.matrixWorldNeedsUpdate = true;
+    // Nothing to cast a shadow on where the road has been taken away.
+    this.shadow.visible = !sim.overGap();
 
     // Chase camera, riding the track a little way behind so it loops, twists and corkscrews with the ball.
     const back = 8.2 + clamp((sim.v - CRUISE) * 0.07, 0, 2.4);

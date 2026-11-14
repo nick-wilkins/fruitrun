@@ -51,3 +51,15 @@ Chrome at 1280x720:
 - PASS levels 8, 13, 17, 18, 25, 33, 50 and 68 auto-played to the finish at 60 fps, no console errors.
 - PASS Tropical Falls and Blossom Village maps: all nodes sit on the painted stones; world switch buttons work.
 - Not checked: a real iPad; sound by ear; most of the 50 new levels by eye (covered by the tests only).
+
+## Review
+
+`/code-review medium`, 10 findings, all fixed. `npm test`: 565 passed.
+
+- Side-path levels in worlds 2 and 3 were among the hardest in their world although they open early. Difficulty now follows how far along the route a level is.
+- World 1 courses changed, so best times set on the old layouts could never be beaten. Records carry a layout version (`COURSES`); the first run on a new layout replaces an old time, and the card hides a time it cannot vouch for. Stars are kept. Test added.
+- Saves from before today had no "last played" level, so Pip went back to level 1. It now falls back to the furthest level finished, which also covers a save naming a level that no longer exists (that used to stop the game loading).
+- Gap launches threw away boost speed and gave a crawling ball a free lift. Speed is now kept and the arc is a fixed height.
+- The ball's shadow floated over gaps. Hidden there now. Checked in Chrome on level 60.
+- Course layout could stall the first tap on a level. Courses are laid out in the background after load, reachable levels first, and each attempt has a smaller budget. Opening level 60 cold took 45 ms in Chrome.
+- Tidied: one `levelByNumber` lookup, a dead check removed from the automatic recipe, README brought up to date.
