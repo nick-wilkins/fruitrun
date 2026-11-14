@@ -6,6 +6,7 @@ import { LEVELS, WORLDS } from '../data/levels';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
 import { pipSvg } from './pip';
+import { setBackdrop } from './screen';
 
 /** One ingredient that gives a recipe away a little, for recipes not found yet. */
 function clue(combo: Combo): string | null {
@@ -112,6 +113,7 @@ function collection(app: App): HTMLElement {
 export function bookScreen(app: App): HTMLElement {
   const stage = el('div.stage.book-stage');
   stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
+  setBackdrop(asset('assets/stall.webp'));
   const pages = { Trophies: trophies, Recipes: recipes, Collection: collection };
   const body = el('div.book-body');
   const tabs = el('div.book-tabs');

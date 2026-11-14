@@ -6,6 +6,7 @@ import { starTimesFor } from '../game/courses';
 import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
+import { fullscreenButton, setBackdrop } from './screen';
 
 const HOUSE =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10.5V20h4.5v-5h3v5H18v-9.5" fill="currentColor"/></svg>';
@@ -60,6 +61,7 @@ export function mapScreen(app: App): HTMLElement {
   const drawn = world.nodes !== 'art';
   const stage = el(`div.stage.map-stage${drawn ? '.small' : ''}`);
   stage.append(el('img.bg', { src: asset(world.art), alt: '', draggable: false }));
+  setBackdrop(asset(world.art));
 
   const here = save.last ?? LEVELS[0].id;
   for (const level of LEVELS) {
@@ -166,6 +168,6 @@ export function mapScreen(app: App): HTMLElement {
     go('Blend', 'green', 'blender'),
     go('Book', 'orange', 'book'),
   );
-  stage.append(blender, el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
+  stage.append(blender, el('div.corner', {}, home, fullscreenButton(), el('div.chip.world-name', {}, world.name)), bar);
   return stage;
 }

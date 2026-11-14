@@ -59,6 +59,15 @@ img {
   pointer-events: none;
 }
 
+/* On a screen that is not the stage's shape, the bars are filled with a soft copy of the picture. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: -6%;
+  background: var(--backdrop, none) center / cover no-repeat;
+  filter: blur(22px) saturate(1.1) brightness(0.92);
+}
+
 #ui > * {
   pointer-events: auto;
 }
@@ -101,8 +110,11 @@ img {
   container-type: inline-size;
   overflow: hidden;
   font-size: 1.7cqw;
-  border-radius: 1.2cqw;
-  box-shadow: 0 0 6cqw rgba(0, 0, 0, 0.35);
+  /* Feather the stage into the backdrop so there is no hard edge where the picture stops. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 1.6%, #000 98.4%, transparent), linear-gradient(to bottom, transparent, #000 2.4%, #000 97.6%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 1.6%, #000 98.4%, transparent), linear-gradient(to bottom, transparent, #000 2.4%, #000 97.6%, transparent);
+  mask-composite: intersect;
 }
 
 .stage > .bg {
@@ -611,7 +623,7 @@ img {
   gap: 0.7cqw;
 }
 
-.corner .home {
+.corner .round {
   position: static;
   flex: none;
   display: flex;
@@ -619,9 +631,17 @@ img {
   justify-content: center;
 }
 
-.home svg {
+.round svg {
   width: 58%;
   height: 58%;
+}
+
+.menu-stage .fullscreen {
+  right: 6.4cqw;
+  top: 1.6cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .topbar {

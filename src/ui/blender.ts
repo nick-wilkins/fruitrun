@@ -5,6 +5,7 @@ import { INGREDIENTS, ingredient } from '../data/ingredients';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
 import { pipSvg } from './pip';
+import { setBackdrop } from './screen';
 
 const PER_PAGE = 9;
 const BLEND_SECONDS = 2.4;
@@ -30,6 +31,7 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
   const big = capacity > MAX_JUG;
   const stage = el(`div.stage.blend-stage${big ? '.big' : ''}`);
   stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
+  setBackdrop(asset('assets/stall.webp'));
 
   const jug: string[] = [];
   let page = 0;
