@@ -99,5 +99,13 @@ export const sfx = {
     const notes = [392, 494, 587, 784, 988].slice(0, Math.max(2, rating));
     notes.forEach((f, i) => tone(f, 0.3, 'triangle', 0.3, i * 0.12));
   },
+  sip: (seconds: number) => {
+    for (let t = 0; t < seconds; t += 0.11) tone(180 + Math.random() * 140, 0.09, 'sine', 0.16, t, 120 + Math.random() * 60);
+    noise(seconds, 0.07, 700);
+  },
+  yuck: () => {
+    tone(320, 0.5, 'sawtooth', 0.2, 0, 90);
+    tone(140, 0.3, 'square', 0.12, 0.3, 70);
+  },
   nope: () => tone(200, 0.18, 'square', 0.14, 0, 140),
 };

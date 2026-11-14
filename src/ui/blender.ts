@@ -4,9 +4,13 @@ import { COMBOS, MAX_JUG, type SmoothieResult } from '../core/smoothie';
 import { INGREDIENTS, ingredient } from '../data/ingredients';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
+import { pipSvg, type PipMood } from './pip';
 
 const PER_PAGE = 9;
 const BLEND_SECONDS = 2.4;
+const SIP_SECONDS = 1.5;
+/** Pip's face for each rating, worst to best. */
+const REACTIONS: PipMood[] = ['yuck', 'meh', 'nice', 'yum', 'wow'];
 
 /** Where each of the ten ingredients settles inside the glass, as a percentage of its box. */
 const PILE: [number, number][] = [
@@ -132,58 +136,65 @@ export function blenderScreen(app: App): HTMLElement {
       badges.append(el('div.badge.combo', {}, `${fresh.includes(combo.id) ? 'NEW! ' : ''}${combo.name} +${combo.pts}`));
     }
     for (const note of result.notes) badges.append(el(`div.badge.${note.good ? 'good' : 'bad'}`, {}, note.label));
-    const card = el(
-      'div.modal',
+    const buttons = el(
+      'div.row',
       {},
       el(
-        'div.card.smoothie',
-        {},
-        el('div.kicker', {}, result.verdict),
-        el('h2', {}, result.name),
-        el('div.glassful', { style: `--smoothie:${result.color}` }),
-        cups,
-        total,
-        el('div.kicker.small', {}, 'smoothie points'),
-        badges,
-        el(
-          'div.row',
-          {},
-          el(
-            'button.btn.purple',
-            {
-              onclick: () => {
-                sfx.tap();
-                app.show('map');
-              },
-            },
-            'Map',
-          ),
-          el(
-            'button.btn.green',
-            {
-              onclick: () => {
-                sfx.tap();
-                card.remove();
-                busy = false;
-                liquid.style.height = '0%';
-                stage.classList.remove('blending');
-                render();
-              },
-            },
-            'Blend another',
-          ),
-        ),
+        'button.btn.purple',
+        {
+          onclick: () => {
+            sfx.tap();
+            app.show('map');
+          },
+        },
+        'Map',
+      ),
+      el(
+        'button.btn.green',
+        {
+          onclick: () => {
+            sfx.tap();
+            card.remove();
+            busy = false;
+            liquid.style.height = '0%';
+            stage.classList.remove('blending');
+            render();
+          },
+        },
+        'Blend another',
       ),
     );
+
+    // Pip tastes it first: a long sip, then a face that says it all.
+    const level = el('div.level');
+    const taster = el('div.taster', { innerHTML: pipSvg('sip') });
+    const verdict = el('div.verdict', {}, result.verdict);
+    const taste = el('div.taste', {}, el('div.glassful', { style: `--smoothie:${result.color}` }, level, el('div.straw')), taster, verdict);
+    const after = el('div.after', {}, cups, total, el('div.kicker.small', {}, 'smoothie points'), badges, buttons);
+    const card = el('div.modal', {}, el('div.card.smoothie', {}, el('h2', {}, result.name), taste, after));
     stage.append(card);
-    sfx.reveal(result.rating);
-    const started = performance.now();
-    const tick = (now: number) => {
-      const k = Math.min(1, (now - started) / 900);
-      total.textContent = String(Math.round((result.points * (1 - Math.pow(1 - k, 3))) / 5) * 5);
-      if (k < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+    sfx.sip(SIP_SECONDS);
+    requestAnimationFrame(() => level.classList.add('drained'));
+
+    setTimeout(() => {
+      if (!card.isConnected) return;
+      taster.innerHTML = pipSvg(REACTIONS[result.rating - 1]);
+      taste.classList.add('reacted', `rated-${result.rating}`);
+      if (result.rating === 1) sfx.yuck();
+      else sfx.reveal(result.rating);
+    }, SIP_SECONDS * 1000);
+
+    setTimeout(() => {
+      if (!card.isConnected) return;
+      after.classList.add('shown');
+      const started = performance.now();
+      const tick = (now: number) => {
+        const k = Math.min(1, (now - started) / 900);
+        total.textContent = String(Math.round((result.points * (1 - Math.pow(1 - k, 3))) / 5) * 5);
+        if (k < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, SIP_SECONDS * 1000 + 900);
   }
 
   onTap(blendButton, () => {

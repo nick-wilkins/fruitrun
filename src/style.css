@@ -1064,18 +1064,127 @@ button.mix-item {
   width: 31em;
 }
 
+.taste {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 0.2em;
+  height: 10.5em;
+  margin: 0.3em 0 0.2em;
+}
+
 .glassful {
-  width: 5.2em;
-  height: 6.4em;
-  margin: 0.4em auto 0.5em;
-  background: linear-gradient(rgba(255, 255, 255, 0.5) 0 12%, var(--smoothie) 12%);
-  border: 0.3em solid #fff;
-  border-top-width: 0.15em;
-  border-radius: 0.4em 0.4em 1.6em 1.6em;
-  box-shadow:
-    0 0 0 0.18em var(--ink),
-    inset 0.7em 0 0 rgba(255, 255, 255, 0.28);
-  animation: bob 1.2s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+  width: 4.6em;
+  height: 6em;
+  margin-bottom: 0.4em;
+  background: rgba(255, 255, 255, 0.55);
+  border: 0.28em solid #fff;
+  border-top-width: 0.12em;
+  border-radius: 0.4em 0.4em 1.5em 1.5em;
+  box-shadow: 0 0 0 0.18em var(--ink);
+}
+
+.glassful .level {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 90%;
+  background: var(--smoothie);
+  border-radius: 0.2em 0.2em 1.2em 1.2em;
+  box-shadow: inset 0.6em 0 0 rgba(255, 255, 255, 0.28);
+  transition: height 1.5s ease-in-out;
+}
+
+.glassful .level.drained {
+  height: 22%;
+}
+
+.straw {
+  position: absolute;
+  left: 58%;
+  bottom: 8%;
+  width: 0.55em;
+  height: 6.2em;
+  transform-origin: 50% 100%;
+  transform: rotate(61deg);
+  background: repeating-linear-gradient(#ff4d6d 0 0.5em, #fff 0.5em 1em);
+  border: 0.12em solid var(--ink);
+  border-radius: 0.3em;
+}
+
+.taster {
+  width: 8.6em;
+  flex: none;
+  animation: slurp 0.3s ease-in-out infinite;
+}
+
+.reacted .taster {
+  animation: star-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1), bob 0.9s 0.45s ease-in-out infinite;
+}
+
+.rated-1 .taster {
+  animation: star-pop 0.3s, queasy 0.5s 0.3s ease-in-out infinite;
+}
+
+.rated-5 .taster {
+  animation: star-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1), party 0.5s 0.45s ease-in-out infinite;
+}
+
+.reacted .straw {
+  transform: rotate(8deg);
+  height: 7.4em;
+  transition: transform 0.3s, height 0.3s;
+}
+
+.verdict {
+  position: absolute;
+  left: 62%;
+  top: -0.3em;
+  padding: 0.25em 0.8em;
+  font-size: 1.35em;
+  color: #fff;
+  white-space: nowrap;
+  background: #3fa81e;
+  border: 0.14em solid var(--ink);
+  border-radius: 1em 1em 1em 0.2em;
+  transform: scale(0);
+  transform-origin: 0 100%;
+}
+
+.reacted .verdict {
+  transform: scale(1) rotate(-4deg);
+  transition: transform 0.35s cubic-bezier(0.2, 1.7, 0.4, 1);
+}
+
+.rated-1 .verdict {
+  background: #8a9a2a;
+}
+
+.rated-2 .verdict {
+  background: #c9762a;
+}
+
+.rated-4 .verdict {
+  background: #e2551f;
+}
+
+.rated-5 .verdict {
+  background: linear-gradient(90deg, #ff4d6d, #b574f2, #4aa3ff);
+}
+
+.after {
+  opacity: 0;
+  transform: translateY(0.6em);
+  pointer-events: none;
+}
+
+.after.shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 0.3s, transform 0.3s;
 }
 
 .cups {
@@ -1239,6 +1348,30 @@ button.mix-item {
   }
   to {
     transform: rotate(360deg) scale(0.9);
+  }
+}
+
+@keyframes slurp {
+  50% {
+    scale: 1.04 0.96;
+  }
+}
+
+@keyframes queasy {
+  25% {
+    rotate: -7deg;
+    translate: -4% 0;
+  }
+  75% {
+    rotate: 7deg;
+    translate: 4% 0;
+  }
+}
+
+@keyframes party {
+  50% {
+    translate: 0 -14%;
+    rotate: 6deg;
   }
 }
 
