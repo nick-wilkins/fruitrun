@@ -43,3 +43,8 @@ The camera smoothing added above predicted the next view from how far the camera
 - Test first: six levels played with uneven frames (60, 30 and 20 a second, plus hitches). Camera wandered 23 to 62 units from the ball; all six failed.
 - Fix: the prediction now comes from the ball's speed and the length of the frame, so nothing goes stale, and a carried difference of more than a road's width is dropped outright.
 - After: all six pass (camera within 22 units), with the 204 smoothness runs still passing. In Chrome on level 7 with a forced 70 ms hitch every 25 frames, a pause and resume and a turbo pad, the camera stayed within 12.8 units of the ball.
+
+## Also from Nick's screenshots: fork joins and the lamp
+
+- A fork's two roads and the filler between them could each be a different tint, with a jagged shimmer where they overlapped. A fork now keeps one tint from before it parts until after it rejoins, and arms are drawn just behind the main road in depth instead of being sunk below it. Checked in Chrome on level 2 (day) and level 5 (night): one colour, clean edge.
+- The ball's lamp bleached the road white on night levels. It is about a tenth as bright now (12 at night, 34 at midnight).

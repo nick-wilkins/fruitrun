@@ -506,8 +506,32 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
   const fills = roads.map((road) => {
     const fill = road.clone();
     fill.side = DoubleSide;
+    // Drawn behind both roads wherever they cover it, so the two never flicker against each other.
+    fill.polygonOffset = true;
+    fill.polygonOffsetFactor = 2;
+    fill.polygonOffsetUnits = 8;
     return fill;
   });
+  // Fork arms lie exactly on the main road where they overlap it. Rather than sink them, they are drawn just
+  // behind it in depth: no ledge where the roads part, and no jagged shimmer where they overlap.
+  const armRoads = roads.map((road) => {
+    const arm = road.clone();
+    arm.polygonOffset = true;
+    arm.polygonOffsetFactor = 1;
+    arm.polygonOffsetUnits = 4;
+    return arm;
+  });
+  const forks = course.lanes.flatMap((lane) => (lane.from ? [lane.from] : []));
+  /** Which tint the road has at `s` on the main route. A fork keeps one tint from before it parts until after it rejoins. */
+  const tintAt = (s: number) => {
+    const fork = forks.find((f) => s >= f.s0 - 14 && s <= f.s1 + 14);
+    return Math.floor((fork ? fork.s0 - 14 : s) / STRETCH) % roads.length;
+  };
+  // Where the main road may change tint: every stretch, and either side of each fork.
+  const marks = [...new Set([...forks.flatMap((f) => [f.s0 - 14, f.s1 + 14]), ...Array.from({ length: Math.ceil(course.track.length / STRETCH) }, (_, i) => i * STRETCH)])]
+    .filter((s) => s > 0 && s < course.track.length)
+    .map((s) => Math.round(s * 2) / 2)
+    .sort((a, b) => a - b);
   // Kerbs keep glowing at midnight so the edges of the road can always be seen.
   const kerbMaterial = trackMaterial(stripeTexture(theme.kerbA, theme.kerbB), Math.max(theme.glow, 0.5));
   const underMaterial = new MeshLambertMaterial({ color: theme.under, emissive: theme.under, emissiveIntensity: theme.glow * 0.9 });
@@ -515,14 +539,19 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
     const track = lane.track;
     const half = track.half;
     // Fork arms sit a hair lower so they do not flicker where they overlap the main road.
-    const dip = index === 0 ? 0 : -0.04;
+    const dip = 0;
     const solid = solidRuns(course, index);
     for (const [s0, s1] of solid) {
       // The third number ties a point to the road's edge, so it follows where the road widens or narrows.
-      for (let from = s0; from < s1; from = Math.floor(from / STRETCH + 1) * STRETCH) {
-        const to = Math.min(s1, Math.floor(from / STRETCH + 1) * STRETCH);
-        const tint = index === 0 ? Math.floor(from / STRETCH) % roads.length : index % roads.length;
-        scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0: from, s1: to, vScale: 0.1 }), roads[tint]));
+      if (lane.from) {
+        // An arm is one colour throughout: the main road's where it leaves.
+        scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0, s1, vScale: 0.1 }), armRoads[tintAt(lane.from.s0)]));
+      } else {
+        const cuts = [s0, ...marks.filter((m) => m > s0 && m < s1), s1];
+        for (let i = 0; i < cuts.length - 1; i++) {
+          const tint = tintAt((cuts[i] + cuts[i + 1]) / 2);
+          scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0: cuts[i], s1: cuts[i + 1], vScale: 0.1 }), roads[tint]));
+        }
       }
       scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip, 1], [half * 0.55, -1.5 + dip, 1], [-half * 0.55, -1.5 + dip, -1], [-half - 0.9, -0.6 + dip, -1]], { s0, s1, stride: 2 }), underMaterial));
     }
@@ -540,7 +569,7 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
   const b = makeFrame();
   for (const lane of course.lanes) {
     if (!lane.from) continue;
-    const reach = lane.from.decide + 6;
+    const reach = lane.from.decide + 10;
     for (const end of [0, 1]) {
       const at = end ? lane.from.s1 : lane.from.s0;
       const points: number[] = [];
@@ -551,7 +580,7 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
         // Stop where one road has climbed away from the other: there is nothing to join there.
         if (Math.abs(a.p.y - b.p.y) > 0.6) break;
         for (const f of [a, b]) {
-          points.push(f.p.x - f.u.x * 0.07, f.p.y - f.u.y * 0.07, f.p.z - f.u.z * 0.07);
+          points.push(f.p.x - f.u.x * 0.02, f.p.y - f.u.y * 0.02, f.p.z - f.u.z * 0.02);
           uvs.push(f === a ? 0.3 : 0.7, d * 0.1);
         }
       }
@@ -563,7 +592,7 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
       fill.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
       fill.setIndex(index);
       fill.computeVertexNormals();
-      scene.add(new Mesh(fill, fills[Math.floor(at / STRETCH) % fills.length]));
+      scene.add(new Mesh(fill, fills[tintAt(lane.from.s0)]));
     }
   }
 

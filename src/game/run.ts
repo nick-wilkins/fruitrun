@@ -240,7 +240,8 @@ export class Run {
     this.world.scene.add(this.pip.root);
     // In the dark the ball carries a lamp that lights the road just around it.
     if (course.mood === 'night' || course.mood === 'midnight') {
-      const lamp = new PointLight(0xfff0c2, course.mood === 'midnight' ? 260 : 120, 60, 1.4);
+      // Bright enough to pick the road out a few lengths ahead, not so bright that it bleaches it.
+      const lamp = new PointLight(0xfff0c2, course.mood === 'midnight' ? 34 : 12, 42, 1.4);
       lamp.position.set(0, 3.2, 3);
       this.pip.root.add(lamp);
     }
