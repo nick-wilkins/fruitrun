@@ -6,6 +6,9 @@ let music: HTMLAudioElement | null = null;
 let wantMusic = false;
 let musicGain: GainNode | null = null;
 let duckTimer = 0;
+let playlist: string[] = [];
+let playing = 0;
+let featured: string | null = null;
 
 const SFX_VOLUME = 0.8;
 const MUSIC_VOLUME = 0.32;
@@ -55,8 +58,10 @@ export function unlockAudio(): void {
 /** Start the soundtrack: the tracks play in turn, for ever. It begins on the first tap if the browser is not ready yet. */
 export function startMusic(urls: string[]): void {
   if (!music) {
-    let playing = 0;
-    const player = new Audio(urls[0]);
+    playlist = urls;
+    // Start somewhere different each visit.
+    playing = Math.floor(Math.random() * urls.length);
+    const player = new Audio(urls[playing]);
     player.volume = MUSIC_VOLUME;
     player.preload = 'auto';
     player.addEventListener('ended', () => {
@@ -68,6 +73,18 @@ export function startMusic(urls: string[]): void {
     document.addEventListener('visibilitychange', syncMusic);
   }
   wantMusic = true;
+  syncMusic();
+}
+
+/**
+ * Play one tune on repeat instead of the playlist (a night level has its own), or pass null to go back to the
+ * playlist where it left off.
+ */
+export function musicFor(url: string | null): void {
+  if (!music || url === featured) return;
+  featured = url;
+  music.src = url ?? playlist[playing];
+  music.loop = url !== null;
   syncMusic();
 }
 

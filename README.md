@@ -24,6 +24,7 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 - `src/game/themes.ts` the look of each level
 - `src/game/track.ts`, `course.ts` track maths and the builder; `world.ts`, `run.ts`, `character.ts` what you see
 - `src/ui/` menu, map, HUD/results and blender screens
+- `tools/music.py` composes and synthesises the extra music tracks (needs macOS `afconvert`)
 - `tools/slice.py` cuts `tools/source/*.png` sticker sheets into `public/assets/` (needs Pillow)
 
 ## Changing levels

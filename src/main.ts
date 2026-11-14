@@ -1,5 +1,5 @@
 import { WebGLRenderer } from 'three';
-import { setMuted, startMusic, unlockAudio } from './audio';
+import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
 import { clearSave, completeLevel, isUnlocked, loadSave, newSave, storeSave, type RunResult } from './core/progress';
 import { LEVELS, levelById, type Level } from './data/levels';
@@ -30,6 +30,7 @@ const stored = loadSave();
 function endRun(): void {
   run?.dispose();
   run = null;
+  musicFor(null);
   canvas.classList.add('hidden');
 }
 
@@ -71,6 +72,8 @@ const app: App = {
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');
     let result: RunResult | null = null;
+    // Night levels get their own dreamy tune.
+    musicFor(level.mood === 'night' ? asset('assets/audio/track4.m4a') : null);
     run = new Run(renderer, courseFor(level), level, {
       hud: (state) => hud.update(state),
       pickup: (id) => hud.pickup(id),
@@ -101,7 +104,7 @@ const app: App = {
 setMuted(app.save.muted);
 // Browsers hold sound back until the player does something, and differ on which event counts.
 for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(type, unlockAudio, { passive: true });
-startMusic([asset('assets/audio/track1.mp3'), asset('assets/audio/track2.mp3')]);
+startMusic(['track1.mp3', 'track3.m4a', 'track2.mp3', 'track5.m4a', 'track6.m4a'].map((file) => asset(`assets/audio/${file}`)));
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
