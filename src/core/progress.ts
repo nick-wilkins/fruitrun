@@ -70,8 +70,8 @@ export function loadSave(): Save | null {
     if (parsed.version !== 1) return null;
     delete parsed.unlocked;
     const save = { ...newSave(), ...parsed };
-    // Saves from before the book existed only know what is in the basket now.
-    if (!parsed.seen) save.seen = Object.keys(save.inventory);
+    // Saves from before the book existed: what is in the basket now, plus the fruit of every level finished.
+    if (!parsed.seen) save.seen = [...new Set([...Object.keys(save.inventory), ...LEVELS.filter((l) => save.levels[l.id]).map((l) => l.fruit)])];
     // Pip stands on the level last played. Older saves did not record it, and a level may since have gone:
     // fall back to the furthest level finished.
     if (!save.last || !LEVELS.some((l) => l.id === save.last)) {

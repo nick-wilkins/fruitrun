@@ -1,5 +1,6 @@
 import {
   AdditiveBlending,
+  BufferAttribute,
   BufferGeometry,
   Color,
   Float32BufferAttribute,
@@ -124,7 +125,15 @@ class Sparks {
   }
 }
 
-/** Rain streaks or snowflakes in a box that travels with the camera. */
+const BOX = { x: 70, y: 44, z: 70 };
+
+/** Keep `v` within half a box either side of `centre` by wrapping it round. */
+const wrap = (v: number, centre: number, size: number) => centre + ((((v - centre + size / 2) % size) + size) % size) - size / 2;
+
+/**
+ * Rain streaks or snowflakes. Each one stays put in the world and simply falls; any that drop out of the box
+ * around the camera reappear on the far side, so the weather streams past as the ball moves.
+ */
 class Weather {
   readonly object: LineSegments | Points;
   private readonly count: number;
@@ -137,15 +146,12 @@ class Weather {
     this.count = this.snow ? 420 : 520;
     this.fall = this.snow ? 7 : 58;
     this.at = new Float32Array(this.count * 3);
-    for (let i = 0; i < this.count; i++) this.at.set([(Math.random() - 0.5) * 70, Math.random() * 44 - 14, (Math.random() - 0.5) * 70], i * 3);
+    for (let i = 0; i < this.count; i++) this.at.set([Math.random() * BOX.x, Math.random() * BOX.y, Math.random() * BOX.z], i * 3);
     const geometry = new BufferGeometry();
-    if (this.snow) {
-      geometry.setAttribute('position', new Float32BufferAttribute(this.at, 3));
-      this.object = new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 0.45, map: blobTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'), transparent: true, depthWrite: false }));
-    } else {
-      geometry.setAttribute('position', new Float32BufferAttribute(new Float32Array(this.count * 6), 3));
-      this.object = new LineSegments(geometry, new LineBasicMaterial({ color: '#d6ecff', transparent: true, opacity: 0.5, depthWrite: false }));
-    }
+    geometry.setAttribute('position', new BufferAttribute(new Float32Array(this.count * (this.snow ? 3 : 6)), 3));
+    this.object = this.snow
+      ? new Points(geometry, new PointsMaterial({ color: '#ffffff', size: 0.45, map: blobTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'), transparent: true, depthWrite: false }))
+      : new LineSegments(geometry, new LineBasicMaterial({ color: '#d6ecff', transparent: true, opacity: 0.5, depthWrite: false }));
     this.object.frustumCulled = false;
   }
 
@@ -153,18 +159,19 @@ class Weather {
     const position = this.object.geometry.attributes.position;
     for (let i = 0; i < this.count; i++) {
       const o = i * 3;
-      this.at[o + 1] -= this.fall * dt;
-      if (this.at[o + 1] < -14) this.at[o + 1] += 44;
+      const drift = this.snow ? Math.sin(clock * 1.3 + i) * dt * 1.4 : 0;
+      const x = (this.at[o] = wrap(this.at[o] + drift, camera.x, BOX.x));
+      const y = (this.at[o + 1] = wrap(this.at[o + 1] - this.fall * dt, camera.y + 8, BOX.y));
+      const z = (this.at[o + 2] = wrap(this.at[o + 2], camera.z, BOX.z));
       if (this.snow) {
-        this.at[o] += Math.sin(clock * 1.3 + i) * dt * 1.4;
+        position.setXYZ(i, x, y, z);
       } else {
         // Each streak is a short line slanting with the wind.
-        position.setXYZ(i * 2, this.at[o], this.at[o + 1], this.at[o + 2]);
-        position.setXYZ(i * 2 + 1, this.at[o] + 0.25, this.at[o + 1] - 1.7, this.at[o + 2]);
+        position.setXYZ(i * 2, x, y, z);
+        position.setXYZ(i * 2 + 1, x + 0.25, y - 1.7, z);
       }
     }
     position.needsUpdate = true;
-    this.object.position.copy(camera);
   }
 }
 
@@ -180,7 +187,8 @@ export class Run {
   private readonly flying: Flying[] = [];
   private readonly weather: Weather | null;
 
-  private pointerSteer: number | null = null;
+  /** Where the steering finger is across the screen, -0.5 to 0.5, or null when nothing is held. */
+  private pointerAcross: number | null = null;
   private pointerId: number | null = null;
   private keySteer = 0;
   private shake = 0;
@@ -261,16 +269,14 @@ export class Run {
       return;
     }
     const rect = this.canvas.getBoundingClientRect();
-    const across = (e.clientX - rect.left) / rect.width - 0.5;
-    const reach = this.sim.limit + PUSH;
-    this.pointerSteer = clamp(across * 2 * (this.sim.limit + BALL_RADIUS) * 1.35, -reach, reach);
+    this.pointerAcross = (e.clientX - rect.left) / rect.width - 0.5;
     e.preventDefault();
   };
 
   private readonly onRelease = (e: PointerEvent) => {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
-    this.pointerSteer = null;
+    this.pointerAcross = null;
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
@@ -284,7 +290,7 @@ export class Run {
   private readonly dropInput = () => {
     this.keySteer = 0;
     this.pointerId = null;
-    this.pointerSteer = null;
+    this.pointerAcross = null;
   };
 
   private readonly resize = () => {
@@ -297,8 +303,9 @@ export class Run {
   };
 
   private steer(): number | null {
-    if (this.pointerSteer !== null) return this.pointerSteer;
+    // Worked out afresh every frame: a finger held still means something different as the road narrows or widens.
     const reach = this.sim.limit + PUSH;
+    if (this.pointerAcross !== null) return clamp(this.pointerAcross * 2 * (this.sim.limit + BALL_RADIUS) * 1.35, -reach, reach);
     if (this.keySteer) return clamp(this.sim.x + this.keySteer * 3, -reach, reach);
     return null;
   }
@@ -589,7 +596,7 @@ export class Run {
       for (let i = this.flying.length - 1; i >= 0; i--) if (this.flying[i].life <= 0) this.flying.splice(i, 1);
     }
 
-    if (sim.boostT > 0 && racing) {
+    if ((sim.boostT > 0 || sim.turboT > 0) && racing) {
       const hot = sim.turboT > 0;
       this.sparks.burst(sim.point(sim.s - 0.6, sim.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), hot ? 3 : 1, hot ? ['#ff5a2a', '#ffd23f'] : ['#eaff3d', '#ffffff'], 2);
     }

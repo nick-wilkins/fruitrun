@@ -3,11 +3,12 @@
 Each tune is built from a chord progression: a bass line, an arpeggio, drums and a melody made of short motifs
 that repeat and vary. Everything is plain waveforms, chiptune style.
 
-Run from the project root: python3 tools/music.py   (needs macOS afconvert to encode)
+Run from the project root: python3 tools/music.py [track ...]   (needs macOS afconvert to encode)
 """
 import math
 import random
 import struct
+import sys
 import subprocess
 import wave
 from pathlib import Path
@@ -163,11 +164,18 @@ MINOR = [0, 3, 7]
 PENTA = [0, 2, 4, 7, 9, 12, 14, 16]
 MINOR_PENTA = [-3, 0, 2, 4, 7, 9, 12, 14]
 
-# Sunny Skip: bright and bouncy, for the meadow.
-compose("track3", 11, 132, [("C", 3, MAJOR), ("G", 3, MAJOR), ("A", 3, MINOR), ("F", 3, MAJOR)], PENTA, lead="square")
-# Night Glide: slower and dreamy, for the night levels.
-compose("track4", 23, 96, [("A", 3, MINOR), ("F", 3, MAJOR), ("C", 3, MAJOR), ("G", 3, MAJOR)], MINOR_PENTA, lead="triangle", drums="soft")
-# Jungle Shuffle: a swung groove, for the tropics.
-compose("track5", 37, 116, [("D", 3, MINOR), ("G", 3, MAJOR), ("C", 3, MAJOR), ("A", 3, MINOR)], PENTA, lead="pulse", swing=0.16)
-# Turbo Pop: fast and busy.
-compose("track6", 51, 152, [("F", 3, MAJOR), ("C", 3, MAJOR), ("D", 3, MINOR), ("A#", 2, MAJOR)], [-7, -5, -3, 0, 2, 5, 7, 9], lead="saw")
+TRACKS = {
+    # Sunny Skip: bright and bouncy, for the meadow.
+    "track3": lambda: compose("track3", 11, 132, [("C", 3, MAJOR), ("G", 3, MAJOR), ("A", 3, MINOR), ("F", 3, MAJOR)], PENTA, lead="square"),
+    # Night Glide: slower and dreamy, for the night levels.
+    "track4": lambda: compose("track4", 23, 96, [("A", 3, MINOR), ("F", 3, MAJOR), ("C", 3, MAJOR), ("G", 3, MAJOR)], MINOR_PENTA, lead="triangle", drums="soft"),
+    # Jungle Shuffle: a swung groove, for the tropics.
+    "track5": lambda: compose("track5", 37, 116, [("D", 3, MINOR), ("G", 3, MAJOR), ("C", 3, MAJOR), ("A", 3, MINOR)], PENTA, lead="pulse", swing=0.16),
+    # Turbo Pop: fast and busy.
+    "track6": lambda: compose("track6", 51, 152, [("F", 3, MAJOR), ("C", 3, MAJOR), ("D", 3, MINOR), ("A#", 2, MAJOR)], [-7, -5, -3, 0, 2, 5, 7, 9], lead="saw"),
+}
+
+if __name__ == "__main__":
+    # Name tracks to render only those: python3 tools/music.py track4
+    for track in sys.argv[1:] or TRACKS:
+        TRACKS[track]()

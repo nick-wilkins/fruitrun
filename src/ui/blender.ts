@@ -1,16 +1,15 @@
 import { sfx } from '../audio';
 import { blend } from '../core/progress';
-import { COMBOS, MAX_JUG, type SmoothieResult } from '../core/smoothie';
+import { COMBOS, MAX_JUG, RATINGS, type SmoothieResult } from '../core/smoothie';
 import { INGREDIENTS, ingredient } from '../data/ingredients';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
-import { pipSvg, type PipMood } from './pip';
+import { pipSvg } from './pip';
 
 const PER_PAGE = 9;
 const BLEND_SECONDS = 2.4;
 const SIP_SECONDS = 1.5;
-/** Pip's face for each rating, worst to best. */
-const REACTIONS: PipMood[] = ['yuck', 'meh', 'nice', 'yum', 'wow'];
+
 
 /** Where each of the ten ingredients settles inside the glass, as a percentage of its box. */
 const PILE: [number, number][] = [
@@ -192,7 +191,7 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
 
     setTimeout(() => {
       if (!card.isConnected) return;
-      taster.innerHTML = pipSvg(REACTIONS[result.rating - 1]);
+      taster.innerHTML = pipSvg(RATINGS[result.rating - 1].face);
       taste.classList.add('reacted', `rated-${result.rating}`);
       if (result.rating === 1) sfx.yuck();
       else sfx.reveal(result.rating);

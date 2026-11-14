@@ -451,9 +451,11 @@ export const PIECES = {
     b.pad(2, 0).straight(12);
     b.turbo(6, 0).straight(40);
     b.gap(0, 90);
-    b.ring(22, 0, 7).fruit(45, 0, 9).ring(68, 0, 7);
+    // At turbo speed the ball covers about 185 before it comes down, far past the gap, so the rings and fruit
+    // follow that arc: up over the gap, the fruit at the top, and a last ring on the way down over the road.
+    b.ring(26, 0, 8.3).fruit(94, 0, 16.5).ring(155, 0, 10);
     b.straight(90);
-    b.pickup(60, 0).pad(120, 0);
+    b.pickup(125, 0).pad(138, 0);
     b.straight(150);
   },
 

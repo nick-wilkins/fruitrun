@@ -60,3 +60,16 @@ Chrome:
 - PASS levels 9, 11, 18, 50 and 63 auto-played to the finish; no console errors.
 - PASS music: four new tracks load (52 to 81 s); a night level switches to its tune on repeat and the playlist resumes afterwards.
 - Not checked: how the music and effects sound; slippery steering by hand (only the autopilot has driven it); a real iPad.
+
+## Review
+
+`/code-review medium`, 10 findings, all fixed. `npm test`: 576 passed.
+
+- Snow did not fall: the flakes were drawn from a copy of their positions. Rain and snow now live in the world and wrap round the camera, so they stream past as you move. Measured in Chrome on level 45: a flake fell 3.6 units in half a second.
+- The turbo jump's fruit and second ring hung where no ball could reach. They now follow the turbo arc. Test written first (failed, now passes).
+- Turbo carried on through an escalator and through sticky patches. Both end it now. Tests written first (failed, now pass).
+- A finger held still while the road narrowed kept its old target and scraped the kerb all along the tightrope. The target is now worked out every frame from where the finger is.
+- Turbo's flame trail flickered when a ring was collected. Fixed.
+- Retrying a night level restarted its tune, and the playlist restarted from the top afterwards. A retry now leaves the tune alone and the playlist resumes where it was.
+- Old saves: the Collection tab now also counts the fruit of every level already finished.
+- Tidied: one ratings table shared by scoring, the blender and the book; `tools/music.py` only renders when run directly and can render named tracks.

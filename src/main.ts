@@ -30,7 +30,6 @@ const stored = loadSave();
 function endRun(): void {
   run?.dispose();
   run = null;
-  musicFor(null);
   canvas.classList.add('hidden');
 }
 
@@ -44,6 +43,7 @@ const app: App = {
   },
   show(screen: Screen) {
     endRun();
+    musicFor(null);
     const build = {
       menu: menuScreen,
       map: mapScreen,

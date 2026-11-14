@@ -101,8 +101,14 @@ export interface SmoothieResult {
 }
 
 const DUPLICATE_WORTH = [1, 0.8, 0.6, 0.45, 0.3];
-const VERDICTS = ['Yuck!', 'Hmm, not bad', 'Yummy!', 'Delicious!', 'LEGENDARY!'];
-const RATING_FLOORS = [0, 80, 220, 420, 720];
+/** The five ratings, worst to best: the points needed, what Pip says, the short name, and the face Pip pulls. */
+export const RATINGS = [
+  { floor: 0, shout: 'Yuck!', name: 'Yuck', face: 'yuck' },
+  { floor: 80, shout: 'Hmm, not bad', name: 'Not bad', face: 'meh' },
+  { floor: 220, shout: 'Yummy!', name: 'Yummy', face: 'nice' },
+  { floor: 420, shout: 'Delicious!', name: 'Delicious', face: 'yum' },
+  { floor: 720, shout: 'LEGENDARY!', name: 'Legendary', face: 'wow' },
+] as const;
 
 function comboMatches(combo: Combo, have: Set<string>, kinds: number): boolean {
   if (combo.kinds && kinds < combo.kinds) return false;
@@ -222,12 +228,14 @@ export function scoreSmoothie(ids: string[], capacity = MAX_JUG): SmoothieResult
   const points = Math.max(5, Math.round((score * multiplier) / 5) * 5);
   let rating = 1;
   // Twenty slots make big scores easy, so the super blender expects more than twice as much for each rating.
-  for (let i = 0; i < RATING_FLOORS.length; i++) if (points >= RATING_FLOORS[i] * (big ? 2.3 : 1)) rating = i + 1;
+  RATINGS.forEach((r, i) => {
+    if (points >= r.floor * (big ? 2.3 : 1)) rating = i + 1;
+  });
 
   return {
     points,
     rating: rating as SmoothieResult['rating'],
-    verdict: VERDICTS[rating - 1],
+    verdict: RATINGS[rating - 1].shout,
     name: nameSmoothie(items, counts, combos, taste),
     color: mixColor(items),
     combos,

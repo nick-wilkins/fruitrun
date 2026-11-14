@@ -239,9 +239,12 @@ export class Sim {
     }
 
     // Speed: always rolling, quicker downhill, and boosts fade slowly so chaining them pays off.
+    this.turboT -= dt;
     if (this.finished) {
       this.v -= this.v * 1.7 * dt;
     } else if (riding) {
+      // An escalator sets its own pace: any turbo ends there.
+      this.turboT = 0;
       this.v += (LIFT_SPEED - this.v) * Math.min(1, dt * 6);
       this.time += dt;
     } else {
@@ -249,7 +252,6 @@ export class Sim {
       else this.v -= (this.v - CRUISE) * 0.24 * dt;
       this.v -= GRAVITY * f.t.y * dt;
       // Turbo holds a speed far above the usual limit, then it bleeds off quickly.
-      this.turboT -= dt;
       if (this.turboT > 0) this.v = Math.max(this.v, TURBO_SPEED);
       else if (this.v > MAX_SPEED) this.v -= (this.v - MAX_SPEED) * 2.5 * dt;
       this.v = clamp(this.v, MIN_SPEED, TURBO_SPEED);
@@ -343,7 +345,7 @@ export class Sim {
         if (Math.abs(ds) < 3 && dx < 1.9 && this.h < 0.6 && ready) {
           this.readyAt[index] = Infinity;
           this.v = Math.max(this.v, Math.min(MAX_SPEED, Math.max(this.v, CRUISE) + 13));
-          this.boostT = 1.1;
+          this.boostT = Math.max(this.boostT, 1.1);
           this.emit({ type: 'boost', index });
         }
         break;
@@ -411,6 +413,7 @@ export class Sim {
         break;
       case 'goo':
         if (Math.abs(ds) < (o.len ?? 8) / 2 && dx < 1.9 && this.h < 0.3) {
+          this.turboT = 0;
           this.v -= Math.max(0, this.v - 15) * 4 * this.dt;
           this.gooT -= this.dt;
           if (this.gooT <= 0) {
@@ -423,7 +426,7 @@ export class Sim {
         if (crossed && dx < 1.75 && Math.abs(this.h + BALL_RADIUS - (o.y ?? 2)) < 2.4) {
           this.done[index] = true;
           this.v = Math.max(this.v, Math.min(MAX_SPEED, this.v + 6));
-          this.boostT = 0.5;
+          this.boostT = Math.max(this.boostT, 0.5);
           this.emit({ type: 'ring', index });
         }
         break;

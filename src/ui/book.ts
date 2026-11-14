@@ -1,14 +1,11 @@
 import { sfx } from '../audio';
 import { isUnlocked } from '../core/progress';
-import { COMBOS, type Combo } from '../core/smoothie';
+import { COMBOS, RATINGS, type Combo } from '../core/smoothie';
 import { CATEGORY_LABEL, INGREDIENTS, ingredient } from '../data/ingredients';
 import { LEVELS, WORLDS } from '../data/levels';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
-import { pipSvg, type PipMood } from './pip';
-
-const FACES: PipMood[] = ['yuck', 'meh', 'nice', 'yum', 'wow'];
-const VERDICTS = ['Yuck', 'Not bad', 'Yummy', 'Delicious', 'Legendary'];
+import { pipSvg } from './pip';
 
 /** One ingredient that gives a recipe away a little, for recipes not found yet. */
 function clue(combo: Combo): string | null {
@@ -40,8 +37,8 @@ function trophies(app: App): HTMLElement {
   });
 
   const tally = el('div.book-tally');
-  FACES.forEach((mood, i) => {
-    tally.append(el('div.tally', {}, el('div.face', { innerHTML: pipSvg(mood) }), el('b', {}, String(save.ratings[i] ?? 0)), el('span', {}, VERDICTS[i])));
+  RATINGS.forEach((rating, i) => {
+    tally.append(el('div.tally', {}, el('div.face', { innerHTML: pipSvg(rating.face) }), el('b', {}, String(save.ratings[i] ?? 0)), el('span', {}, rating.name)));
   });
 
   const recent = el('div.book-recent');

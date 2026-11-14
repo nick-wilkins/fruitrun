@@ -9,6 +9,7 @@ let duckTimer = 0;
 let playlist: string[] = [];
 let playing = 0;
 let featured: string | null = null;
+let resumeAt = 0;
 
 const SFX_VOLUME = 0.8;
 const MUSIC_VOLUME = 0.32;
@@ -78,13 +79,19 @@ export function startMusic(urls: string[]): void {
 
 /**
  * Play one tune on repeat instead of the playlist (a night level has its own), or pass null to go back to the
- * playlist where it left off.
+ * playlist where it left off. Asking for what is already playing changes nothing, so a retry does not restart it.
  */
 export function musicFor(url: string | null): void {
   if (!music || url === featured) return;
+  const player = music;
+  if (featured === null) resumeAt = player.currentTime;
   featured = url;
-  music.src = url ?? playlist[playing];
-  music.loop = url !== null;
+  player.src = url ?? playlist[playing];
+  player.loop = url !== null;
+  if (url === null) {
+    const back = resumeAt;
+    player.addEventListener('loadedmetadata', () => (player.currentTime = back), { once: true });
+  }
   syncMusic();
 }
 
