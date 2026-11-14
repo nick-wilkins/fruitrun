@@ -229,14 +229,14 @@ export type StarTimes = [number, number, number, number];
 const built = new Map<string, { course: Course; starTimes: StarTimes }>();
 
 /**
- * Star times come from playing the course hands-free: five stars allows a little over a good racing line, and
+ * Star times come from playing the course hands-free: five stars needs very nearly a good racing line, and
  * never steering at all lands in the two-star band at best.
  */
 function calibrate(course: Course, level: Level): StarTimes {
   const idle = timeCourse(course, level, 'none');
   const best = Math.min(timeCourse(course, level, 'smart'), idle * 0.9);
   const two = Math.ceil(idle * 1.02);
-  let five = Math.ceil(best * 1.08);
+  let five = Math.ceil(best * 1.03);
   const three = Math.min(Math.round(five + ((two - five) * 2) / 3), Math.ceil(idle) - 1);
   five = Math.min(five, three - 2);
   return [five, Math.round((five + three) / 2), three, two];

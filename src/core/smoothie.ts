@@ -83,7 +83,7 @@ export interface SmoothieResult {
 
 const DUPLICATE_WORTH = [1, 0.8, 0.6, 0.45, 0.3];
 const VERDICTS = ['Yuck!', 'Hmm, not bad', 'Yummy!', 'Delicious!', 'LEGENDARY!'];
-const RATING_FLOORS = [0, 60, 150, 260, 400];
+const RATING_FLOORS = [0, 80, 220, 420, 720];
 
 function comboMatches(combo: Combo, have: Set<string>): boolean {
   if (combo.distinct) {

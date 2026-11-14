@@ -170,8 +170,12 @@ export function blenderScreen(app: App): HTMLElement {
     const taster = el('div.taster', { innerHTML: pipSvg('sip') });
     const verdict = el('div.verdict', {}, result.verdict);
     const taste = el('div.taste', {}, el('div.glassful', { style: `--smoothie:${result.color}` }, level, el('div.straw')), taster, verdict);
-    const after = el('div.after', {}, cups, total, el('div.kicker.small', {}, 'smoothie points'), badges, buttons);
-    const card = el('div.modal', {}, el('div.card.smoothie', {}, el('h2', {}, result.name), taste, after));
+    // Pip on the left, the score on the right, so the card stays short enough for the buttons to be on screen.
+    const scorebox = el('div.scorebox.late', {}, cups, total, el('div.kicker.small', {}, 'smoothie points'));
+    badges.classList.add('late');
+    buttons.classList.add('late');
+    const panel = el('div.card.smoothie', {}, el('h2', {}, result.name), el('div.reveal', {}, taste, scorebox), badges, buttons);
+    const card = el('div.modal', {}, panel);
     stage.append(card);
     sfx.sip(SIP_SECONDS);
     requestAnimationFrame(() => level.classList.add('drained'));
@@ -186,7 +190,7 @@ export function blenderScreen(app: App): HTMLElement {
 
     setTimeout(() => {
       if (!card.isConnected) return;
-      after.classList.add('shown');
+      panel.classList.add('done');
       const started = performance.now();
       const tick = (now: number) => {
         const k = Math.min(1, (now - started) / 900);
