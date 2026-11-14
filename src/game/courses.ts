@@ -1,9 +1,10 @@
+import { ingredient } from '../data/ingredients';
 import type { Level } from '../data/levels';
 import { CourseBuilder, type Course } from './course';
 import { PIECES, type PieceName, type Rng } from './pieces';
 import { timeCourse } from './sim';
 import { seeded } from './random';
-import { THEMES } from './themes';
+import { themeFor } from './themes';
 
 /** Level 1, Apple Orchard: laid out by hand as a gentle tour of the basics. */
 function appleOrchard(): CourseBuilder {
@@ -88,7 +89,7 @@ function appleOrchard(): CourseBuilder {
   return b;
 }
 
-/** What each generated level is made of, in order. Each level leans on one or two signature pieces. */
+/** What each level of the first world is made of, in order. Each leans on one or two signature pieces. */
 const RECIPES: Record<string, PieceName[]> = {
   'level-2': ['sweeper', 'forkDiamond', 'sBends', 'hairpinWall', 'escalatorHill', 'bigDrop', 'loopOne', 'sweeper', 'crateField', 'corkscrewDown', 'jumpLine'],
   'level-3': ['pinAlley', 'sBends', 'gooField', 'cliffFall', 'sweeper', 'pinAlley', 'tightLoops', 'forkDiamond', 'waves', 'megaJump'],
@@ -139,12 +140,46 @@ const LINKS: Link[] = [
   (b, r) => (fall(b, r), fall(b, r), bend(60, 60)(b, r)),
 ];
 
+/** Pieces grouped by what they feel like, for writing a recipe automatically. */
+const FAMILIES: Record<string, PieceName[]> = {
+  speed: ['sweeper', 'hairpinWall', 'sBends', 'padStraight'],
+  air: ['megaJump', 'superJump', 'cliffFall', 'jumpLine'],
+  loops: ['loopOne', 'loopDouble', 'tightLoops'],
+  spirals: ['corkscrewDown', 'tightCorkscrew', 'helixUp'],
+  hazards: ['crateField', 'pinAlley', 'spinnerRun', 'windmills', 'pendulumBridge', 'gooField', 'sliderTunnel'],
+  hills: ['waves', 'bigDrop', 'escalatorHill', 'twist'],
+  forks: ['forkDiamond', 'forkShortcut', 'forkHill', 'forkThree', 'forkLoops', 'forkLift'],
+};
+const RHYTHM = ['speed', 'hazards', 'forks', 'air', 'loops', 'hazards', 'hills', 'spirals', 'forks', 'air', 'hazards', 'hills'];
+
+/** A recipe for a level that has none written by hand: one piece from each family in a set rhythm, never the same twice running. */
+function autoRecipe(r: Rng): PieceName[] {
+  const start = Math.floor(r() * RHYTHM.length);
+  const recipe: PieceName[] = [];
+  for (let i = 0; i < RHYTHM.length; i++) {
+    const family = FAMILIES[RHYTHM[(start + i) % RHYTHM.length]];
+    let piece = family[Math.floor(r() * family.length)];
+    if (piece === recipe[recipe.length - 1] || recipe.filter((p) => p === piece).length >= 2) piece = family[(family.indexOf(piece) + 1) % family.length];
+    recipe.push(piece);
+  }
+  return recipe;
+}
+
+/** The final downhill sprint to the line. */
+function finale(b: CourseBuilder): void {
+  b.flip = 1;
+  b.pitchTo(-8);
+  b.pad(6, 0).crates(24, -3).pad(34, 3).crates(52, 3).pad(62, -3).crates(80, 0).pad(90, 0).pickup(44, 0).fruit(72, 3);
+  b.straight(104);
+  b.pitchTo(0);
+  b.straight(64);
+}
+
 /** Assemble a level from its recipe, trying links and mirror images until each piece fits without hitting the rest. */
-function generate(level: Level): CourseBuilder {
-  const recipe = RECIPES[level.id];
-  if (!recipe) throw new Error(`No course recipe for ${level.id}`);
-  const r = seeded(level.n * 7919);
-  const difficulty = (level.n - 1) / 17;
+function generate(level: Level, attempt = 0): CourseBuilder {
+  const r = seeded(level.n * 7919 + attempt * 104729);
+  const recipe = RECIPES[level.id] ?? autoRecipe(r);
+  const difficulty = level.difficulty;
   const b = new CourseBuilder();
   b.pad(34, 0).pickup(52, -3).pickup(66, 3);
   b.straight(80);
@@ -152,7 +187,14 @@ function generate(level: Level): CourseBuilder {
   // Depth-first: if a later piece cannot be fitted, go back and lay the earlier one a different way.
   let budget = 2000;
   const place = (index: number): boolean => {
-    if (index === recipe.length) return true;
+    if (index === recipe.length) {
+      // The sprint to the line has to fit too, or the last piece is laid again a different way.
+      const start = b.snapshot();
+      finale(b);
+      if (!b.clashes(start)) return true;
+      b.restore(start);
+      return false;
+    }
     const first = Math.floor(r() * 3);
     const mirror = r() < 0.5 ? 1 : -1;
     const start = b.snapshot();
@@ -172,15 +214,12 @@ function generate(level: Level): CourseBuilder {
     }
     return false;
   };
-  if (!place(0)) throw new Error(`${level.id}: could not lay out the course`);
+  if (!place(0)) {
+    // Boxed in: start again with different luck.
+    if (attempt < 6) return generate(level, attempt + 1);
+    throw new Error(`${level.id}: could not lay out the course`);
+  }
 
-  // Final downhill sprint to the line.
-  b.flip = 1;
-  b.pitchTo(-8);
-  b.pad(6, 0).crates(24, -3).pad(34, 3).crates(52, 3).pad(62, -3).crates(80, 0).pad(90, 0).pickup(44, 0).fruit(72, 3);
-  b.straight(104);
-  b.pitchTo(0);
-  b.straight(64);
   return b;
 }
 
@@ -206,7 +245,7 @@ function calibrate(course: Course, level: Level): StarTimes {
 function prepared(level: Level) {
   let entry = built.get(level.id);
   if (!entry) {
-    const course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(THEMES[level.id]);
+    const course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(themeFor(level, ingredient(level.fruit).color));
     entry = { course, starTimes: calibrate(course, level) };
     built.set(level.id, entry);
   }

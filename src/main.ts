@@ -34,6 +34,7 @@ function endRun(): void {
 const app: App = {
   save: stored ?? newSave(),
   hasSave: stored !== null,
+  world: stored?.last ? levelById(stored.last).world : 0,
   persist() {
     app.hasSave = true;
     storeSave(app.save);
@@ -45,6 +46,7 @@ const app: App = {
   },
   play(level: Level) {
     endRun();
+    app.world = level.world;
     const hud = createHud(level, {
       pause: (paused) => run?.setPaused(paused),
       restart: () => app.play(level),
@@ -76,6 +78,7 @@ const app: App = {
   startAgain() {
     clearSave();
     app.save = { ...newSave(), muted: app.save.muted };
+    app.world = 0;
     app.persist();
     app.show('map');
   },

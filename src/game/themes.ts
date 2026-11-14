@@ -50,8 +50,8 @@ const base: Theme = {
 
 const theme = (changes: Partial<Theme>): Theme => ({ ...base, ...changes });
 
-/** One look per level, keyed by level id. */
-export const THEMES: Record<string, Theme> = {
+/** Hand-picked looks for the first world, keyed by level id. */
+const THEMES: Record<string, Theme> = {
   'level-1': base,
   'level-2': theme({
     skyTop: '#ffb347', skyBottom: '#fff1c1', fog: '#ffe9b0', ground: '#e9d27a', groundDark: '#cdb35a',
@@ -142,3 +142,45 @@ export const THEMES: Record<string, Theme> = {
     cloud: '#f5c2e3', light: 0.78,
   }),
 };
+
+/** Settings that rotate through the levels of the later worlds, so neighbours on the map look different. */
+const SETTINGS: Partial<Theme>[][] = [
+  [],
+  // Tropical Falls
+  [
+    { skyTop: '#12b5cb', skyBottom: '#d9fbff', fog: '#c2f3f5', ground: '#3fc2b0', groundDark: '#2fa596', road: '#fff4d6', roadStyle: 'plain', scenery: 'palm', canopy: ['#2e9e4a', '#57c26a'] },
+    { skyTop: '#ff8f5a', skyBottom: '#ffe9c2', fog: '#ffdcae', ground: '#f0d68a', groundDark: '#d9b864', road: '#fff1cf', roadStyle: 'planks', scenery: 'palm', canopy: ['#3fa84a', '#6fcf5a'] },
+    { skyTop: '#2f9bff', skyBottom: '#d6f4ff', fog: '#c2ecff', ground: '#58c26a', groundDark: '#3fa052', road: '#f1f6e6', roadStyle: 'tiles', scenery: 'mushroom', canopy: ['#ff7aa8', '#ffb347', '#b574f2'] },
+    { skyTop: '#5b3fa8', skyBottom: '#ffb0c9', fog: '#e09ac2', ground: '#3f9a8a', groundDark: '#2f7f72', road: '#ffe9f5', roadStyle: 'tiles', scenery: 'palm', canopy: ['#2f8f5a', '#3fa86a'], cloud: '#ffd9ec', light: 0.82 },
+  ],
+  // Blossom Village
+  [
+    { skyTop: '#4aa8ff', skyBottom: '#e3f6ff', fog: '#d1efff', ground: '#86d45a', groundDark: '#60b842', road: '#f6e3b8', roadStyle: 'planks', scenery: 'orchard', canopy: ['#ffb3d1', '#ff8fb8', '#ffd6e6'] },
+    { skyTop: '#3f8fe0', skyBottom: '#fff4c9', fog: '#f0f2c2', ground: '#7fcc52', groundDark: '#58ae3a', road: '#efe6d6', roadStyle: 'tiles', scenery: 'orchard', canopy: ['#3fae3a', '#58c244', '#2f9a3f'] },
+    { skyTop: '#ff9a6b', skyBottom: '#ffe6cf', fog: '#ffd9bd', ground: '#8fcf6a', groundDark: '#68b24c', road: '#fff0dd', roadStyle: 'plain', scenery: 'pine', canopy: ['#3f9a5a', '#58b56a'] },
+    { skyTop: '#27306e', skyBottom: '#9a7fd6', fog: '#7a68b8', ground: '#4a8a5a', groundDark: '#356e48', road: '#e6e0ff', roadStyle: 'tiles', roadLine: '#fff36b', scenery: 'castle', canopy: ['#3f8f6a', '#57a87a'], cloud: '#c9c2f0', light: 0.72 },
+  ],
+];
+
+const darken = (hex: string, by: number): string => {
+  const n = parseInt(hex.slice(1), 16);
+  const part = (shift: number) => Math.round(((n >> shift) & 255) * (1 - by)).toString(16).padStart(2, '0');
+  return `#${part(16)}${part(8)}${part(0)}`;
+};
+
+/** The look of a level: hand-picked in the first world, afterwards a world setting trimmed in the fruit's colour. */
+export function themeFor(level: { id: string; world: number; label: number; fruit: string }, fruitColor: string): Theme {
+  const picked = THEMES[level.id];
+  if (picked) return picked;
+  const settings = SETTINGS[level.world];
+  return theme({
+    ...settings[(level.label - 1) % settings.length],
+    kerbA: fruitColor,
+    kerbB: '#ffffff',
+    under: darken(fruitColor, 0.45),
+    tunnelA: fruitColor,
+    tunnelB: '#ffffff',
+    fruit: fruitColor,
+    goo: darken(fruitColor, 0.3),
+  });
+}

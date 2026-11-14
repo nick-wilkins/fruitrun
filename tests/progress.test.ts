@@ -62,6 +62,27 @@ describe('the map', () => {
   });
 });
 
+describe('worlds', () => {
+  const byNumber = (n: number) => LEVELS.find((l) => l.n === n)!;
+
+  it('opens the second world from the castle and the third from the portal', () => {
+    const save = newSave();
+    expect(isUnlocked(save, byNumber(19))).toBe(false);
+    save.levels[byNumber(18).id] = { stars: 1, time: 99 };
+    expect(isUnlocked(save, byNumber(19))).toBe(true);
+    expect(isUnlocked(save, byNumber(40))).toBe(false);
+    save.levels[byNumber(32).id] = { stars: 1, time: 99 };
+    expect(isUnlocked(save, byNumber(40))).toBe(true);
+  });
+
+  it('gives every level a way in from a level that exists', () => {
+    for (const level of LEVELS.slice(1)) {
+      expect(level.after.length, level.id).toBeGreaterThan(0);
+      for (const n of level.after) expect(byNumber(n), `${level.id} after ${n}`).toBeDefined();
+    }
+  });
+});
+
 describe('blend', () => {
   it('uses up the ingredients and banks the points', () => {
     const save = newSave();

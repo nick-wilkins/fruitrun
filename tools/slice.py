@@ -140,7 +140,7 @@ slice_sheet("tools/source/fruits28.png", FRUITS, 7, 4, "public/assets/fruits", T
 slice_sheet("tools/source/extras28.png", NUTS_AND_SEEDS, 7, 4, "public/assets/items", False)
 slice_sheet("tools/source/extras40.png", OTHERS, 8, 5, "public/assets/items", False)
 
-for name in ("map", "stall"):
+for name in ("map", "map-tropics", "map-village", "stall"):
     Image.open(ROOT / f"tools/source/{name}.png").convert("RGB").save(ROOT / f"public/assets/{name}.webp", quality=90, method=6)
 Image.open(ROOT / "tools/source/smoothie-cup.png").save(ROOT / "public/assets/smoothie-cup.png", optimize=True)
 
