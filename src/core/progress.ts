@@ -1,6 +1,22 @@
 import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
+import { claimAwards, type Award } from './awards';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
+
+/** What happened on a run, beyond the time: counted by the rules engine. */
+export interface Feats {
+  rings: number;
+  /** Crates, bumpers, pendulums, spinners and windmills hit. */
+  hits: number;
+  pins: number;
+  turbos: number;
+  launches: number;
+  /** Pickups collected, and how many there were on the route taken. */
+  pickups: number;
+  possible: number;
+}
+
+const NO_FEATS: Feats = { rings: 0, hits: 1, pins: 0, turbos: 0, launches: 0, pickups: 0, possible: 1 };
 
 /** A smoothie as remembered in the book. */
 export interface Sip {
@@ -15,7 +31,7 @@ export interface Sip {
 const HISTORY = 12;
 
 /** Bump when courses are re-laid, so best times set on the old layouts stop counting against the new ones. */
-export const COURSES = 3;
+export const COURSES = 4;
 
 export interface LevelRecord {
   stars: number;
@@ -40,6 +56,10 @@ export interface Save {
   history: Sip[];
   /** How many smoothies earned each rating, from Yuck to Legendary. */
   ratings: number[];
+  /** Running totals behind the awards: rings, skittles, perfect runs and so on. */
+  stats: Record<string, number>;
+  /** Ids of awards earned. */
+  awards: string[];
   muted: boolean;
 }
 
@@ -58,6 +78,8 @@ export function newSave(): Save {
     seen: [],
     history: [],
     ratings: [0, 0, 0, 0, 0],
+    stats: {},
+    awards: [],
     muted: false,
   };
 }
@@ -78,6 +100,8 @@ export function loadSave(): Save | null {
       const done = LEVELS.filter((l) => save.levels[l.id]);
       save.last = done.length ? done[done.length - 1].id : null;
     }
+    // Awards arrived after some saves were made: hand over, quietly, any that have already been earned.
+    claimAwards(save);
     return save;
   } catch {
     return null;
@@ -117,10 +141,18 @@ export interface RunResult {
   bonuses: string[];
   newBest: boolean;
   firstClear: boolean;
+  /** Every pickup on the route taken was collected. */
+  perfect: boolean;
+  /** Nothing was hit. */
+  clean: boolean;
+  pickups: number;
+  possible: number;
+  /** Awards earned by this run. */
+  awards: Award[];
 }
 
 /** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
-export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[]): RunResult {
+export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats: Feats = NO_FEATS): RunResult {
   const stars = starsForTime(level, seconds);
   const previous = save.levels[level.id];
   // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.
@@ -135,7 +167,24 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   for (const id of bonuses) save.inventory[id] = (save.inventory[id] ?? 0) + 1;
   for (const id of [level.fruit, ...bonuses]) if (!save.seen.includes(id)) save.seen.push(id);
   save.last = level.id;
-  return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous };
+
+  const perfect = feats.possible > 0 && feats.pickups >= feats.possible;
+  const clean = feats.hits === 0;
+  const add = (key: string, by = 1) => (save.stats[key] = (save.stats[key] ?? 0) + by);
+  add('rings', feats.rings);
+  add('pins', feats.pins);
+  add('hits', feats.hits);
+  add('turbos', feats.turbos);
+  add('launches', feats.launches);
+  save.stats.bestRings = Math.max(save.stats.bestRings ?? 0, feats.rings);
+  if (perfect) add('perfect');
+  if (clean) add('clean');
+  if (perfect && clean && stars === 5) add('flawless');
+  if (level.mood !== 'sunny') add(level.mood);
+  if (stars === 5 && (level.mood === 'rain' || level.mood === 'snow')) add('slipperyFive');
+  if (previous && comparable && newBest) add('newBests');
+
+  return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous, perfect, clean, pickups: feats.pickups, possible: feats.possible, awards: claimAwards(save) };
 }
 
 /** The super blender stands at the end of the side path on the first map: finish that path to use it. */
@@ -168,5 +217,7 @@ export function blend(save: Save, ids: string[], capacity = MAX_JUG): SmoothieRe
   for (const combo of result.combos) {
     if (!save.combosFound.includes(combo.id)) save.combosFound.push(combo.id);
   }
+  if (capacity > MAX_JUG) save.stats.superBlends = (save.stats.superBlends ?? 0) + 1;
+  claimAwards(save);
   return result;
 }

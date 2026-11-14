@@ -9,6 +9,8 @@ const LANES = [-3, 0, 3];
 const lane = (r: Rng) => LANES[Math.floor(r() * 3)];
 const side = (r: Rng): 1 | -1 => (r() < 0.5 ? 1 : -1);
 const others = (x: number) => LANES.filter((l) => l !== x);
+/** To one side or the other, never the middle. */
+const off = (r: Rng) => side(r) * 2.6;
 const rad = (deg: number) => (deg * Math.PI) / 180;
 
 /** One side of a fork: swing out, run parallel for `middle`, swing back to the original line. */
@@ -182,7 +184,7 @@ export const PIECES = {
   loopOne(b, r, d) {
     const radius = 15 + Math.round(d * 3);
     b.pad(4, 0).straight(18);
-    b.pickup(Math.PI * radius, 0);
+    b.pickup(Math.PI * radius * 0.6, off(r)).ring(Math.PI * radius, off(r), 2).pickup(Math.PI * radius * 1.4, off(r));
     b.loop(radius, side(r));
   },
 
@@ -190,10 +192,10 @@ export const PIECES = {
   loopDouble(b, r) {
     const first = side(r);
     b.pad(4, 0).straight(18);
-    b.pickup(Math.PI * 15, 0).loop(15, first);
+    b.pickup(Math.PI * 15, off(r)).ring(Math.PI * 22, off(r), 2).loop(15, first);
     b.pad(4, 0).pad(14, 0).straight(22);
     // Same side again: the second loop keeps sliding away from the first rather than back into it.
-    b.fruit(Math.PI * 15, 0).loop(15, first);
+    b.fruit(Math.PI * 15, off(r)).pickup(Math.PI * 8, off(r)).loop(15, first);
   },
 
   /** Corkscrew down: inside line for pickups, outside for pads. */
@@ -269,7 +271,6 @@ export const PIECES = {
         }
         main.straight(len);
       },
-      1.2,
     );
     b.straight(12);
   },
@@ -283,7 +284,7 @@ export const PIECES = {
       (arm) =>
         bulge(arm, -1, (m) => {
           m.pitchTo(9, 12);
-          m.pad(2, 0).jump(13, 0, 13).fruit(24, 0, 4.4).ring(34, 0, 4.2);
+          m.pad(2, 0).jump(13, 0, 13).fruit(30, 0, 4.4);
           m.straight(16).pitchTo(-9, 24);
           m.pad(4, 0).straight(16).pitchTo(0, 12);
         }),
@@ -350,7 +351,9 @@ export const PIECES = {
     const way = side(r);
     b.pad(4, 0).pad(14, 0).straight(20);
     for (let i = 0; i < 3; i++) {
-      i === 1 ? b.fruit(Math.PI * 10, 0) : b.pickup(Math.PI * 10, 0);
+      const x = (i % 2 ? 1 : -1) * way * 2.6;
+      i === 1 ? b.fruit(Math.PI * 10, x) : b.pickup(Math.PI * 10, x);
+      b.ring(Math.PI * 16, -x, 2);
       b.loop(10, way);
       b.pad(4, 0).straight(16);
     }
@@ -381,9 +384,7 @@ export const PIECES = {
             centre.windmill(PARTED + 6, 1 + d * 0.5).pins(PARTED + 22, 0).pad(len - PARTED, 0);
             centre.straight(len);
           },
-          1.3,
         ),
-      1.3,
     );
     b.straight(12);
   },
@@ -397,9 +398,9 @@ export const PIECES = {
       (arm) =>
         bulge(arm, -1, (m) => {
           m.pad(2, 0).straight(18);
-          m.fruit(Math.PI * 10, 0).loop(10, -1);
+          m.fruit(Math.PI * 10, 2.6).loop(10, -1);
           m.pad(4, 0).pad(24, 0).straight(40);
-          m.fruit(Math.PI * 10, 0).loop(10, 1);
+          m.fruit(Math.PI * 10, -2.6).loop(10, 1);
           m.straight(18);
         }),
       (main) =>
@@ -487,10 +488,10 @@ export const PIECES = {
   forkTwinLoops(b, r) {
     const loops = (m: CourseBuilder, out: 1 | -1, treats: boolean) => {
       m.pad(2, 0).straight(18);
-      treats ? m.fruit(Math.PI * 10, 0) : m.ring(Math.PI * 10, 0, 2);
+      treats ? m.fruit(Math.PI * 10, out * 2.6) : m.ring(Math.PI * 10, out * 2.6, 2);
       m.loop(10, out);
       m.pad(4, 0).pad(24, lane(r)).straight(40);
-      treats ? m.fruit(Math.PI * 10, 0) : m.pickup(Math.PI * 10, 0);
+      treats ? m.fruit(Math.PI * 10, -out * 2.6) : m.pickup(Math.PI * 10, -out * 2.6);
       m.loop(10, -out as 1 | -1);
       m.straight(18);
     };
@@ -520,9 +521,9 @@ export const PIECES = {
           m.tunnel(8, 74).pickup(20, 0).fruit(60, 0).twist(90, 1);
           m.straight(10);
           m.pad(2, 0).straight(18);
-          m.ring(Math.PI * 10, 0, 2).loop(10, -1);
+          m.ring(Math.PI * 10, 2.6, 2).loop(10, -1);
           m.pad(4, 0).pad(24, 0).straight(40);
-          m.fruit(Math.PI * 10, 0).loop(10, 1);
+          m.fruit(Math.PI * 10, -2.6).loop(10, 1);
           m.straight(18);
           m.pad(4, 0).pad(16, 0).straight(26);
           m.gap(0, 60);
@@ -546,6 +547,66 @@ export const PIECES = {
         }),
     );
     b.straight(12);
+  },
+
+  /** A long banked bend inside a tunnel. */
+  tunnelSweep(b, r, d) {
+    const deg = 120 + Math.floor(r() * 50);
+    const len = rad(deg) * 42;
+    b.tunnel(6, len - 12);
+    b.pad(len * 0.12, 3).ring(len * 0.35, 3).pickup(len * 0.5, 3.2).fruit(len * 0.68, -3).pad(len * 0.85, 3);
+    if (d > 0.35) b.slider(len * 0.6, 2.4, 1.5 + d * 0.6);
+    b.turn(deg, 42);
+  },
+
+  /** Into a tunnel and straight down. */
+  tunnelDive(b, r) {
+    b.tunnel(4, 86);
+    b.pitchTo(-20, 14);
+    b.pad(6, lane(r)).pickup(18, lane(r)).pad(30, lane(r)).fruit(40, off(r));
+    b.straight(44);
+    b.pitchTo(0, 20);
+    b.straight(16);
+  },
+
+  /** A tunnel that snakes left and right. */
+  tunnelWiggle(b, r, d) {
+    const first = side(r);
+    b.tunnel(4, 3 * rad(45) * 36 - 8);
+    for (let i = 0; i < 3; i++) {
+      const dir = (i % 2 ? -first : first) as 1 | -1;
+      b.pickup(10, dir * 3.2).pad(20, dir * 3);
+      if (d > 0.5 && i === 1) b.slider(14, 2.2, 1.8);
+      b.turn(dir * 45, 36);
+    }
+    b.straight(10);
+  },
+
+  /** The road pinches to a beam, swells into a wide yard, and pinches again. */
+  bottleneck(b, r, d) {
+    b.pad(2, 0).width(2.6, 14);
+    b.pickup(8, 0).ring(20, 0).straight(30);
+    b.width(7.6, 16);
+    const yard = [-5.6, -2.8, 0, 2.8, 5.6];
+    const open = Math.floor(r() * 5);
+    b.pins(8, yard[open]).crates(22, yard[(open + 1) % 5], yard[(open + 3) % 5]).fruit(22, yard[(open + 2) % 5]).pad(34, yard[(open + 4) % 5]);
+    if (d > 0.5) b.crates(36, yard[(open + 2) % 5]);
+    b.straight(44);
+    b.width(2.6, 16);
+    b.pickup(8, 0).ring(20, 0).straight(30);
+    b.width(5, 14);
+  },
+
+  /** A great wide banked bend with room for five lanes of things. */
+  wideSweeper(b, r, d) {
+    b.width(8, 18);
+    const deg = 130 + Math.floor(r() * 40);
+    const len = rad(deg) * 52;
+    b.pad(len * 0.1, 6.4).ring(len * 0.3, 6.4).pickup(len * 0.45, 6.6).pad(len * 0.62, 6.4).fruit(len * 0.8, 6.6);
+    b.pins(len * 0.25, 0).crates(len * 0.5, 3, -3).pickup(len * 0.7, -6);
+    if (d > 0.5) b.crates(len * 0.85, 0, -6);
+    b.turn(deg, 52);
+    b.width(5, 18);
   },
 } satisfies Record<string, Piece>;
 

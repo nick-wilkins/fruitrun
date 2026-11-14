@@ -10,6 +10,7 @@ import {
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
+  PointLight,
   PlaneGeometry,
   Points,
   PointsMaterial,
@@ -19,7 +20,7 @@ import {
   type WebGLRenderer,
 } from 'three';
 import { sfx } from '../audio';
-import { starsForTime } from '../core/progress';
+import { starsForTime, type Feats } from '../core/progress';
 import type { Level } from '../data/levels';
 import { buildPip, type Pip } from './character';
 import type { Course } from './course';
@@ -44,7 +45,7 @@ export interface RunHooks {
   hud(state: HudState): void;
   pickup(id: string): void;
   /** The line has been crossed: bank the result now. */
-  finish(time: number, bonuses: string[]): void;
+  finish(time: number, bonuses: string[], feats: Feats): void;
   /** The celebration has played: show the results. */
   results(): void;
 }
@@ -228,11 +229,17 @@ export class Run {
   ) {
     this.canvas = renderer.domElement;
     this.sim = new Sim(course, level, (event) => this.react(event));
-    this.world = buildWorld(course, this.sim.items);
+    this.world = buildWorld(course, this.sim.items, level.fruit);
 
     this.pip = buildPip();
     this.pip.root.matrixAutoUpdate = false;
     this.world.scene.add(this.pip.root);
+    // In the dark the ball carries a lamp that lights the road just around it.
+    if (course.mood === 'night' || course.mood === 'midnight') {
+      const lamp = new PointLight(0xfff0c2, course.mood === 'midnight' ? 260 : 120, 60, 1.4);
+      lamp.position.set(0, 3.2, 3);
+      this.pip.root.add(lamp);
+    }
 
     this.shadow = new Mesh(
       new PlaneGeometry(3, 3),
@@ -312,19 +319,21 @@ export class Run {
   };
 
   private steer(): number | null {
-    // Worked out afresh every frame: a finger held still means something different as the road narrows or widens.
-    const reach = this.sim.limit + PUSH;
+    // Worked out afresh every frame: the road narrows, widens, and spreads out at a fork.
+    const [lo, hi] = this.sim.bounds();
+    const least = lo - PUSH;
+    const most = hi + PUSH;
     if (this.pointerAcross !== null && this.swipeFrom) {
       // The ball moves as far as the finger has swiped: SWIPE of the screen's width carries it right across the road.
       const from = this.swipeFrom;
-      const wanted = from.x + ((this.pointerAcross - from.across) / SWIPE) * reach * 2;
-      const target = clamp(wanted, -reach, reach);
+      const wanted = from.x + ((this.pointerAcross - from.across) / SWIPE) * (this.sim.limit + PUSH) * 2;
+      const target = clamp(wanted, least, most);
       // Swiped past the kerb: move the starting point along, so swiping back answers straight away.
       from.x += target - wanted;
       return target;
     }
-    if (this.pointerAcross !== null) return clamp(this.pointerAcross * 2 * (this.sim.limit + BALL_RADIUS) * 1.35, -reach, reach);
-    if (this.keySteer) return clamp(this.sim.x + this.keySteer * 3, -reach, reach);
+    if (this.pointerAcross !== null) return clamp((lo + hi) / 2 + this.pointerAcross * (hi - lo + BALL_RADIUS * 2) * 1.35, least, most);
+    if (this.keySteer) return clamp(this.sim.x + this.keySteer * 3, least, most);
     return null;
   }
 
@@ -475,7 +484,7 @@ export class Run {
         break;
       }
       case 'finish': {
-        this.hooks.finish(sim.time, sim.bonuses);
+        this.hooks.finish(sim.time, sim.bonuses, sim.feats());
         sfx.finish();
         const f = sim.frameAt(sim.s, this.f);
         this.sparks.burst(this.ballAt(2, this.v1), 90, ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#ffffff'], 14, this.v2.copy(f.t).multiplyScalar(sim.v * 0.5));

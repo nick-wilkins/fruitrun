@@ -1,4 +1,5 @@
 import { Vector3 } from 'three';
+import type { Feats } from '../core/progress';
 import type { Level } from '../data/levels';
 import { GRIP, LEVEL_FRUIT, type Course, type CourseObj } from './course';
 import { makeFrame, type Frame } from './track';
@@ -53,6 +54,10 @@ export class Sim {
   swiping = false;
   autopilot: Autopilot = 'none';
   readonly bonuses: string[] = [];
+  /** Counts for the awards: rings threaded, things hit and so on. */
+  readonly tally = { rings: 0, hits: 0, pins: 0, turbos: 0, launches: 0 };
+  /** Fork arms the ball went down. */
+  private readonly taken = new Set<number>();
   /** Per course object: used up (smashed, collected). */
   readonly done: boolean[];
   /** Per course object: the ingredient a pickup holds. */
@@ -97,6 +102,50 @@ export class Sim {
     return this.course.lanes[this.lane].track.halfAt(Math.max(0, this.s)) - BALL_RADIUS;
   }
 
+  /** The fork arms the ball is alongside but has not yet chosen between, with how far each has drawn away. */
+  private parting(): { lane: number; off: number }[] {
+    if (this.lane !== 0) return [];
+    const out: { lane: number; off: number }[] = [];
+    this.course.lanes.forEach((lane, index) => {
+      const from = lane.from;
+      if (!from) return;
+      const d = this.s - from.s0;
+      if (d >= 0 && d < from.decide) out.push({ lane: index, off: from.spread[Math.floor(d)] });
+    });
+    return out;
+  }
+
+  /**
+   * How far left and right the ball can go. Where a fork is parting, the road is as wide as both routes together,
+   * so the choice can be left until they have actually separated.
+   */
+  bounds(): [number, number] {
+    const limit = this.limit;
+    let lo = -limit;
+    let hi = limit;
+    for (const { off } of this.parting()) {
+      lo = Math.min(lo, off - limit);
+      hi = Math.max(hi, off + limit);
+    }
+    return [lo, hi];
+  }
+
+  /** What the run achieved, for the results and the awards. */
+  feats(): Feats {
+    const { lanes, objects } = this.course;
+    // Pickups the ball could have reached: those on arms it took, and on the main route outside those arms.
+    const reachable = (o: CourseObj) =>
+      o.lane === 0 ? ![...this.taken].some((arm) => o.s > lanes[arm].from!.s0 + lanes[arm].from!.decide && o.s < lanes[arm].from!.s1) : this.taken.has(o.lane);
+    let pickups = 0;
+    let possible = 0;
+    objects.forEach((o, i) => {
+      if (o.kind !== 'pickup' || !reachable(o)) return;
+      possible++;
+      if (this.done[i]) pickups++;
+    });
+    return { ...this.tally, pickups, possible };
+  }
+
   /** Jump straight to racing. */
   skipCountdown(): void {
     this.countdown = 0;
@@ -115,7 +164,13 @@ export class Sim {
         if (left && s < left.from!.s1) return left.track.at(left.track.length - (left.from!.s1 - s), out);
         for (let i = 1; i < lanes.length; i++) {
           const next = lanes[i].from!;
-          if (this.s < next.s0 && s > next.s0 && s - next.s0 < 40 && next.side * this.x > next.gate) return lanes[i].track.at(s - next.s0, out);
+          // Looking ahead past where a fork parts: follow the road the ball is heading for.
+          const d = this.s - next.s0;
+          if (d < next.decide && s - next.s0 >= next.decide && s - next.s0 < 60) {
+            const off = next.spread[Math.max(0, Math.min(next.decide, Math.floor(d)))];
+            const final = next.spread[next.decide];
+            if (d >= 0 ? Math.abs(this.x - off) < Math.abs(this.x) : final * this.x > 0 && Math.abs(this.x) > 2) return lanes[i].track.at(s - next.s0, out);
+          }
         }
       }
       return track.at(s, out);
@@ -183,7 +238,8 @@ export class Sim {
     }
     this.frameAt(this.s + 8, this.ahead);
     const edge = this.limit - 0.6;
-    wants.push(clamp(this.ahead.k * 160, -edge, edge), this.x);
+    // Never drift across a parting fork by accident: stay on the route the ball is on.
+    wants.push(clamp(this.ahead.k * 160, -edge, edge), clamp(this.x, -edge, edge));
     const safe = (x: number) => hazards.every((h) => h.s > 20 || Math.abs(h.x - x) > h.wide);
     const pick = wants.find(safe);
     if (pick !== undefined) return pick;
@@ -229,11 +285,11 @@ export class Sim {
       this.xv *= Math.exp(-Math.min(8, grip * 0.5) * dt);
     }
     this.x += this.xv * dt;
-    const limit = this.limit;
-    if (Math.abs(this.x) > limit) {
-      this.x = Math.sign(this.x) * limit;
-      if (this.xv * this.x > 0) this.xv = 0;
-      if (target !== null && Math.abs(target) > limit && this.v > CRUISE * 0.75) {
+    const [lo, hi] = this.bounds();
+    if (this.x < lo || this.x > hi) {
+      this.x = clamp(this.x, lo, hi);
+      if (this.xv * (this.x - (lo + hi) / 2) > 0) this.xv = 0;
+      if (target !== null && (target < lo || target > hi) && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
         this.scrapeT -= dt;
         if (this.scrapeT <= 0) {
@@ -273,9 +329,14 @@ export class Sim {
       if (this.cameFrom && this.s > lanes[this.cameFrom].from!.s1 + 14) this.cameFrom = 0;
       for (let i = 1; i < lanes.length; i++) {
         const from = lanes[i].from!;
-        if (before < from.s0 && this.s >= from.s0 && from.side * this.x > from.gate) {
+        // The roads have parted: the ball is on whichever it is nearer the middle of.
+        const parted = from.s0 + from.decide;
+        const off = from.spread[from.decide];
+        if (before < parted && this.s >= parted && Math.abs(this.x - off) < Math.abs(this.x)) {
           this.lane = i;
           this.s -= from.s0;
+          this.x -= off;
+          this.taken.add(i);
           before = -1;
           this.emit({ type: 'fork' });
           break;
@@ -297,6 +358,7 @@ export class Sim {
         this.v = Math.max(this.v, 30);
         this.vh = (13 * (gap.s1 - gap.s0 + 4)) / 43;
         this.h = Math.max(this.h, 0.01);
+        this.tally.launches++;
         this.emit({ type: 'launch' });
       } else if (this.h === 0 && this.s > gap.s0 && this.s < gap.s1 - 1) {
         // Landed short: skip on rather than roll along thin air.
@@ -360,6 +422,7 @@ export class Sim {
           this.turboT = TURBO_TIME;
           this.v = TURBO_SPEED;
           this.boostT = TURBO_TIME;
+          this.tally.turbos++;
           this.emit({ type: 'turbo', index });
         }
         break;
@@ -367,6 +430,7 @@ export class Sim {
         if (Math.abs(ds) < 1.4 && dx < 1.15 + BALL_RADIUS * 0.9 && this.h < 1.7) {
           this.done[index] = true;
           this.slow(0.5);
+          this.tally.hits++;
           this.emit({ type: 'crate', index });
         }
         break;
@@ -374,6 +438,7 @@ export class Sim {
         if (Math.abs(ds) < 0.9 && dx < 0.4 + BALL_RADIUS * 0.9 && this.h < 1.2) {
           this.done[index] = true;
           this.v *= 0.97;
+          this.tally.pins++;
           this.emit({ type: 'pin', index });
         }
         break;
@@ -385,6 +450,7 @@ export class Sim {
           this.slow(0.55);
           this.xv = Math.sign(this.x - sx || 1) * 10;
           this.knockT = 0.25;
+          this.tally.hits++;
           this.emit({ type: 'bump', index });
         }
         break;
@@ -400,6 +466,7 @@ export class Sim {
           this.slow(0.6);
           this.xv = Math.sign(lx || 1) * 9;
           this.knockT = 0.25;
+          this.tally.hits++;
           this.emit({ type: 'bump', index });
         }
         break;
@@ -412,7 +479,8 @@ export class Sim {
             this.slow(0.55);
             this.xv = Math.sign(this.x - sail || 1) * 10;
             this.knockT = 0.25;
-            this.emit({ type: 'bump', index });
+            this.tally.hits++;
+          this.emit({ type: 'bump', index });
           }
         }
         break;
@@ -432,6 +500,7 @@ export class Sim {
           this.done[index] = true;
           this.v = Math.max(this.v, Math.min(MAX_SPEED, this.v + 6));
           this.boostT = Math.max(this.boostT, 0.5);
+          this.tally.rings++;
           this.emit({ type: 'ring', index });
         }
         break;

@@ -3,7 +3,7 @@ import { Vector3 } from 'three';
 import { starsForTime } from '../src/core/progress';
 import { LEVELS } from '../src/data/levels';
 import { findClash, type CourseObj } from '../src/game/course';
-import { courseFor, starTimesFor } from '../src/game/courses';
+import { courseFor, INTRO, RECIPES, starTimesFor } from '../src/game/courses';
 import { Sim, timeCourse } from '../src/game/sim';
 
 describe.each(LEVELS)('$name course', (level) => {
@@ -87,28 +87,59 @@ describe.each(LEVELS)('$name course', (level) => {
   });
 });
 
+describe('the first world', () => {
+  it('only uses a kind of piece from the level that introduces it', () => {
+    for (const [id, recipe] of Object.entries(RECIPES)) {
+      const n = Number(id.split('-')[1]);
+      for (const piece of recipe) expect(INTRO[piece], `${piece} on level ${n}`).toBeLessThanOrEqual(n);
+    }
+  });
+
+  it('brings something new on every level from 2 to 12', () => {
+    for (let n = 2; n <= 12; n++) {
+      const fresh = RECIPES[`level-${n}`].filter((piece) => INTRO[piece] === n);
+      expect(fresh.length, `level ${n}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('has used every kind of piece by level 12', () => {
+    const used = new Set(Object.entries(RECIPES).filter(([id]) => Number(id.split('-')[1]) <= 12).flatMap(([, recipe]) => recipe));
+    expect(Object.keys(INTRO).filter((piece) => !used.has(piece as keyof typeof INTRO))).toEqual([]);
+  });
+});
+
 describe('forks', () => {
-  it('sends a ball on the fork side down the arm and brings it back', () => {
-    const level = LEVELS[1];
-    const course = courseFor(level);
-    const arm = course.lanes.findIndex((l) => l.from);
-    expect(arm).toBeGreaterThan(0);
-    const from = course.lanes[arm].from!;
-    const play = (x: number) => {
-      const sim = new Sim(course, level);
-      sim.skipCountdown();
-      sim.s = from.s0 - 5;
-      sim.x = x;
-      const seen = new Set<number>();
-      for (let i = 0; i < 120 * 30 && !(sim.lane === 0 && sim.s > from.s1 + 5); i++) {
-        sim.step(1 / 120);
-        seen.add(sim.lane);
-      }
-      return { seen, s: sim.s };
-    };
-    const taken = play(from.side * 3);
+  const level = LEVELS[1];
+  const course = courseFor(level);
+  const arm = course.lanes.findIndex((l) => l.from);
+  const from = course.lanes[arm].from!;
+
+  /** Arrive at the fork at `x`, then hold the stick `towards` one side all the way through. */
+  const play = (x: number, towards: number) => {
+    const sim = new Sim(course, level);
+    sim.skipCountdown();
+    sim.s = from.s0 - 5;
+    sim.x = x;
+    const seen = new Set<number>();
+    for (let i = 0; i < 120 * 30 && !(sim.lane === 0 && sim.s > from.s1 + 5); i++) {
+      sim.steer = sim.s > from.s0 ? towards * 30 : x;
+      sim.step(1 / 120);
+      seen.add(sim.lane);
+    }
+    return { seen, s: sim.s };
+  };
+
+  it('sends a ball steered to the fork side down the arm and brings it back', () => {
+    const taken = play(from.side * 3, from.side);
     expect(taken.seen.has(arm)).toBe(true);
     expect(taken.s).toBeGreaterThan(from.s1);
-    expect(play(-from.side * 3).seen.has(arm)).toBe(false);
+    expect(play(-from.side * 3, -from.side).seen.has(arm)).toBe(false);
+  });
+
+  it('lets you choose right up to where the roads part, not where they start to', () => {
+    // In the middle as the fork begins, then steering for the arm: you get the arm.
+    expect(play(0, from.side).seen.has(arm)).toBe(true);
+    // On the arm's side as the fork begins, then steering away from it: you stay on the main route.
+    expect(play(from.side * 3, -from.side).seen.has(arm)).toBe(false);
   });
 });

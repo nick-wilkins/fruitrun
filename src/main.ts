@@ -73,12 +73,12 @@ const app: App = {
     canvas.classList.remove('hidden');
     let result: RunResult | null = null;
     // Night levels get their own dreamy tune.
-    musicFor(level.mood === 'night' ? asset('assets/audio/track4.m4a') : null);
+    musicFor(level.mood === 'night' || level.mood === 'midnight' ? asset('assets/audio/track4.m4a') : null);
     run = new Run(renderer, courseFor(level), level, {
       hud: (state) => hud.update(state),
       pickup: (id) => hud.pickup(id),
-      finish: (time, bonuses) => {
-        result = completeLevel(app.save, level, time, bonuses);
+      finish: (time, bonuses, feats) => {
+        result = completeLevel(app.save, level, time, bonuses, feats);
         app.persist();
         hud.finished();
       },

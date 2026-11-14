@@ -42,7 +42,7 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   const bag = el('div.bag', {}, bagIcon, bagCount);
   const count = el('div.countdown');
   const touch = window.matchMedia('(pointer: coarse)').matches;
-  const warning = { sunny: '', night: 'Night run! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
+  const warning = { sunny: '', night: 'Night run! ', midnight: 'Midnight run: follow the lights! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
   const hint = el('div.hint', {}, warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
@@ -134,6 +134,16 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
           el('div.extra', { title: item.name, style: `animation-delay:${1.8 + i * 0.07}s` }, el('img', { src: asset(item.img), alt: item.name }), n > 1 ? el('b', {}, `×${n}`) : null),
         );
       });
+      // What made this run special, and any awards it earned.
+      const feats = el('div.feats');
+      if (result.perfect) feats.append(el('div.feat.gold', {}, '★ Perfect run! Every pickup collected'));
+      else feats.append(el('div.feat', {}, `${result.pickups} of ${result.possible} pickups`));
+      if (result.clean) feats.append(el('div.feat.gold', {}, '★ Nothing hit!'));
+      // Room for three; any more are waiting in the Book.
+      for (const award of result.awards.slice(0, 3)) feats.append(el('div.feat.won', {}, el('img', { src: asset(award.icon), alt: '' }), `Award: ${award.name}`));
+      if (result.awards.length > 3) feats.append(el('div.feat.won', {}, `+${result.awards.length - 3} more awards in your Book`));
+      if (result.awards.length) setTimeout(() => sfx.reveal(4), 1500);
+
       const card = el(
         'div.modal.clear',
         {},
@@ -146,6 +156,7 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
           starRow,
           el('div.kicker', {}, `You won ${countOf(result.fruits, fruit.name)}!`),
           loot,
+          feats,
           counts.size ? el('div.kicker.small', {}, 'Extras you picked up') : null,
           counts.size ? extras : null,
           el(

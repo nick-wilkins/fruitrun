@@ -1,4 +1,5 @@
 import { sfx } from '../audio';
+import { AWARDS } from '../core/awards';
 import { isUnlocked } from '../core/progress';
 import { COMBOS, RATINGS, type Combo } from '../core/smoothie';
 import { CATEGORY_LABEL, INGREDIENTS, ingredient } from '../data/ingredients';
@@ -73,6 +74,15 @@ function trophies(app: App): HTMLElement {
   );
 }
 
+function awards(app: App): HTMLElement {
+  const won = new Set(app.save.awards);
+  const grid = el('div.book-awards');
+  for (const award of [...AWARDS].sort((a, b) => Number(won.has(b.id)) - Number(won.has(a.id)))) {
+    grid.append(el(`div.award${won.has(award.id) ? '.won' : ''}`, {}, el('img', { src: asset(award.icon), alt: '' }), el('b', {}, award.name), el('span', {}, award.how)));
+  }
+  return el('div.book-page', {}, el('p.book-note', {}, `${won.size} of ${AWARDS.length} awards won.`), grid);
+}
+
 function recipes(app: App): HTMLElement {
   const found = new Set(app.save.combosFound);
   const grid = el('div.book-recipes');
@@ -114,7 +124,7 @@ export function bookScreen(app: App): HTMLElement {
   const stage = el('div.stage.book-stage');
   stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
   setBackdrop(asset('assets/stall.webp'));
-  const pages = { Trophies: trophies, Recipes: recipes, Collection: collection };
+  const pages = { Trophies: trophies, Awards: awards, Recipes: recipes, Collection: collection };
   const body = el('div.book-body');
   const tabs = el('div.book-tabs');
   const open = (name: keyof typeof pages) => {

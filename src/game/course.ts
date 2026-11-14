@@ -1,5 +1,5 @@
 import type { Theme } from './themes';
-import { STEP, Track, type Segment, type Span } from './track';
+import { makeFrame, STEP, Track, type Segment, type Span } from './track';
 
 export type ObjKind = 'pad' | 'turbo' | 'crate' | 'slider' | 'pendulum' | 'spinner' | 'windmill' | 'pin' | 'goo' | 'pickup' | 'jump' | 'ring';
 
@@ -29,15 +29,29 @@ export interface CourseObj {
 export type LaneSpan = Span & { lane: number };
 
 /** The weather on a course. Rain and snow make the road slippery. */
-export type Mood = 'sunny' | 'night' | 'rain' | 'snow';
+export type Mood = 'sunny' | 'night' | 'midnight' | 'rain' | 'snow';
 
 /** How quickly the ball answers the controls in each mood, in changes per second. Sunny and night are instant. */
-export const GRIP: Record<Mood, number> = { sunny: Infinity, night: Infinity, rain: 5.5, snow: 3 };
+export const GRIP: Record<Mood, number> = { sunny: Infinity, night: Infinity, midnight: Infinity, rain: 5.5, snow: 3 };
+
+/** Where a fork arm leaves and rejoins the main route. */
+export interface Fork {
+  s0: number;
+  s1: number;
+  side: 1 | -1;
+  /**
+   * How far into the fork the two roads have fully parted. Until then they overlap and the ball may roll across
+   * both; this is where it is finally on one or the other.
+   */
+  decide: number;
+  /** For each unit of distance up to `decide`: how far the arm's centre is from the main route's, to the right. */
+  spread: number[];
+}
 
 export interface Lane {
   track: Track;
   /** For a fork arm: where it leaves and rejoins the main route, and who takes it. */
-  from?: { s0: number; s1: number; side: 1 | -1; gate: number };
+  from?: Fork;
   /** How far the arm had to be bent to rejoin. Large values mean a badly designed fork. */
   drift: number;
 }
@@ -62,7 +76,6 @@ interface Arm {
   s0: number;
   s1: number;
   side: 1 | -1;
-  gate: number;
 }
 
 interface Shared {
@@ -166,12 +179,12 @@ export class CourseBuilder {
 
   /**
    * Split the route. `main` continues this builder; `arm` lays an alternative that must end where `main` does.
-   * A ball on the `side` half of the road (further out than `gate`) takes the arm.
+   * The roads overlap as they part, and the ball takes whichever it is nearer to once they have separated.
    */
-  fork(side: 1 | -1, arm: (b: CourseBuilder) => void, main: (b: CourseBuilder) => void, gate = 0): this {
+  fork(side: 1 | -1, arm: (b: CourseBuilder) => void, main: (b: CourseBuilder) => void): this {
     if (this.lane !== 0) throw new Error('A fork arm cannot fork again: arms always leave and rejoin the main route');
     const index = this.shared.arms.length;
-    const record: Arm = { segments: [], s0: this.s, s1: this.s, side: (side * this.flip) as 1 | -1, gate };
+    const record: Arm = { segments: [], s0: this.s, s1: this.s, side: (side * this.flip) as 1 | -1 };
     this.shared.arms.push(record);
     const branch = new CourseBuilder(this.half, this.shared, index + 1);
     branch.flip = this.flip;
@@ -265,7 +278,9 @@ export class CourseBuilder {
     return this.add('ring', ahead, x, { y });
   }
 
+  /** A ramp. Ordinary hops get a ring hung in the air to aim for; bigger launches place their own. */
   jump(ahead: number, x: number, power = 11.5): this {
+    if (power <= 14) this.ring(ahead + 12, x, 3.4);
     return this.add('jump', ahead, x, { power });
   }
 
@@ -302,7 +317,21 @@ export class CourseBuilder {
     for (const arm of this.shared.arms) {
       const track = new Track(arm.segments, this.half, main.poseAt(arm.s0));
       const drift = track.bendTo(main.poseAt(arm.s1).pos);
-      lanes.push({ track, from: { s0: arm.s0, s1: arm.s1, side: arm.side, gate: arm.gate }, drift });
+      // Measure how the arm draws away from the main route, and so where the two roads have parted.
+      const spread: number[] = [];
+      const a = makeFrame();
+      const m = makeFrame();
+      let decide = 60;
+      for (let d = 0; d <= 60; d++) {
+        main.at(arm.s0 + d, m);
+        track.at(d, a);
+        spread.push(a.p.sub(m.p).dot(m.r));
+        if (Math.abs(spread[d]) >= this.half * 2 - 1.5) {
+          decide = d;
+          break;
+        }
+      }
+      lanes.push({ track, from: { s0: arm.s0, s1: arm.s1, side: arm.side, decide, spread }, drift });
     }
     return lanes;
   }

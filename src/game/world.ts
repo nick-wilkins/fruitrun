@@ -3,6 +3,7 @@ import {
   BackSide,
   BoxGeometry,
   BufferGeometry,
+  CanvasTexture,
   CircleGeometry,
   Color,
   ConeGeometry,
@@ -130,8 +131,45 @@ function place(object: Object3D, matrix: Matrix4): void {
 }
 
 /** Track surfaces glow a little with their own colour so they stay readable upside down in a loop. */
-function trackMaterial(map: Texture): MeshLambertMaterial {
-  return new MeshLambertMaterial({ map, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.5 });
+function trackMaterial(map: Texture, glow = 0.5): MeshLambertMaterial {
+  return new MeshLambertMaterial({ map, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: glow });
+}
+
+/** Blend two colours: 0 is all `a`, 1 is all `b`. */
+function mix(a: string, b: string, amount: number): string {
+  return `#${new Color(a).lerp(new Color(b), amount).getHexString()}`;
+}
+
+/**
+ * The finish: a giant cut-out of the level's fruit standing across the road, with an archway through the middle.
+ */
+function fruitArch(course: Course, fruitUrl: string): Mesh {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  const image = new Image();
+  image.onload = () => {
+    const g = canvas.getContext('2d')!;
+    g.drawImage(image, 0, 0, size, size);
+    // Cut the archway: as wide as the road and kerbs, rounded at the top.
+    g.globalCompositeOperation = 'destination-out';
+    const half = size * 0.215;
+    const top = size * 0.66;
+    g.beginPath();
+    g.moveTo(size / 2 - half, size);
+    g.lineTo(size / 2 - half, top);
+    g.arc(size / 2, top, half, Math.PI, 0);
+    g.lineTo(size / 2 + half, size);
+    g.closePath();
+    g.fill();
+    texture.needsUpdate = true;
+  };
+  image.src = fruitUrl;
+  const arch = new Mesh(new PlaneGeometry(32, 32), new MeshBasicMaterial({ map: texture, transparent: true, alphaTest: 0.5, side: DoubleSide }));
+  place(arch, standing(course.track, course.finishS, 0, 14.6));
+  return arch;
 }
 
 function wedgeGeometry(width: number, length: number, height: number): BufferGeometry {
@@ -439,9 +477,12 @@ function addPillars(scene: Scene, course: Course, groundY: number): void {
 }
 
 function addTrack(scene: Scene, course: Course, theme: Theme): void {
-  const roadMaterial = trackMaterial(roadTexture(theme));
-  const kerbMaterial = trackMaterial(stripeTexture(theme.kerbA, theme.kerbB));
-  const underMaterial = new MeshLambertMaterial({ color: theme.under, emissive: theme.under, emissiveIntensity: 0.45 });
+  // The road changes colour in stretches: its own colour, then two tints of the level's fruit.
+  const roads = [theme.road, mix(theme.road, theme.fruit, 0.38), mix(theme.road, theme.kerbA, 0.22)].map((road) => trackMaterial(roadTexture({ ...theme, road }), theme.glow));
+  const STRETCH = 260;
+  // Kerbs keep glowing at midnight so the edges of the road can always be seen.
+  const kerbMaterial = trackMaterial(stripeTexture(theme.kerbA, theme.kerbB), Math.max(theme.glow, 0.5));
+  const underMaterial = new MeshLambertMaterial({ color: theme.under, emissive: theme.under, emissiveIntensity: theme.glow * 0.9 });
   course.lanes.forEach((lane, index) => {
     const track = lane.track;
     const half = track.half;
@@ -450,7 +491,11 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
     const solid = solidRuns(course, index);
     for (const [s0, s1] of solid) {
       // The third number ties a point to the road's edge, so it follows where the road widens or narrows.
-      scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0, s1, vScale: 0.1 }), roadMaterial));
+      for (let from = s0; from < s1; from = Math.floor(from / STRETCH + 1) * STRETCH) {
+        const to = Math.min(s1, Math.floor(from / STRETCH + 1) * STRETCH);
+        const tint = index === 0 ? Math.floor(from / STRETCH) % roads.length : index % roads.length;
+        scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0: from, s1: to, vScale: 0.1 }), roads[tint]));
+      }
       scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip, 1], [half * 0.55, -1.5 + dip, 1], [-half * 0.55, -1.5 + dip, -1], [-half - 0.9, -0.6 + dip, -1]], { s0, s1, stride: 2 }), underMaterial));
     }
     for (const [s0, s1] of clip(kerbRuns(course.lanes, index, -1), solid)) {
@@ -460,6 +505,37 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
       scene.add(new Mesh(extrude(track, [[half, 0, 1], [half, 0.6, 1], [half + 0.9, 0.6, 1], [half + 0.9, -0.6, 1]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
     }
   });
+
+  // Where two roads part or meet there is a sliver between them that neither covers. Fill it with road, laid
+  // from one centreline to the other just under both surfaces.
+  const fillMaterial = trackMaterial(roadTexture(theme), theme.glow);
+  fillMaterial.side = DoubleSide;
+  const a = makeFrame();
+  const b = makeFrame();
+  for (const lane of course.lanes) {
+    if (!lane.from) continue;
+    const reach = 64;
+    for (const end of [0, 1]) {
+      const points: number[] = [];
+      const uvs: number[] = [];
+      for (let d = 0; d <= reach; d += 2) {
+        course.track.at(end ? lane.from.s1 - d : lane.from.s0 + d, a);
+        lane.track.at(end ? lane.track.length - d : d, b);
+        for (const f of [a, b]) {
+          points.push(f.p.x - f.u.x * 0.07, f.p.y - f.u.y * 0.07, f.p.z - f.u.z * 0.07);
+          uvs.push(f === a ? 0.3 : 0.7, d * 0.1);
+        }
+      }
+      const index: number[] = [];
+      for (let i = 0; i < points.length / 3 - 2; i += 2) index.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
+      const fill = new BufferGeometry();
+      fill.setAttribute('position', new Float32BufferAttribute(points, 3));
+      fill.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
+      fill.setIndex(index);
+      fill.computeVertexNormals();
+      scene.add(new Mesh(fill, fillMaterial));
+    }
+  }
 
   // A sign on the island where each fork parts.
   const signFace = new MeshBasicMaterial({ map: forkSignTexture() });
@@ -484,8 +560,8 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
   }
 }
 
-/** Build everything you can see for a course. `items` gives the ingredient held by each pickup object. */
-export function buildWorld(course: Course, items: (string | undefined)[]): World {
+/** Build everything you can see for a course. `items` gives the ingredient held by each pickup; `fruitId` is the level's fruit. */
+export function buildWorld(course: Course, items: (string | undefined)[], fruitId: string): World {
   const { track, theme, lanes } = course;
   const scene = new Scene();
   scene.fog = new Fog(theme.fog, 140, 620);
@@ -497,7 +573,7 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
 
   // Stars on a night course: they ride with the sky dome so they never get nearer.
   let stars: Points | null = null;
-  if (course.mood === 'night') {
+  if (course.mood === 'night' || course.mood === 'midnight') {
     const rand = seeded(5);
     const dots = new Float32Array(420 * 3);
     for (let i = 0; i < 420; i++) {
@@ -531,7 +607,7 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
     const a = Math.PI - (i / 14) * Math.PI;
     arch.push([Math.cos(a) * radius, Math.sin(a) * radius * 0.95 + 0.3]);
   }
-  const tunnelMaterial = trackMaterial(stripeTexture(theme.tunnelA, theme.tunnelB));
+  const tunnelMaterial = trackMaterial(stripeTexture(theme.tunnelA, theme.tunnelB), Math.max(theme.glow, 0.4));
   tunnelMaterial.side = DoubleSide;
   const portalGeometry = new TorusGeometry(radius + 0.3, 0.75, 8, 22, Math.PI);
   const portalMaterial = new MeshLambertMaterial({ color: '#ffffff' });
@@ -571,7 +647,7 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   addScenery(scene, course, groundY);
 
   scene.add(gate(track, 44, 'GO!', '#2fb344'));
-  scene.add(gate(track, course.finishS, 'FINISH', '#ff4d6d'));
+  scene.add(fruitArch(course, ingredient(fruitId).img));
   const line = new Mesh(new PlaneGeometry(half * 2, 3), new MeshBasicMaterial({ map: checkerTexture() }));
   place(line, lying(track, course.finishS, 0, 0.04));
   scene.add(line);

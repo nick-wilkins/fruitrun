@@ -2,7 +2,7 @@ import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { COURSES, isUnlocked, superBlenderOpen } from '../core/progress';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
-import { starTimesFor } from '../game/courses';
+import { newOn, starTimesFor } from '../game/courses';
 import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
@@ -25,6 +25,7 @@ const lockCover = (level: Level) => {
 function levelCard(app: App, level: Level, close: () => void): HTMLElement {
   const record = app.save.levels[level.id];
   const fruit = ingredient(level.fruit);
+  const fresh = newOn(level);
   const targets = el('div.targets');
   starTimesFor(level).forEach((limit, i) => {
     targets.append(el('div.target', {}, stars(5 - i, 5), el('span', {}, `under ${formatTime(limit).slice(0, -2)}`)));
@@ -40,6 +41,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
       record ? el('div.best', {}, stars(record.stars), record.courses === COURSES ? el('span', {}, `Best ${formatTime(record.time)}`) : null) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
+      fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       targets,
       el(
         'button.btn.green.big',

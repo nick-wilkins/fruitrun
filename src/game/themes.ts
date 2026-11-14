@@ -24,6 +24,8 @@ export interface Theme {
   cloud: string;
   /** Overall brightness: 1 is midday, lower for dusk and night. */
   light: number;
+  /** How much the road shows its own colour whatever the light: high by day, low at midnight when it sinks into the dark. */
+  glow: number;
 }
 
 const base: Theme = {
@@ -46,6 +48,7 @@ const base: Theme = {
   goo: '#c2185b',
   cloud: '#ffffff',
   light: 1,
+  glow: 0.5,
 };
 
 const theme = (changes: Partial<Theme>): Theme => ({ ...base, ...changes });
@@ -186,8 +189,11 @@ export function themeFor(level: { id: string; world: number; label: number; frui
 }
 
 /** Repaint a level's look for its weather. */
-export function inMood(look: Theme, mood: 'sunny' | 'night' | 'rain' | 'snow'): Theme {
+export function inMood(look: Theme, mood: 'sunny' | 'night' | 'midnight' | 'rain' | 'snow'): Theme {
   switch (mood) {
+    case 'midnight':
+      // Almost black: the road itself goes dark, lit only by the ball's lamp, the kerbs and whatever glows.
+      return { ...look, skyTop: '#01020a', skyBottom: '#0a0d2a', fog: '#05071a', ground: darken(look.ground, 0.85), groundDark: darken(look.groundDark, 0.88), road: darken(look.road, 0.62), under: darken(look.under, 0.7), cloud: '#141833', canopy: look.canopy.map((c) => darken(c, 0.8)), light: 0.22, glow: 0.2 };
     case 'night':
       return { ...look, skyTop: '#070b26', skyBottom: '#2a2f6e', fog: '#1a1f4f', ground: darken(look.ground, 0.55), groundDark: darken(look.groundDark, 0.6), cloud: '#4a4f8a', canopy: look.canopy.map((c) => darken(c, 0.45)), light: 0.5 };
     case 'rain':

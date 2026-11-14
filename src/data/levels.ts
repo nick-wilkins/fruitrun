@@ -35,7 +35,7 @@ export interface Level {
   /** 0 (gentle) to 1 (busy): how many obstacles the course pieces lay down. */
   difficulty: number;
   /** The weather: rain and snow make the road slippery, night is dark. */
-  mood: 'sunny' | 'night' | 'rain' | 'snow';
+  mood: 'sunny' | 'night' | 'midnight' | 'rain' | 'snow';
   /** Bonus ingredients that can appear on this course. */
   bonusPool: string[];
 }
@@ -52,25 +52,50 @@ export const WORLDS: World[] = [
 
 /** Levels with weather, by level number. Everything else is sunny. */
 const MOODS: Record<number, Level['mood']> = {
-  // Sunny Meadow
-  10: 'rain',
-  11: 'night',
-  17: 'night',
-  // Tropical Falls: storms and warm nights
-  22: 'rain',
-  27: 'night',
+  // Sunny Meadow: weather arrives early and comes round often.
+  3: 'rain',
+  5: 'night',
+  6: 'snow',
+  8: 'rain',
+  9: 'snow',
+  10: 'night',
+  11: 'midnight',
+  12: 'rain',
+  13: 'snow',
+  14: 'night',
+  15: 'rain',
+  16: 'snow',
+  17: 'midnight',
+  // Tropical Falls: storms and warm nights, with the odd hailstorm.
+  20: 'rain',
+  22: 'night',
+  23: 'rain',
+  25: 'midnight',
+  26: 'snow',
+  28: 'rain',
+  30: 'night',
   31: 'rain',
-  35: 'night',
-  38: 'rain',
-  // Blossom Village: frost, showers and the dark cave
-  45: 'snow',
+  33: 'snow',
+  35: 'midnight',
+  36: 'rain',
+  38: 'night',
+  // Blossom Village: frost, showers and the dark cave.
+  41: 'snow',
+  43: 'rain',
+  44: 'night',
+  46: 'snow',
   48: 'rain',
-  50: 'night',
-  54: 'snow',
-  58: 'rain',
-  63: 'snow',
-  67: 'night',
-  68: 'night',
+  50: 'midnight',
+  51: 'snow',
+  53: 'rain',
+  55: 'night',
+  57: 'snow',
+  59: 'rain',
+  61: 'midnight',
+  62: 'snow',
+  64: 'rain',
+  66: 'night',
+  68: 'midnight',
 };
 
 /** Staples that turn up everywhere. */
