@@ -9,6 +9,7 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host",
+    "start": "node server.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
