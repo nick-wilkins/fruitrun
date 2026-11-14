@@ -49,6 +49,8 @@ export class Sim {
   boostT = 0;
   /** Where the player wants the ball, or null to hold its line. */
   steer: number | null = null;
+  /** Set while `steer` comes from a finger swiping on a touch screen. */
+  swiping = false;
   autopilot: Autopilot = 'none';
   readonly bonuses: string[] = [];
   /** Per course object: used up (smashed, collected). */
@@ -218,8 +220,10 @@ export class Sim {
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
     const grip = GRIP[this.course.mood];
     if (target !== null) {
-      // Quick enough to cross the whole road in about a third of a second.
-      const wanted = clamp((target - this.x) * (riding ? 2.5 : 14), -28, 28);
+      // A swiping finger gets a snappier ball than keys or the mouse: quick enough to cross the road in about a
+      // third of a second.
+      const pace = this.swiping ? { pull: 14, top: 28 } : { pull: 9, top: 16 };
+      const wanted = clamp((target - this.x) * (riding ? 2.5 : pace.pull), -pace.top, pace.top);
       this.xv += (wanted - this.xv) * Math.min(1, dt * grip);
     } else {
       this.xv *= Math.exp(-Math.min(8, grip * 0.5) * dt);

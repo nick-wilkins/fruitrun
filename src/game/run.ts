@@ -349,6 +349,7 @@ export class Run {
     if (this.paused) return;
     // Fixed steps, however long the frame took: the same line earns the same time on any device.
     this.sim.steer = this.steer();
+    this.sim.swiping = this.pointerAcross !== null && this.swipeFrom !== null;
     this.owed += dt;
     while (this.owed >= TICK) {
       this.sim.step(TICK);
