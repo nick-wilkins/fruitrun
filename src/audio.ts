@@ -245,5 +245,15 @@ export const sfx = {
     if (rating >= 4) tone(notes[notes.length - 1] * 2, 0.8, { volume: 0.16, delay: notes.length * 0.12, wobble: [7, 12] });
     if (rating === 5) noise(1, 0.1, 5000, 0.5, 9000, 'highpass');
   },
+  /** Flung off the end of the road. */
+  launch: () => {
+    tone(260, 0.6, { volume: 0.32, to: 1400 });
+    tone(390, 0.5, { type: 'triangle', volume: 0.16, to: 2100, delay: 0.04 });
+    noise(0.7, 0.26, 400, 0, 6000, 'bandpass');
+  },
+  /** Escalator: a ratchety climb. */
+  lift: () => {
+    for (let i = 0; i < 14; i++) tone(300 + i * 28, 0.05, { type: 'square', volume: 0.1, delay: i * 0.11 });
+  },
   nope: () => tone(210, 0.2, { type: 'square', volume: 0.16, to: 130 }),
 };

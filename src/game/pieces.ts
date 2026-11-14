@@ -296,6 +296,146 @@ export const PIECES = {
     );
     b.straight(12);
   },
+
+  /** The road just stops: sail off the edge and drop to the level below. */
+  cliffFall(b, r) {
+    b.pad(4, lane(r)).straight(16);
+    b.gap(0, 40);
+    b.fruit(18, 0, 3.2);
+    b.pitchTo(-42, 8).straight(22).pitchTo(0, 10);
+    b.pad(6, 0).pickup(16, lane(r));
+    b.straight(30);
+  },
+
+  /** A long gap with nothing underneath: thread the rings on the way over. */
+  superJump(b, r) {
+    b.pad(4, 0).pad(16, 0).straight(26);
+    b.gap(0, 60);
+    b.ring(15, 0, 6.5).fruit(30, 0, 8.3).ring(45, 0, 6.5);
+    b.straight(60);
+    b.pad(6, lane(r)).pickup(18, lane(r));
+    b.straight(30);
+  },
+
+  /** Upright windmills: slip through between the sails. */
+  windmills(b, r, d) {
+    const count = 2 + Math.round(d);
+    for (let i = 0; i < count; i++) {
+      const at = 26 + i * 34;
+      b.windmill(at, 1 + d * 0.6, i * 0.9).pickup(at + 12, lane(r)).pad(at + 20, lane(r));
+    }
+    b.straight(30 + count * 34);
+  },
+
+  /** Escalator up a steep hill: sit back and enjoy the view. */
+  escalatorHill(b) {
+    b.straight(8);
+    b.lift(0, 66);
+    b.pitchTo(28, 10);
+    b.pickup(10, 0).pickup(24, 0).fruit(38, 0);
+    b.straight(46).pitchTo(0, 10);
+    b.pad(4, 0).straight(20);
+  },
+
+  /** A corkscrew wound up tight. */
+  tightCorkscrew(b, r) {
+    const turns = 2.5 + Math.round(r()) * 0.5;
+    const len = turns * 2 * Math.PI * 13;
+    for (let at = 30; at < len; at += 60) b.pad(at, -2.5).pickup(at + 25, 3.2);
+    b.spiral(turns, 13, 13);
+  },
+
+  /** Three small loops in a row. */
+  tightLoops(b, r) {
+    const way = side(r);
+    b.pad(4, 0).pad(14, 0).straight(20);
+    for (let i = 0; i < 3; i++) {
+      i === 1 ? b.fruit(Math.PI * 10, 0) : b.pickup(Math.PI * 10, 0);
+      b.loop(10, way);
+      b.pad(4, 0).straight(16);
+    }
+  },
+
+  /** Three ways on: fast on the left, tasty on the right, or brave the windmill down the middle. */
+  forkThree(b, r, d) {
+    const middle = 70;
+    b.straight(12);
+    b.pad(-6, -3.4).pickup(-6, 3.4);
+    b.fork(
+      -1,
+      (arm) =>
+        bulge(arm, -1, (m) => {
+          m.pad(2, 0).ring(18, 0).pad(34, lane(r)).pad(58, 0);
+          m.straight(middle);
+        }),
+      (main) =>
+        main.fork(
+          1,
+          (arm) =>
+            bulge(arm, 1, (m) => {
+              m.pickup(4, lane(r)).fruit(22, 0).pickup(40, lane(r)).fruit(58, 0);
+              m.straight(middle);
+            }),
+          (centre) => {
+            const len = bulgeAdvance(middle);
+            centre.windmill(PARTED + 6, 1 + d * 0.5).pins(PARTED + 22, 0).pad(len - PARTED, 0);
+            centre.straight(len);
+          },
+          1.3,
+        ),
+      1.3,
+    );
+    b.straight(12);
+  },
+
+  /** Left for two tight loops, right for an easy cruise. */
+  forkLoops(b, r) {
+    b.straight(12);
+    b.ring(-6, -3.2).pickup(-6, 3.2);
+    b.fork(
+      -1,
+      (arm) =>
+        bulge(arm, -1, (m) => {
+          m.pad(2, 0).straight(18);
+          m.fruit(Math.PI * 10, 0).loop(10, -1);
+          m.pad(4, 0).pad(24, 0).straight(40);
+          m.fruit(Math.PI * 10, 0).loop(10, 1);
+          m.straight(18);
+        }),
+      (main) =>
+        bulge(main, 1, (m) => {
+          m.pickup(10, lane(r)).pickup(34, lane(r)).pickup(58, lane(r));
+          m.straight(76);
+        }),
+    );
+    b.straight(12);
+  },
+
+  /** Left rides an escalator up and jumps off the top; right stays down among the crates. */
+  forkLift(b, r) {
+    b.straight(12);
+    b.ring(-6, -3.2).pickup(-6, 3.2);
+    b.fork(
+      -1,
+      (arm) =>
+        bulge(arm, -1, (m) => {
+          m.lift(0, 50);
+          m.pitchTo(28, 10).straight(30).pitchTo(0, 10);
+          m.fruit(4, 0).pad(8, 0).straight(14);
+          m.gap(0, 50);
+          m.fruit(24, 0, 3.6);
+          m.pitchTo(-28, 10).straight(30).pitchTo(0, 10);
+        }),
+      (main) =>
+        bulge(main, 1, (m) => {
+          const open = lane(r);
+          m.pad(6, open).crates(30, ...others(open)).pickup(30, open).pad(54, lane(r)).crates(80, lane(r));
+          // The same ground covered as the hill on the other side, measured flat.
+          m.straight(105.5);
+        }),
+    );
+    b.straight(12);
+  },
 } satisfies Record<string, Piece>;
 
 export type PieceName = keyof typeof PIECES;

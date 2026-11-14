@@ -14,11 +14,16 @@ const START_S = 12;
 export const PUSH = 1.2;
 /** The rules always advance in steps this long, so a course plays the same at any frame rate. */
 export const TICK = 1 / 120;
+/** How fast an escalator carries the ball. */
+const LIFT_SPEED = 24;
+/** Reach of a windmill sail, and how far round from straight down it still sweeps the road. */
+export const SAIL = 6.2;
+const SAIL_LOW = 0.76;
 
 export type Autopilot = 'none' | 'smart';
 
 export type SimEvent =
-  | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' }
+  | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' }
   | { type: 'boost' | 'crate' | 'pin' | 'bump' | 'ring' | 'jump'; index: number }
   | { type: 'pickup'; index: number; id: string };
 
@@ -51,6 +56,7 @@ export class Sim {
 
   /** The fork arm the ball has just come off, while it is still close behind. */
   private cameFrom = 0;
+  private riding = false;
   private vh = 0;
   private knockT = 0;
   private scrapeT = 0;
@@ -127,6 +133,21 @@ export class Sim {
     return o.x + (o.amp ?? 0) * Math.sin(this.clock * (o.speed ?? 1) + (o.phase ?? 0));
   }
 
+  /** Where each windmill sail that is low enough to hit is crossing the road right now. */
+  sailsAt(o: CourseObj): number[] {
+    const out: number[] = [];
+    for (let k = 0; k < 4; k++) {
+      const angle = this.spinAngle(o) + (k * Math.PI) / 2;
+      if (Math.cos(angle) > SAIL_LOW) out.push(SAIL * Math.sin(angle));
+    }
+    return out;
+  }
+
+  /** Is the ball on an escalator? */
+  onLift(): boolean {
+    return this.course.lifts.some((l) => l.lane === this.lane && this.s >= l.s0 && this.s <= l.s1);
+  }
+
   spinAngle(o: CourseObj): number {
     return this.clock * (o.speed ?? 1) + (o.phase ?? 0);
   }
@@ -142,6 +163,7 @@ export class Sim {
       if (o.kind === 'crate' || o.kind === 'goo') hazards.push({ s: ahead, x: o.x, wide: 2.3 });
       else if (o.kind === 'slider' || o.kind === 'pendulum') hazards.push({ s: ahead, x: this.swingX(o), wide: 2.4 });
       else if (o.kind === 'spinner') hazards.push({ s: ahead, x: o.x, wide: (o.len ?? 3.2) + 0.6 });
+      else if (o.kind === 'windmill') for (const x of this.sailsAt(o)) hazards.push({ s: ahead, x, wide: 2.6 });
       else if (o.kind !== 'pin' && ahead < 26 && (o.y ?? 0) < 3) wants.push(o.x);
     }
     this.frameAt(this.s + 8, this.ahead);
@@ -173,9 +195,13 @@ export class Sim {
 
     // Steering: the ball chases the finger; let go and it holds its line.
     this.knockT -= dt;
-    const wanted = this.autopilot === 'smart' ? this.smartLine() : this.steer;
+    // On an escalator the ball is carried: it drifts to the middle and steering does nothing.
+    const riding = this.onLift();
+    if (riding && !this.riding) this.emit({ type: 'lift' });
+    this.riding = riding;
+    const wanted = riding ? 0 : this.autopilot === 'smart' ? this.smartLine() : this.steer;
     const target = this.finished || this.knockT > 0 ? null : wanted;
-    if (target !== null) this.xv = clamp((target - this.x) * 9, -16, 16);
+    if (target !== null) this.xv = clamp((target - this.x) * (riding ? 2.5 : 9), -16, 16);
     else this.xv *= Math.exp(-8 * dt);
     this.x += this.xv * dt;
     if (Math.abs(this.x) > this.limit) {
@@ -193,6 +219,9 @@ export class Sim {
     // Speed: always rolling, quicker downhill, and boosts fade slowly so chaining them pays off.
     if (this.finished) {
       this.v -= this.v * 1.7 * dt;
+    } else if (riding) {
+      this.v += (LIFT_SPEED - this.v) * Math.min(1, dt * 6);
+      this.time += dt;
     } else {
       if (this.v < CRUISE) this.v += 10 * dt;
       else this.v -= (this.v - CRUISE) * 0.24 * dt;
@@ -224,6 +253,21 @@ export class Sim {
       before = lanes[this.lane].from!.s1 - 0.01;
       this.cameFrom = this.lane;
       this.lane = 0;
+    }
+
+    // Where the road stops, fling the ball across to where it starts again.
+    for (const gap of this.course.gaps) {
+      if (gap.lane !== this.lane) continue;
+      if (before < gap.s0 && this.s >= gap.s0) {
+        this.v = clamp(this.v, 40, 46);
+        this.vh = (13 * (gap.s1 - gap.s0 + 4)) / this.v;
+        this.h = Math.max(this.h, 0.01);
+        this.emit({ type: 'launch' });
+      } else if (this.h === 0 && this.s > gap.s0 && this.s < gap.s1 - 1) {
+        // Landed short: skip on rather than roll along thin air.
+        this.vh = 7;
+        this.h = 0.01;
+      }
     }
 
     if (this.h > 0 || this.vh > 0) {
@@ -315,6 +359,18 @@ export class Sim {
         }
         break;
       }
+      case 'windmill':
+        if (Math.abs(ds) < 1.2 && this.h < 2.2 && ready) {
+          const sail = this.sailsAt(o).find((x) => Math.abs(this.x - x) < 1.4);
+          if (sail !== undefined) {
+            this.readyAt[index] = this.clock + 1;
+            this.slow(0.55);
+            this.xv = Math.sign(this.x - sail || 1) * 10;
+            this.knockT = 0.25;
+            this.emit({ type: 'bump', index });
+          }
+        }
+        break;
       case 'goo':
         if (Math.abs(ds) < (o.len ?? 8) / 2 && dx < 1.9 && this.h < 0.3) {
           this.v -= Math.max(0, this.v - 15) * 4 * this.dt;

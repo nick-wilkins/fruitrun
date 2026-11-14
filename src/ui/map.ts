@@ -52,6 +52,8 @@ export function mapScreen(app: App): HTMLElement {
     const node = el('button.node', { style: `left:${level.x}%;top:${level.y}%`, ariaLabel: `Level ${level.n}` });
     if (locked && !level.artLocked) node.append(el('div.cover.grey', {}, el('img', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false })));
     if (!locked && level.artLocked) node.append(el('div.cover.gold', {}, String(level.n)));
+    const fruit = ingredient(level.fruit);
+    node.append(el(`img.prize${locked ? '.locked' : ''}`, { src: asset(fruit.img), alt: fruit.name, title: fruit.name, draggable: false }));
     if (record) node.append(stars(record.stars));
     // Every level waiting to be played pulses, so a fork in the path reads as a choice.
     if (!locked && !record) node.classList.add('open');

@@ -378,6 +378,13 @@ export class Run {
       case 'fork':
         sfx.fork();
         break;
+      case 'launch':
+        sfx.launch();
+        this.sparks.burst(this.ballAt(0.4, this.v1), 16, ['#ffffff', '#ffd23f', '#ff7a1a'], 8);
+        break;
+      case 'lift':
+        sfx.lift();
+        break;
       case 'pickup': {
         const visual = this.world.pickups.get(event.index)!;
         visual.sprite.visible = false;
@@ -419,9 +426,9 @@ export class Run {
     // Chase camera, riding the track a little way behind so it loops, twists and corkscrews with the ball.
     const back = 8.2 + clamp((sim.v - CRUISE) * 0.07, 0, 2.4);
     const fc = sim.frameAt(sim.s - back, this.fc);
-    this.camPos.copy(fc.p).addScaledVector(fc.u, 4 + sim.h * 0.45).addScaledVector(fc.r, sim.x * 0.55);
+    this.camPos.copy(fc.p).addScaledVector(fc.u, 4 + sim.h * 0.8).addScaledVector(fc.r, sim.x * 0.55);
     const fl = sim.frameAt(sim.s + 7, this.fl);
-    this.camLook.copy(fl.p).addScaledVector(fl.r, sim.x * 0.75).addScaledVector(fl.u, 1 + sim.h * 0.3);
+    this.camLook.copy(fl.p).addScaledVector(fl.r, sim.x * 0.75).addScaledVector(fl.u, 1 + sim.h * 0.65);
     this.camUp.copy(fc.u).add(f.u).normalize();
 
     if (sim.finished) {
@@ -480,6 +487,10 @@ export class Run {
         this.m.multiply(this.m2.makeRotationY(sim.spinAngle(o))).scale(this.v3.set((o.len ?? 3.2) / 3.2, 1, 1));
         world.spinners.setMatrixAt(slot, this.m);
         moved.spinner = true;
+      } else if (o.kind === 'windmill') {
+        const sails = world.windmills.get(i)!;
+        sails.matrix.copy(standing(track, o.s, 0, PIVOT + 0.4, 1, this.m)).multiply(this.m2.makeRotationZ(sim.spinAngle(o)));
+        sails.matrixWorldNeedsUpdate = true;
       } else if (o.kind === 'pendulum') {
         // The ball swings on a rod from the top of its arch, lifting a little at each end of the swing.
         const px = sim.swingX(o);

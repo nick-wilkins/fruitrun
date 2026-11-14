@@ -90,23 +90,23 @@ function appleOrchard(): CourseBuilder {
 
 /** What each generated level is made of, in order. Each level leans on one or two signature pieces. */
 const RECIPES: Record<string, PieceName[]> = {
-  'level-2': ['sweeper', 'forkDiamond', 'sBends', 'hairpinWall', 'padStraight', 'loopOne', 'sweeper', 'crateField', 'corkscrewDown', 'hairpinWall', 'jumpLine'],
-  'level-3': ['pinAlley', 'sBends', 'gooField', 'jumpLine', 'sweeper', 'pinAlley', 'loopOne', 'forkDiamond', 'gooField', 'waves', 'megaJump'],
-  'level-4': ['spinnerRun', 'sweeper', 'loopOne', 'crateField', 'forkShortcut', 'spinnerRun', 'hairpinWall', 'loopDouble', 'sBends', 'jumpLine', 'spinnerRun'],
-  'level-5': ['corkscrewDown', 'twist', 'sBends', 'helixUp', 'sliderTunnel', 'corkscrewDown', 'forkDiamond', 'twist', 'pinAlley', 'bigDrop', 'loopOne'],
-  'level-6': ['waves', 'forkShortcut', 'gooField', 'sweeper', 'waves', 'pendulumBridge', 'loopOne', 'sBends', 'megaJump', 'forkDiamond', 'crateField'],
-  'level-7': ['waves', 'hairpinWall', 'megaJump', 'gooField', 'jumpLine', 'hairpinWall', 'twist', 'crateField', 'bigDrop', 'loopDouble', 'forkHill', 'megaJump'],
-  'level-8': ['bigDrop', 'sliderTunnel', 'pendulumBridge', 'forkHill', 'climb', 'bigDrop', 'corkscrewDown', 'spinnerRun', 'sliderTunnel', 'loopOne', 'twist', 'bigDrop'],
-  'level-9': ['helixUp', 'padStraight', 'loopDouble', 'helixUp', 'bigDrop', 'forkDiamond', 'corkscrewDown', 'pinAlley', 'megaJump', 'loopOne', 'bigDrop'],
-  'level-10': ['bigDrop', 'twist', 'forkDiamond', 'gooField', 'climb', 'bigDrop', 'forkShortcut', 'waves', 'loopOne', 'twist', 'pendulumBridge', 'forkHill', 'bigDrop'],
-  'level-11': ['spinnerRun', 'twist', 'sBends', 'spinnerRun', 'loopDouble', 'pendulumBridge', 'forkDiamond', 'hairpinWall', 'megaJump', 'corkscrewDown', 'sliderTunnel', 'spinnerRun'],
-  'level-12': ['helixUp', 'climb', 'bigDrop', 'loopDouble', 'loopOne', 'megaJump', 'forkHill', 'corkscrewDown', 'bigDrop', 'spinnerRun', 'waves'],
-  'level-13': ['forkDiamond', 'pendulumBridge', 'forkShortcut', 'sweeper', 'forkHill', 'pendulumBridge', 'loopOne', 'forkDiamond', 'gooField', 'megaJump', 'twist', 'forkShortcut'],
-  'level-14': ['twist', 'sliderTunnel', 'corkscrewDown', 'twist', 'forkHill', 'pendulumBridge', 'loopDouble', 'sliderTunnel', 'twist', 'bigDrop', 'spinnerRun', 'twist'],
-  'level-15': ['crateField', 'spinnerRun', 'pendulumBridge', 'gooField', 'sliderTunnel', 'forkDiamond', 'pinAlley', 'loopDouble', 'spinnerRun', 'megaJump', 'corkscrewDown'],
-  'level-16': ['megaJump', 'jumpLine', 'forkDiamond', 'waves', 'megaJump', 'hairpinWall', 'forkShortcut', 'loopOne', 'jumpLine', 'bigDrop', 'megaJump', 'twist', 'forkHill'],
-  'level-17': ['pinAlley', 'megaJump', 'hairpinWall', 'pinAlley', 'forkDiamond', 'spinnerRun', 'bigDrop', 'megaJump', 'pinAlley', 'loopDouble', 'corkscrewDown', 'forkHill', 'pendulumBridge'],
-  'level-18': ['helixUp', 'twist', 'forkDiamond', 'spinnerRun', 'loopDouble', 'bigDrop', 'pendulumBridge', 'megaJump', 'corkscrewDown', 'forkHill', 'twist', 'loopOne', 'forkShortcut', 'bigDrop', 'megaJump'],
+  'level-2': ['sweeper', 'forkDiamond', 'sBends', 'hairpinWall', 'escalatorHill', 'bigDrop', 'loopOne', 'sweeper', 'crateField', 'corkscrewDown', 'jumpLine'],
+  'level-3': ['pinAlley', 'sBends', 'gooField', 'cliffFall', 'sweeper', 'pinAlley', 'tightLoops', 'forkDiamond', 'waves', 'megaJump'],
+  'level-4': ['spinnerRun', 'sweeper', 'windmills', 'loopOne', 'forkShortcut', 'superJump', 'hairpinWall', 'loopDouble', 'sBends', 'windmills', 'jumpLine'],
+  'level-5': ['tightCorkscrew', 'twist', 'forkLoops', 'helixUp', 'sliderTunnel', 'corkscrewDown', 'cliffFall', 'twist', 'pinAlley', 'tightCorkscrew', 'loopOne'],
+  'level-6': ['waves', 'forkShortcut', 'gooField', 'superJump', 'sweeper', 'pendulumBridge', 'tightLoops', 'escalatorHill', 'megaJump', 'forkThree', 'crateField'],
+  'level-7': ['waves', 'hairpinWall', 'superJump', 'gooField', 'cliffFall', 'hairpinWall', 'twist', 'crateField', 'megaJump', 'loopDouble', 'forkHill', 'superJump'],
+  'level-8': ['cliffFall', 'sliderTunnel', 'pendulumBridge', 'forkLift', 'escalatorHill', 'bigDrop', 'tightCorkscrew', 'spinnerRun', 'cliffFall', 'loopOne', 'twist', 'bigDrop'],
+  'level-9': ['escalatorHill', 'tightLoops', 'helixUp', 'bigDrop', 'forkDiamond', 'corkscrewDown', 'pinAlley', 'superJump', 'escalatorHill', 'cliffFall', 'loopDouble'],
+  'level-10': ['cliffFall', 'twist', 'forkThree', 'gooField', 'escalatorHill', 'cliffFall', 'forkShortcut', 'waves', 'tightLoops', 'pendulumBridge', 'forkHill', 'cliffFall'],
+  'level-11': ['windmills', 'twist', 'sBends', 'spinnerRun', 'tightLoops', 'pendulumBridge', 'forkLoops', 'hairpinWall', 'superJump', 'tightCorkscrew', 'sliderTunnel', 'windmills'],
+  'level-12': ['escalatorHill', 'helixUp', 'superJump', 'cliffFall', 'tightLoops', 'megaJump', 'forkLift', 'corkscrewDown', 'bigDrop', 'spinnerRun', 'waves'],
+  'level-13': ['forkThree', 'pendulumBridge', 'forkLoops', 'sweeper', 'forkLift', 'windmills', 'forkDiamond', 'gooField', 'megaJump', 'forkShortcut', 'twist', 'forkHill'],
+  'level-14': ['twist', 'sliderTunnel', 'tightCorkscrew', 'windmills', 'forkHill', 'pendulumBridge', 'loopDouble', 'twist', 'cliffFall', 'spinnerRun', 'tightLoops'],
+  'level-15': ['crateField', 'windmills', 'pendulumBridge', 'forkThree', 'gooField', 'sliderTunnel', 'cliffFall', 'pinAlley', 'tightLoops', 'spinnerRun', 'superJump', 'corkscrewDown'],
+  'level-16': ['superJump', 'jumpLine', 'forkLift', 'waves', 'megaJump', 'hairpinWall', 'forkThree', 'loopOne', 'superJump', 'cliffFall', 'twist', 'forkHill'],
+  'level-17': ['pinAlley', 'escalatorHill', 'superJump', 'hairpinWall', 'forkLoops', 'windmills', 'bigDrop', 'megaJump', 'pinAlley', 'tightCorkscrew', 'forkLift', 'pendulumBridge'],
+  'level-18': ['escalatorHill', 'twist', 'forkThree', 'windmills', 'tightLoops', 'cliffFall', 'pendulumBridge', 'superJump', 'tightCorkscrew', 'forkLift', 'twist', 'forkLoops', 'bigDrop', 'megaJump'],
 };
 
 type Link = (b: CourseBuilder, r: Rng) => void;
@@ -150,7 +150,7 @@ function generate(level: Level): CourseBuilder {
   b.straight(80);
 
   // Depth-first: if a later piece cannot be fitted, go back and lay the earlier one a different way.
-  let budget = 600;
+  let budget = 2000;
   const place = (index: number): boolean => {
     if (index === recipe.length) return true;
     const first = Math.floor(r() * 3);

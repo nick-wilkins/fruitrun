@@ -1,7 +1,7 @@
 import type { Theme } from './themes';
 import { STEP, Track, type Segment, type Span } from './track';
 
-export type ObjKind = 'pad' | 'crate' | 'slider' | 'pendulum' | 'spinner' | 'pin' | 'goo' | 'pickup' | 'jump' | 'ring';
+export type ObjKind = 'pad' | 'crate' | 'slider' | 'pendulum' | 'spinner' | 'windmill' | 'pin' | 'goo' | 'pickup' | 'jump' | 'ring';
 
 /** Pickups marked with this become the level's own fruit rather than a random extra. */
 export const LEVEL_FRUIT = '@fruit';
@@ -26,6 +26,8 @@ export interface CourseObj {
   item?: string;
 }
 
+export type LaneSpan = Span & { lane: number };
+
 export interface Lane {
   track: Track;
   /** For a fork arm: where it leaves and rejoins the main route, and who takes it. */
@@ -39,7 +41,11 @@ export interface Course {
   /** The main route: lanes[0].track. */
   track: Track;
   objects: CourseObj[];
-  tunnels: (Span & { lane: number })[];
+  tunnels: LaneSpan[];
+  /** Stretches with no road at all: the ball is flung across. */
+  gaps: LaneSpan[];
+  /** Escalators: the ball is carried along at a steady speed and cannot be steered. */
+  lifts: LaneSpan[];
   finishS: number;
   theme: Theme;
 }
@@ -54,7 +60,9 @@ interface Arm {
 
 interface Shared {
   objects: CourseObj[];
-  tunnels: (Span & { lane: number })[];
+  tunnels: LaneSpan[];
+  gaps: LaneSpan[];
+  lifts: LaneSpan[];
   arms: Arm[];
 }
 
@@ -62,6 +70,8 @@ export interface Snapshot {
   segments: number;
   objects: number;
   tunnels: number;
+  gaps: number;
+  lifts: number;
   arms: number;
   s: number;
   pitch: number;
@@ -83,7 +93,7 @@ export class CourseBuilder {
 
   constructor(
     readonly half = 5,
-    private readonly shared: Shared = { objects: [], tunnels: [], arms: [] },
+    private readonly shared: Shared = { objects: [], tunnels: [], gaps: [], lifts: [], arms: [] },
     private readonly lane = 0,
   ) {}
 
@@ -173,6 +183,23 @@ export class CourseBuilder {
     return this;
   }
 
+  /** Take the road away for `len`: the ball is launched at the near edge and lands on the far one. */
+  gap(ahead: number, len: number): this {
+    this.shared.gaps.push({ kind: 'gap', lane: this.lane, s0: this.s + ahead, s1: this.s + ahead + len });
+    return this;
+  }
+
+  /** An escalator: carries the ball at a steady speed whatever the slope. */
+  lift(ahead: number, len: number): this {
+    this.shared.lifts.push({ kind: 'lift', lane: this.lane, s0: this.s + ahead, s1: this.s + ahead + len });
+    return this;
+  }
+
+  /** An upright windmill on an arch: its sails sweep across the road one after another. */
+  windmill(ahead: number, speed = 1.1, phase = 0): this {
+    return this.add('windmill', ahead, 0, { speed: speed * this.flip, phase });
+  }
+
   pad(ahead: number, x: number): this {
     return this.add('pad', ahead, x);
   }
@@ -232,6 +259,8 @@ export class CourseBuilder {
       segments: this.segments.length,
       objects: this.shared.objects.length,
       tunnels: this.shared.tunnels.length,
+      gaps: this.shared.gaps.length,
+      lifts: this.shared.lifts.length,
       arms: this.shared.arms.length,
       s: this.s,
       pitch: this.pitch,
@@ -242,6 +271,8 @@ export class CourseBuilder {
     this.segments.length = to.segments;
     this.shared.objects.length = to.objects;
     this.shared.tunnels.length = to.tunnels;
+    this.shared.gaps.length = to.gaps;
+    this.shared.lifts.length = to.lifts;
     this.shared.arms.length = to.arms;
     this.s = to.s;
     this.pitch = to.pitch;
@@ -272,6 +303,8 @@ export class CourseBuilder {
       track,
       objects: [...this.shared.objects].sort((a, b) => a.lane - b.lane || a.s - b.s),
       tunnels: this.shared.tunnels,
+      gaps: this.shared.gaps,
+      lifts: this.shared.lifts,
       finishS: track.length - 34,
       theme,
     };
@@ -311,7 +344,13 @@ export function findClash(lanes: Lane[], fromS = 0, fromLane = 1): string | null
   const related = (a: Sample, b: Sample): boolean => {
     if (a.lane === b.lane) return Math.abs(a.s - b.s) < 60;
     const [arm, main] = a.lane === 0 ? [b, a] : [a, b];
-    if (main.lane !== 0) return false;
+    if (main.lane !== 0) {
+      // Two arms of the same three-way fork start and end on top of each other.
+      const one = lanes[a.lane];
+      const two = lanes[b.lane];
+      if (one.from!.s0 !== two.from!.s0) return false;
+      return (a.s < 55 && b.s < 55) || (a.s > one.track.length - 55 && b.s > two.track.length - 55);
+    }
     const lane = lanes[arm.lane];
     const from = lane.from!;
     return (arm.s < 55 && Math.abs(main.s - from.s0) < 70) || (arm.s > lane.track.length - 55 && Math.abs(main.s - from.s1) < 70);

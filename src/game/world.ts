@@ -51,6 +51,7 @@ import {
   stripeTexture,
 } from './textures';
 import type { Scenery, Theme } from './themes';
+import { SAIL } from './sim';
 import { extrude, makeFrame, STEP, type Frame, type Track } from './track';
 
 const loader = new TextureLoader();
@@ -88,6 +89,8 @@ export interface World {
   balls: InstancedMesh;
   rods: InstancedMesh;
   rings: InstancedMesh;
+  /** Windmill sails by course object index: turned every frame. */
+  windmills: Map<number, Group>;
   /** For each course object: its instance index within the mesh for its kind. */
   instance: number[];
   pickups: Map<number, PickupVisual>;
@@ -222,6 +225,33 @@ function kerbRuns(lanes: Lane[], index: number, side: 1 | -1): [number, number][
   }
   if (open !== null) runs.push([open, track.length]);
   return runs;
+}
+
+/** The stretches of a lane that have road under them: everything except the gaps. */
+function solidRuns(course: Course, index: number): [number, number][] {
+  const length = course.lanes[index].track.length;
+  const gaps = course.gaps.filter((g) => g.lane === index).sort((a, b) => a.s0 - b.s0);
+  const runs: [number, number][] = [];
+  let from = 0;
+  for (const gap of gaps) {
+    if (gap.s0 > from) runs.push([from, gap.s0]);
+    from = gap.s1;
+  }
+  if (from < length) runs.push([from, length]);
+  return runs;
+}
+
+/** Keep only the parts of `runs` that fall inside `within`. */
+function clip(runs: [number, number][], within: [number, number][]): [number, number][] {
+  const out: [number, number][] = [];
+  for (const [a0, a1] of runs) {
+    for (const [b0, b1] of within) {
+      const s0 = Math.max(a0, b0);
+      const s1 = Math.min(a1, b1);
+      if (s1 - s0 > 1) out.push([s0, s1]);
+    }
+  }
+  return out;
 }
 
 interface TreeKind {
@@ -391,6 +421,7 @@ function addPillars(scene: Scene, course: Course, groundY: number): void {
     const f = track.frames[i];
     const s = i * STEP;
     if (f.u.y < 0.93 || track.inSpan('loop', s) || track.inSpan('spiral', s) || track.inSpan('twist', s)) continue;
+    if (course.gaps.some((g) => g.lane === 0 && s > g.s0 - 3 && s < g.s1 + 3)) continue;
     // Skip a pillar that would stab through a lower piece of track.
     const blocked = lower.some((p) => p.y < f.p.y - 4 && Math.hypot(p.x - f.p.x, p.z - f.p.z) < 9);
     if (!blocked) spots.push(f);
@@ -414,12 +445,15 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
     const half = track.half;
     // Fork arms sit a hair lower so they do not flicker where they overlap the main road.
     const dip = index === 0 ? 0 : -0.04;
-    scene.add(new Mesh(extrude(track, [[-half, dip], [half, dip]], { vScale: 0.1 }), roadMaterial));
-    scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip], [half * 0.55, -1.5 + dip], [-half * 0.55, -1.5 + dip], [-half - 0.9, -0.6 + dip]], { stride: 2 }), underMaterial));
-    for (const [s0, s1] of kerbRuns(course.lanes, index, -1)) {
+    const solid = solidRuns(course, index);
+    for (const [s0, s1] of solid) {
+      scene.add(new Mesh(extrude(track, [[-half, dip], [half, dip]], { s0, s1, vScale: 0.1 }), roadMaterial));
+      scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip], [half * 0.55, -1.5 + dip], [-half * 0.55, -1.5 + dip], [-half - 0.9, -0.6 + dip]], { s0, s1, stride: 2 }), underMaterial));
+    }
+    for (const [s0, s1] of clip(kerbRuns(course.lanes, index, -1), solid)) {
       scene.add(new Mesh(extrude(track, [[-half - 0.9, -0.6], [-half - 0.9, 0.6], [-half, 0.6], [-half, 0]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
     }
-    for (const [s0, s1] of kerbRuns(course.lanes, index, 1)) {
+    for (const [s0, s1] of clip(kerbRuns(course.lanes, index, 1), solid)) {
       scene.add(new Mesh(extrude(track, [[half, 0], [half, 0.6], [half + 0.9, 0.6], [half + 0.9, -0.6]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
     }
   });
@@ -490,6 +524,27 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
     }
   }
 
+  // Gaps get a launch lip; escalators get a moving belt and an arch at each end.
+  const padMap = padTexture();
+  const lipGeometry = wedgeGeometry(half * 2, 5, 1.4);
+  const lipMaterial = new MeshLambertMaterial({ map: stripeTexture('#ff7a1a', '#ffffff'), side: DoubleSide });
+  for (const gap of course.gaps) {
+    const lip = new Mesh(lipGeometry, lipMaterial);
+    place(lip, standing(lanes[gap.lane].track, gap.s0 - 2.6, 0, 0));
+    scene.add(lip);
+  }
+  const beltMaterial = new MeshBasicMaterial({ map: padMap, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const liftArch = new MeshLambertMaterial({ color: '#2fb344' });
+  for (const lift of course.lifts) {
+    const on = lanes[lift.lane].track;
+    scene.add(new Mesh(extrude(on, [[-half + 0.4, 0.05], [half - 0.4, 0.05]], { s0: lift.s0, s1: lift.s1, vScale: 0.11 }), beltMaterial));
+    for (const s of [lift.s0, lift.s1]) {
+      const hoop = new Mesh(portalGeometry, liftArch);
+      place(hoop, standing(on, s, 0, 0.3));
+      scene.add(hoop);
+    }
+  }
+
   addPillars(scene, course, groundY);
   addScenery(scene, course, groundY);
 
@@ -502,7 +557,6 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   // Course objects.
   const count = (kind: CourseObj['kind']) => Math.max(1, course.objects.filter((o) => o.kind === kind).length);
   const decal = { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
-  const padMap = padTexture();
   const pads = new InstancedMesh(new PlaneGeometry(3.4, 6), new MeshBasicMaterial({ map: padMap, ...decal }), count('pad'));
   const goo = new InstancedMesh(new PlaneGeometry(3.7, 8), new MeshBasicMaterial({ map: gooTexture(theme.goo), ...decal }), count('goo'));
   const crates = new InstancedMesh(new BoxGeometry(2.3, 2.1, 2.1), new MeshLambertMaterial({ map: crateTexture() }), count('crate'));
@@ -523,6 +577,12 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
   const rampGeometry = wedgeGeometry(4.4, 5.5, 1.5);
   const archMaterial = new MeshLambertMaterial({ color: '#7b5cff' });
   const glowMaterial = new SpriteMaterial({ map: blobTexture('rgba(255,255,255,0.9)', 'rgba(255,255,255,0)'), transparent: true, depthWrite: false, blending: AdditiveBlending });
+
+  const sailGeometry = new BoxGeometry(1.5, SAIL * 2, 0.35);
+  const sailMaterial = new MeshLambertMaterial({ map: bumperTexture('#ff5a5a', '#ffffff') });
+  const hubGeometry = new SphereGeometry(0.9, 12, 10);
+  const hubMaterial = new MeshLambertMaterial({ color: '#ffd23f' });
+  const windmills = new Map<number, Group>();
 
   const instance: number[] = [];
   const pickups = new Map<number, PickupVisual>();
@@ -561,6 +621,21 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
         rods.setMatrixAt(used.pendulum++, standing(on, o.s, o.x, 4));
         const hoop = new Mesh(portalGeometry, archMaterial);
         place(hoop, standing(on, o.s, 0, 0.3));
+        scene.add(hoop);
+        break;
+      }
+      case 'windmill': {
+        // Two crossed boards make four sails, turning on a hub at the top of an arch.
+        const sails = new Group();
+        const upright = new Mesh(sailGeometry, sailMaterial);
+        const across = new Mesh(sailGeometry, sailMaterial);
+        across.rotation.z = Math.PI / 2;
+        sails.add(upright, across, new Mesh(hubGeometry, hubMaterial));
+        place(sails, standing(on, o.s, 0, PIVOT + 0.4));
+        scene.add(sails);
+        windmills.set(i, sails);
+        const hoop = new Mesh(portalGeometry, archMaterial);
+        place(hoop, standing(on, o.s + 0.8, 0, 0.3));
         scene.add(hoop);
         break;
       }
@@ -615,5 +690,5 @@ export function buildWorld(course: Course, items: (string | undefined)[]): World
     });
   };
 
-  return { scene, sky, padMap, crates, pins, sliders, spinners, balls, rods, rings, instance, pickups, groundY, dispose };
+  return { scene, sky, padMap, crates, pins, sliders, spinners, balls, rods, rings, windmills, instance, pickups, groundY, dispose };
 }

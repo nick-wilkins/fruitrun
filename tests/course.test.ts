@@ -36,6 +36,16 @@ describe.each(LEVELS)('$name course', (level) => {
     }
   });
 
+  it('puts only things you can reach in mid-air over a gap', () => {
+    for (const gap of course.gaps) {
+      for (const o of course.objects) {
+        if (o.lane !== gap.lane || o.s <= gap.s0 || o.s >= gap.s1) continue;
+        expect(['ring', 'pickup'], `${o.kind} over a gap at s=${o.s}`).toContain(o.kind);
+        expect(o.y ?? 0).toBeGreaterThan(2.5);
+      }
+    }
+  });
+
   it('can be finished hands-free, and a good line is faster', () => {
     const idle = timeCourse(course, level, 'none');
     const good = timeCourse(course, level, 'smart');
@@ -54,7 +64,7 @@ describe.each(LEVELS)('$name course', (level) => {
 
   it('keeps solid obstacles off the stretch where a fork\'s two roads overlap', () => {
     // The ball only collides with things on its own route, so anything solid there could be driven through.
-    const solid = new Set(['crate', 'slider', 'pendulum', 'spinner', 'goo', 'pin', 'jump']);
+    const solid = new Set(['crate', 'slider', 'pendulum', 'spinner', 'windmill', 'goo', 'pin', 'jump']);
     const p = new Vector3();
     const d = new Vector3();
     course.lanes.forEach((lane, index) => {
