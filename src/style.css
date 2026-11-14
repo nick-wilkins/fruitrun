@@ -1462,6 +1462,18 @@ button.mix-item {
   border-radius: 99em;
 }
 
+.badge.won {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  color: #5a2d0c;
+  background: linear-gradient(#ffe066, #ffb62e);
+}
+
+.badge.won img {
+  height: 1.3em;
+}
+
 .badge.combo {
   background: linear-gradient(#b574f2, #7a3fc9);
 }

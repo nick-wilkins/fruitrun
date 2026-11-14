@@ -480,6 +480,12 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
   // The road changes colour in stretches: its own colour, then two tints of the level's fruit.
   const roads = [theme.road, mix(theme.road, theme.fruit, 0.38), mix(theme.road, theme.kerbA, 0.22)].map((road) => trackMaterial(roadTexture({ ...theme, road }), theme.glow));
   const STRETCH = 260;
+  // The same tints, drawn from both sides, for the filler where fork roads touch.
+  const fills = roads.map((road) => {
+    const fill = road.clone();
+    fill.side = DoubleSide;
+    return fill;
+  });
   // Kerbs keep glowing at midnight so the edges of the road can always be seen.
   const kerbMaterial = trackMaterial(stripeTexture(theme.kerbA, theme.kerbB), Math.max(theme.glow, 0.5));
   const underMaterial = new MeshLambertMaterial({ color: theme.under, emissive: theme.under, emissiveIntensity: theme.glow * 0.9 });
@@ -507,25 +513,27 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
   });
 
   // Where two roads part or meet there is a sliver between them that neither covers. Fill it with road, laid
-  // from one centreline to the other just under both surfaces.
-  const fillMaterial = trackMaterial(roadTexture(theme), theme.glow);
-  fillMaterial.side = DoubleSide;
+  // from one centreline to the other just under both surfaces, only as far as the roads are still touching.
   const a = makeFrame();
   const b = makeFrame();
   for (const lane of course.lanes) {
     if (!lane.from) continue;
-    const reach = 64;
+    const reach = lane.from.decide + 6;
     for (const end of [0, 1]) {
+      const at = end ? lane.from.s1 : lane.from.s0;
       const points: number[] = [];
       const uvs: number[] = [];
       for (let d = 0; d <= reach; d += 2) {
-        course.track.at(end ? lane.from.s1 - d : lane.from.s0 + d, a);
+        course.track.at(end ? at - d : at + d, a);
         lane.track.at(end ? lane.track.length - d : d, b);
+        // Stop where one road has climbed away from the other: there is nothing to join there.
+        if (Math.abs(a.p.y - b.p.y) > 0.6) break;
         for (const f of [a, b]) {
           points.push(f.p.x - f.u.x * 0.07, f.p.y - f.u.y * 0.07, f.p.z - f.u.z * 0.07);
           uvs.push(f === a ? 0.3 : 0.7, d * 0.1);
         }
       }
+      if (points.length < 12) continue;
       const index: number[] = [];
       for (let i = 0; i < points.length / 3 - 2; i += 2) index.push(i, i + 1, i + 2, i + 1, i + 3, i + 2);
       const fill = new BufferGeometry();
@@ -533,7 +541,7 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
       fill.setAttribute('uv', new Float32BufferAttribute(uvs, 2));
       fill.setIndex(index);
       fill.computeVertexNormals();
-      scene.add(new Mesh(fill, fillMaterial));
+      scene.add(new Mesh(fill, fills[Math.floor(at / STRETCH) % fills.length]));
     }
   }
 

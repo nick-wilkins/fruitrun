@@ -194,8 +194,11 @@ export class Run {
   /** Where the steering finger is across the screen, -0.5 to 0.5, or null when nothing is held. */
   private pointerAcross: number | null = null;
   private pointerId: number | null = null;
-  /** For a finger: where it first touched across the screen, and where the ball was then. */
-  private swipeFrom: { across: number; x: number } | null = null;
+  /**
+   * For a finger: where the ball is being asked to go, built up from each movement of the finger, with where the
+   * finger was last and the sim's sideways re-measurement at that moment.
+   */
+  private swipe: { target: number; across: number; shift: number } | null = null;
   private keySteer = 0;
   private shake = 0;
   private fov = 62;
@@ -283,7 +286,7 @@ export class Run {
     const rect = this.canvas.getBoundingClientRect();
     this.pointerAcross = (e.clientX - rect.left) / rect.width - 0.5;
     // A finger steers by swiping from wherever it lands; a mouse steers by where it points.
-    if (e.type === 'pointerdown') this.swipeFrom = e.pointerType === 'mouse' ? null : { across: this.pointerAcross, x: this.sim.x };
+    if (e.type === 'pointerdown') this.swipe = e.pointerType === 'mouse' ? null : { target: this.sim.x, across: this.pointerAcross, shift: this.sim.shift };
     e.preventDefault();
   };
 
@@ -291,7 +294,7 @@ export class Run {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
     this.pointerAcross = null;
-    this.swipeFrom = null;
+    this.swipe = null;
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
@@ -306,7 +309,7 @@ export class Run {
     this.keySteer = 0;
     this.pointerId = null;
     this.pointerAcross = null;
-    this.swipeFrom = null;
+    this.swipe = null;
   };
 
   private readonly resize = () => {
@@ -323,14 +326,16 @@ export class Run {
     const [lo, hi] = this.sim.bounds();
     const least = lo - PUSH;
     const most = hi + PUSH;
-    if (this.pointerAcross !== null && this.swipeFrom) {
-      // The ball moves as far as the finger has swiped: SWIPE of the screen's width carries it right across the road.
-      const from = this.swipeFrom;
-      const wanted = from.x + ((this.pointerAcross - from.across) / SWIPE) * (this.sim.limit + PUSH) * 2;
-      const target = clamp(wanted, least, most);
-      // Swiped past the kerb: move the starting point along, so swiping back answers straight away.
-      from.x += target - wanted;
-      return target;
+    if (this.pointerAcross !== null && this.swipe) {
+      // The ball moves as far as the finger moves: SWIPE of the screen's width carries it right across the road.
+      // Only movement counts, so a finger held still asks for nothing when the road widens or a fork is taken.
+      const swipe = this.swipe;
+      swipe.target += ((this.pointerAcross - swipe.across) / SWIPE) * (this.sim.limit + PUSH) * 2 + (this.sim.shift - swipe.shift);
+      swipe.across = this.pointerAcross;
+      swipe.shift = this.sim.shift;
+      // Never beyond the kerb, so swiping back answers straight away.
+      swipe.target = clamp(swipe.target, least, most);
+      return swipe.target;
     }
     if (this.pointerAcross !== null) return clamp((lo + hi) / 2 + this.pointerAcross * (hi - lo + BALL_RADIUS * 2) * 1.35, least, most);
     if (this.keySteer) return clamp(this.sim.x + this.keySteer * 3, least, most);
@@ -358,7 +363,7 @@ export class Run {
     if (this.paused) return;
     // Fixed steps, however long the frame took: the same line earns the same time on any device.
     this.sim.steer = this.steer();
-    this.sim.swiping = this.pointerAcross !== null && this.swipeFrom !== null;
+    this.sim.swiping = this.pointerAcross !== null && this.swipe !== null;
     this.owed += dt;
     while (this.owed >= TICK) {
       this.sim.step(TICK);

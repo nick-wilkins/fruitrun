@@ -1,4 +1,5 @@
 import { sfx } from '../audio';
+import type { Award } from '../core/awards';
 import { blend } from '../core/progress';
 import { COMBOS, MAX_JUG, RATINGS, type SmoothieResult } from '../core/smoothie';
 import { INGREDIENTS, ingredient } from '../data/ingredients';
@@ -138,7 +139,7 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
     points.replaceChildren(el('img', { src: asset('assets/smoothie-cup.png'), alt: 'Smoothie points' }), String(save.points));
   }
 
-  function reveal(result: SmoothieResult, fresh: string[]): void {
+  function reveal(result: SmoothieResult & { awards: Award[] }, fresh: string[]): void {
     const total = el('div.score', {}, '0');
     const cups = el('div.cups');
     for (let i = 0; i < 5; i++) cups.append(el('img', { src: asset('assets/smoothie-cup.png'), alt: '', className: i < result.rating ? '' : 'dim', style: `animation-delay:${0.2 + i * 0.12}s` }));
@@ -146,6 +147,7 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
     for (const combo of result.combos) {
       badges.append(el('div.badge.combo', {}, `${fresh.includes(combo.id) ? 'NEW! ' : ''}${combo.name} +${combo.pts}`));
     }
+    for (const award of result.awards.slice(0, 3)) badges.append(el('div.badge.won', {}, el('img', { src: asset(award.icon), alt: '' }), `Award: ${award.name}`));
     for (const note of result.notes) badges.append(el(`div.badge.${note.good ? 'good' : 'bad'}`, {}, note.label));
     const buttons = el(
       'div.row',

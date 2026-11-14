@@ -50,6 +50,8 @@ export class Sim {
   boostT = 0;
   /** Where the player wants the ball, or null to hold its line. */
   steer: number | null = null;
+  /** Running total of sideways re-measurements: taking a fork arm restates x from the arm's own centre. */
+  shift = 0;
   /** Set while `steer` comes from a finger swiping on a touch screen. */
   swiping = false;
   autopilot: Autopilot = 'none';
@@ -167,9 +169,9 @@ export class Sim {
           // Looking ahead past where a fork parts: follow the road the ball is heading for.
           const d = this.s - next.s0;
           if (d < next.decide && s - next.s0 >= next.decide && s - next.s0 < 60) {
-            const off = next.spread[Math.max(0, Math.min(next.decide, Math.floor(d)))];
-            const final = next.spread[next.decide];
-            if (d >= 0 ? Math.abs(this.x - off) < Math.abs(this.x) : final * this.x > 0 && Math.abs(this.x) > 2) return lanes[i].track.at(s - next.s0, out);
+            // The same test the ball itself will face: nearer the arm's centre than the main route's, once parted.
+            const parted = next.spread[next.decide];
+            if (Math.abs(this.x - parted) < Math.abs(this.x)) return lanes[i].track.at(s - next.s0, out);
           }
         }
       }
@@ -336,6 +338,7 @@ export class Sim {
           this.lane = i;
           this.s -= from.s0;
           this.x -= off;
+          this.shift -= off;
           this.taken.add(i);
           before = -1;
           this.emit({ type: 'fork' });

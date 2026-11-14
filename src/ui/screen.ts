@@ -32,16 +32,26 @@ const EXPAND =
 const SHRINK =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+/** Buttons on screen now, so one pair of listeners can redraw them all. */
+const buttons = new Set<HTMLElement>();
+const draw = (button: HTMLElement) => (button.innerHTML = isFullscreen() ? SHRINK : EXPAND);
+const redraw = () => {
+  for (const button of buttons) {
+    if (button.isConnected) draw(button);
+    else buttons.delete(button);
+  }
+};
+// The Escape key leaves full screen without touching a button, so listen rather than assume.
+document.addEventListener('fullscreenchange', redraw);
+document.addEventListener('webkitfullscreenchange', redraw);
+
 /** A round button that switches full screen on and off, or null where the browser cannot do it. */
 export function fullscreenButton(): HTMLElement | null {
   if (!canFullscreen) return null;
   const button = el('button.round.fullscreen', { ariaLabel: 'Full screen' });
-  const draw = () => (button.innerHTML = isFullscreen() ? SHRINK : EXPAND);
-  draw();
+  draw(button);
   onTap(button, () => (isFullscreen() ? leaveFullscreen() : enterFullscreen()));
-  // The Escape key leaves full screen without touching the button, so listen rather than assume.
-  document.addEventListener('fullscreenchange', draw);
-  document.addEventListener('webkitfullscreenchange', draw);
+  buttons.add(button);
   return button;
 }
 

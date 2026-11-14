@@ -53,6 +53,7 @@ describe('awards', () => {
     save.inventory = { cinnamon: 3 };
     const yuck = blend(save, ['cinnamon', 'cinnamon', 'cinnamon']);
     expect(yuck.rating).toBe(1);
+    expect(yuck.awards.map((a) => a.name)).toEqual(expect.arrayContaining(['First Sip', 'Brave Taster']));
     expect(names(save.awards)).toEqual(expect.arrayContaining(['First Sip', 'Brave Taster']));
   });
 
@@ -60,6 +61,16 @@ describe('awards', () => {
     expect(AWARDS.length).toBeGreaterThanOrEqual(35);
     expect(new Set(AWARDS.map((a) => a.id)).size).toBe(AWARDS.length);
     for (const award of AWARDS) expect(award.name.length * award.how.length).toBeGreaterThan(0);
+  });
+});
+
+describe('a result without feats', () => {
+  it('claims nothing about pickups or bumps and adds nothing to the totals', () => {
+    const save = newSave();
+    const result = completeLevel(save, level, 9999, []);
+    expect(result.perfect).toBe(false);
+    expect(result.clean).toBe(false);
+    expect(save.stats.hits ?? 0).toBe(0);
   });
 });
 

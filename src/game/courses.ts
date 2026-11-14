@@ -267,6 +267,8 @@ function generate(level: Level, attempt = 0): CourseBuilder {
     if (index === recipe.length) {
       // The sprint to the line has to fit too, or the last piece is laid again a different way.
       const start = b.snapshot();
+      // Finishes are always built the same way round, whatever mirror the last piece was laid in.
+      b.flip = 1;
       FINALES[level.n % FINALES.length](b, r);
       if (!b.clashes(start)) return true;
       b.restore(start);

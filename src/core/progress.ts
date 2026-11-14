@@ -16,8 +16,6 @@ export interface Feats {
   possible: number;
 }
 
-const NO_FEATS: Feats = { rings: 0, hits: 1, pins: 0, turbos: 0, launches: 0, pickups: 0, possible: 1 };
-
 /** A smoothie as remembered in the book. */
 export interface Sip {
   name: string;
@@ -152,7 +150,7 @@ export interface RunResult {
 }
 
 /** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
-export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats: Feats = NO_FEATS): RunResult {
+export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats): RunResult {
   const stars = starsForTime(level, seconds);
   const previous = save.levels[level.id];
   // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.
@@ -168,15 +166,18 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   for (const id of [level.fruit, ...bonuses]) if (!save.seen.includes(id)) save.seen.push(id);
   save.last = level.id;
 
-  const perfect = feats.possible > 0 && feats.pickups >= feats.possible;
-  const clean = feats.hits === 0;
+  // Without the run's feats (a bare result, as in some tests) nothing is known about pickups or bumps.
+  const perfect = Boolean(feats && feats.possible > 0 && feats.pickups >= feats.possible);
+  const clean = Boolean(feats && feats.hits === 0);
   const add = (key: string, by = 1) => (save.stats[key] = (save.stats[key] ?? 0) + by);
-  add('rings', feats.rings);
-  add('pins', feats.pins);
-  add('hits', feats.hits);
-  add('turbos', feats.turbos);
-  add('launches', feats.launches);
-  save.stats.bestRings = Math.max(save.stats.bestRings ?? 0, feats.rings);
+  if (feats) {
+    add('rings', feats.rings);
+    add('pins', feats.pins);
+    add('hits', feats.hits);
+    add('turbos', feats.turbos);
+    add('launches', feats.launches);
+    save.stats.bestRings = Math.max(save.stats.bestRings ?? 0, feats.rings);
+  }
   if (perfect) add('perfect');
   if (clean) add('clean');
   if (perfect && clean && stars === 5) add('flawless');
@@ -184,7 +185,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   if (stars === 5 && (level.mood === 'rain' || level.mood === 'snow')) add('slipperyFive');
   if (previous && comparable && newBest) add('newBests');
 
-  return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous, perfect, clean, pickups: feats.pickups, possible: feats.possible, awards: claimAwards(save) };
+  return { stars, time: seconds, fruits: stars, bonuses, newBest, firstClear: !previous, perfect, clean, pickups: feats?.pickups ?? 0, possible: feats?.possible ?? 0, awards: claimAwards(save) };
 }
 
 /** The super blender stands at the end of the side path on the first map: finish that path to use it. */
@@ -193,7 +194,7 @@ export function superBlenderOpen(save: Save): boolean {
 }
 
 /** Blend the chosen ingredients: they are used up and the smoothie's points are banked. */
-export function blend(save: Save, ids: string[], capacity = MAX_JUG): SmoothieResult {
+export function blend(save: Save, ids: string[], capacity = MAX_JUG): SmoothieResult & { awards: Award[] } {
   const jug = ids.slice(0, capacity);
   const needed: Record<string, number> = {};
   for (const id of jug) needed[id] = (needed[id] ?? 0) + 1;
@@ -218,6 +219,5 @@ export function blend(save: Save, ids: string[], capacity = MAX_JUG): SmoothieRe
     if (!save.combosFound.includes(combo.id)) save.combosFound.push(combo.id);
   }
   if (capacity > MAX_JUG) save.stats.superBlends = (save.stats.superBlends ?? 0) + 1;
-  claimAwards(save);
-  return result;
+  return { ...result, awards: claimAwards(save) };
 }

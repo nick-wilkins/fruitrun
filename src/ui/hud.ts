@@ -137,12 +137,13 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
       // What made this run special, and any awards it earned.
       const feats = el('div.feats');
       if (result.perfect) feats.append(el('div.feat.gold', {}, '★ Perfect run! Every pickup collected'));
-      else feats.append(el('div.feat', {}, `${result.pickups} of ${result.possible} pickups`));
+      else if (result.possible) feats.append(el('div.feat', {}, `${result.pickups} of ${result.possible} pickups`));
       if (result.clean) feats.append(el('div.feat.gold', {}, '★ Nothing hit!'));
       // Room for three; any more are waiting in the Book.
       for (const award of result.awards.slice(0, 3)) feats.append(el('div.feat.won', {}, el('img', { src: asset(award.icon), alt: '' }), `Award: ${award.name}`));
       if (result.awards.length > 3) feats.append(el('div.feat.won', {}, `+${result.awards.length - 3} more awards in your Book`));
-      if (result.awards.length) setTimeout(() => sfx.reveal(4), 1500);
+      // Only if the card is still up: the player may already have moved on.
+      if (result.awards.length) setTimeout(() => feats.isConnected && sfx.reveal(4), 1500);
 
       const card = el(
         'div.modal.clear',

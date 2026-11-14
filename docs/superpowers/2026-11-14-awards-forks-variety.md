@@ -27,7 +27,7 @@ Decisions (mine):
 - A perfect run means every pickup on the route actually taken, so a fork does not make it impossible.
 - Five stars now means matching the test run's good line (no margin); the other bands are spread evenly towards never steering, which earns one star.
 - At a fork the road is treated as one wide road while the two parts still overlap. The ball takes whichever it is nearer once they have separated (18 to 40 units in, depending on the fork).
-- 46 awards, kept in the save and shown in a new Awards tab in the Book. A run shows at most three new ones. Old saves are given, quietly, any awards they had already earned.
+- 54 awards, kept in the save and shown in a new Awards tab in the Book. A run shows at most three new ones. Old saves are given, quietly, any awards they had already earned.
 - Weather on 42 of the 68 levels: rain first on level 3, night on 5, ice on 6, midnight on 11.
 - World 1 recipes rewritten to an introduction schedule (`INTRO` in `game/courses.ts`); the level card says what is new. `COURSES` bumped to 4, so best times reset once.
 
@@ -67,3 +67,14 @@ Chrome:
 - PASS level 2 fork rejoin: road surface continuous where the two roads meet.
 - PASS level 3 and level 4 auto-played: results show "23 of 28 pickups" and new awards; buttons on screen.
 - Not checked by hand: steering through a fork (covered by the tests only); the Awards tab by eye; a real iPad.
+
+## Review
+
+`/code-review medium`, 10 findings, all fixed. `npm test`: 589 passed.
+
+- Swiping into a fork arm dragged the ball to the arm's outer kerb, because the swipe remembered a position measured from the main road. Swipes are now built up from finger movement only, and follow the ball when its position is re-measured from the arm. In Chrome on level 2: a held left swipe took the arm and the ball stayed where it was on the road (x 3.8 to 4.0), no scraping.
+- The same change means a finger held still no longer moves the ball when the road widens or narrows.
+- The road filler at forks ran 64 units and could span the island, climb to a raised arm or cross a gap. It now stops where the roads have parted or one has climbed away, and matches the road's tint.
+- The camera's look-ahead at a fork used a different rule from the ball's own choice and could swing the wrong way. Same rule now.
+- Awards earned by blending were recorded but never shown. They now appear on the smoothie card.
+- Tidied: one pair of full-screen listeners instead of two per screen visit; finishes always built the same way round; a result without feats no longer counts a phantom bump; the award jingle does not play after the card has gone; award goals come from the number of levels.

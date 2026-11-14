@@ -13,6 +13,8 @@ export interface Award {
   done(save: Save): boolean;
 }
 
+const ALL = LEVELS.length;
+const HALF = Math.round(ALL / 2);
 const STAR = 'assets/ui/star.png';
 const CUP = 'assets/smoothie-cup.png';
 const fruit = (id: string) => `assets/fruits/${id}.png`;
@@ -31,8 +33,8 @@ export const AWARDS: Award[] = [
   { id: 'first-roll', name: 'First Roll', how: 'Finish a level', icon: fruit('apple'), done: (s) => finished(s).length >= 1 },
   ...tiers('levels', fruit('banana'), (s) => finished(s).length, [
     [10, 'Getting Going', 'Finish 10 levels'],
-    [34, 'Halfway There', 'Finish 34 levels'],
-    [68, 'Every Last One', 'Finish all 68 levels'],
+    [HALF, 'Halfway There', `Finish ${HALF} levels`],
+    [ALL, 'Every Last One', `Finish all ${ALL} levels`],
   ]),
   { id: 'world-1', name: 'Meadow Master', how: 'Finish every level in Sunny Meadow', icon: fruit('dragonfruit'), done: (s) => worldDone(s, 0) },
   { id: 'world-2', name: 'Tropic Thunder', how: 'Finish every level in Tropical Falls', icon: fruit('pineapple'), done: (s) => worldDone(s, 1) },
@@ -41,8 +43,8 @@ export const AWARDS: Award[] = [
   ...tiers('five', STAR, fiveStars, [
     [1, 'Five Star', 'Get five stars on a level'],
     [10, 'Star Collector', 'Get five stars on 10 levels'],
-    [34, 'Superstar', 'Get five stars on 34 levels'],
-    [68, 'Galaxy Brain', 'Get five stars on every level'],
+    [HALF, 'Superstar', `Get five stars on ${HALF} levels`],
+    [ALL, 'Galaxy Brain', 'Get five stars on every level'],
   ]),
   ...tiers('best', STAR, (s) => stat(s, 'newBests'), [
     [5, 'Record Breaker', 'Beat your own best time 5 times'],
