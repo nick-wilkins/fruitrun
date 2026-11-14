@@ -287,8 +287,9 @@ img {
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
-  padding: 0.2em 0.8em 0.2em 0.3em;
+  padding: 0.2em 0.8em 0.2em 0.4em;
   font-size: 1.2em;
+  line-height: 1.2;
   color: #fff;
   text-shadow: 0 0.08em 0 rgba(0, 0, 0, 0.4);
   background: rgba(70, 40, 15, 0.78);
@@ -297,6 +298,7 @@ img {
 }
 
 .chip img {
+  display: block;
   width: 1.7em;
   height: 1.7em;
   object-fit: contain;
@@ -414,9 +416,21 @@ img {
   box-shadow: 0 var(--side) 0 #6f7482, 0 calc(var(--side) + 0.2cqw) 0 0.22cqw #4b4f5c;
 }
 
-.node .cover.grey img {
-  height: calc(var(--nh) * 0.75);
-  transform: translateY(calc(var(--side) * 0.4));
+/* The fruit sits in the middle of the plinth, greyed, with the padlock in front of it. */
+.node .cover.grey .hidden-fruit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: calc(var(--nh) * 1.05);
+  transform: translate(-50%, -62%);
+  filter: grayscale(1) brightness(1.3);
+  opacity: 0.85;
+}
+
+.node .cover.grey .lock {
+  position: relative;
+  height: calc(var(--nh) * 0.62);
+  transform: translate(0, calc(var(--side) * 0.7));
   filter: drop-shadow(0 0.2cqw 0 rgba(0, 0, 0, 0.3));
 }
 
@@ -489,9 +503,7 @@ img {
 }
 
 .world-name {
-  position: absolute;
-  left: 6.2cqw;
-  top: 1.7cqw;
+  padding: 0.25em 0.9em;
 }
 
 .node .prize {
@@ -503,11 +515,6 @@ img {
   object-fit: contain;
   filter: drop-shadow(0 0.25cqw 0.15cqw rgba(0, 0, 0, 0.4));
   pointer-events: none;
-}
-
-.node .prize.locked {
-  filter: grayscale(1) brightness(0.92) drop-shadow(0 0.25cqw 0.15cqw rgba(0, 0, 0, 0.4));
-  opacity: 0.8;
 }
 
 .node .stars {
@@ -594,9 +601,27 @@ img {
   opacity: 0.8;
 }
 
-.home {
+/* Home button and the world's name, side by side and centred on each other. */
+.corner {
+  position: absolute;
   left: 1.4cqw;
   top: 1.4cqw;
+  display: flex;
+  align-items: center;
+  gap: 0.7cqw;
+}
+
+.corner .home {
+  position: static;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home svg {
+  width: 58%;
+  height: 58%;
 }
 
 .topbar {

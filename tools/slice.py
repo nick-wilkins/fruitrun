@@ -142,7 +142,9 @@ slice_sheet("tools/source/extras40.png", OTHERS, 8, 5, "public/assets/items", Fa
 
 for name in ("map", "map-tropics", "map-village", "stall"):
     Image.open(ROOT / f"tools/source/{name}.png").convert("RGB").save(ROOT / f"public/assets/{name}.webp", quality=90, method=6)
-Image.open(ROOT / "tools/source/smoothie-cup.png").save(ROOT / "public/assets/smoothie-cup.png", optimize=True)
+# Trim the empty margin so the cup sits centred wherever it is used as an icon.
+cup = Image.open(ROOT / "tools/source/smoothie-cup.png").convert("RGBA")
+cup.crop(cup.getchannel("A").point(lambda a: 255 if a > 40 else 0).getbbox()).save(ROOT / "public/assets/smoothie-cup.png", optimize=True)
 
 
 def cut(source, box, out, strays=True):

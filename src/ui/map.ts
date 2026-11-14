@@ -7,7 +7,19 @@ import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
 
-const lockCover = () => el('div.cover.grey', {}, el('img', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false }));
+const HOUSE =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10.5V20h4.5v-5h3v5H18v-9.5" fill="currentColor"/></svg>';
+
+/** A locked plinth: the level's fruit, greyed, with the padlock in front of it. */
+const lockCover = (level: Level) => {
+  const fruit = ingredient(level.fruit);
+  return el(
+    'div.cover.grey',
+    {},
+    el('img.hidden-fruit', { src: asset(fruit.img), alt: fruit.name, draggable: false }),
+    el('img.lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false }),
+  );
+};
 
 function levelCard(app: App, level: Level, close: () => void): HTMLElement {
   const record = app.save.levels[level.id];
@@ -55,15 +67,16 @@ export function mapScreen(app: App): HTMLElement {
     const locked = !isUnlocked(save, level);
     const record = save.levels[level.id];
     const node = el('button.node', { style: `left:${level.x}%;top:${level.y}%`, ariaLabel: `Level ${level.label}` });
-    if (drawn) {
-      // This map's painted numbers do not follow the route, so every node is drawn over with its own.
-      node.append(locked ? lockCover() : el(`div.cover.${world.nodes}`, {}, String(level.label)));
+    if (locked) {
+      node.append(lockCover(level));
     } else {
-      if (locked && !level.artLocked) node.append(lockCover());
-      if (!locked && level.artLocked) node.append(el('div.cover.gold', {}, String(level.label)));
+      // The new maps' painted numbers do not follow the route, so their nodes are drawn over with their own;
+      // on the first map only the stones painted as locked need covering once they open.
+      if (drawn) node.append(el(`div.cover.${world.nodes}`, {}, String(level.label)));
+      else if (level.artLocked) node.append(el('div.cover.gold', {}, String(level.label)));
+      const fruit = ingredient(level.fruit);
+      node.append(el('img.prize', { src: asset(fruit.img), alt: fruit.name, title: fruit.name, draggable: false }));
     }
-    const fruit = ingredient(level.fruit);
-    node.append(el(`img.prize${locked ? '.locked' : ''}`, { src: asset(fruit.img), alt: fruit.name, title: fruit.name, draggable: false }));
     if (record) node.append(stars(record.stars));
     // Every level waiting to be played pulses, so a fork in the path reads as a choice.
     if (!locked && !record) node.classList.add('open');
@@ -109,7 +122,7 @@ export function mapScreen(app: App): HTMLElement {
     app.show(superPad ? 'superblender' : 'blender');
   });
 
-  const home = el('button.round.home', { ariaLabel: 'Menu' }, '⌂');
+  const home = el('button.round.home', { ariaLabel: 'Menu', innerHTML: HOUSE });
   onTap(home, () => {
     sfx.tap();
     app.show('menu');
@@ -153,6 +166,6 @@ export function mapScreen(app: App): HTMLElement {
     go('Blend', 'green', 'blender'),
     go('Book', 'orange', 'book'),
   );
-  stage.append(blender, home, el('div.chip.world-name', {}, world.name), bar);
+  stage.append(blender, el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
   return stage;
 }
