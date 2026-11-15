@@ -13,6 +13,8 @@ npm test         # game rules, data and course checks
 npm run build    # static site in dist/
 ```
 
+`npm run build` also writes a service worker (`src/sw.ts`) that stores the whole game, about 17 MB with the music, on the first visit. After that it opens and plays with no connection, and the menu has an Add to Home Screen button. After a deploy, the first online visit fetches the new version in the background and the visit after that runs it. The service worker is off in `npm run dev`; use `npm run build && npm start` to try it.
+
 Landscape only. Steer by holding and sliding a finger or the mouse, or with the arrow keys (A/D also work).
 
 ## Where things are
@@ -25,6 +27,7 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 - `src/game/track.ts`, `course.ts` track maths and the builder; `world.ts`, `run.ts`, `character.ts` what you see
 - `src/ui/` menu, map, HUD/results and blender screens
 - `tools/music.py` composes and synthesises the extra music tracks (needs macOS `afconvert`)
+- `tools/icons.py` makes the home-screen icons in `public/` from the smoothie cup (needs Pillow)
 - `tools/slice.py` cuts `tools/source/*.png` sticker sheets into `public/assets/` (needs Pillow)
 
 ## Changing levels

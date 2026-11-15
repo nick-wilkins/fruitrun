@@ -1,6 +1,7 @@
 import { setMuted, sfx } from '../audio';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
+import { installButton } from './install';
 import { pipSvg } from './pip';
 import { enterFullscreen, fullscreenButton, setBackdrop } from './screen';
 
@@ -64,5 +65,10 @@ export function menuScreen(app: App): HTMLElement {
   stage.append(carryOn, startNew, mute, pip, bubble);
   const fullscreen = fullscreenButton();
   if (fullscreen) stage.append(fullscreen);
+  const install = installButton(stage);
+  if (install) {
+    if (!fullscreen) install.classList.add('edge');
+    stage.append(install);
+  }
   return stage;
 }

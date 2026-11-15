@@ -6,8 +6,9 @@ type FullscreenDocument = Document & { webkitFullscreenElement?: Element; webkit
 const root = document.documentElement as FullscreenTarget;
 const doc = document as FullscreenDocument;
 
-/** Whether this browser can go full screen at all (iPhones cannot). */
-export const canFullscreen = Boolean(root.requestFullscreen ?? root.webkitRequestFullscreen);
+/** Whether there is any full screen to go to: iPhones cannot, and the installed game opens that way already. */
+export const canFullscreen =
+  Boolean(root.requestFullscreen ?? root.webkitRequestFullscreen) && !matchMedia('(display-mode: fullscreen)').matches;
 
 const isFullscreen = () => Boolean(document.fullscreenElement ?? doc.webkitFullscreenElement);
 

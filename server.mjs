@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { extname, join, normalize, sep } from 'node:path';
+import { basename, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'dist');
@@ -32,8 +32,18 @@ const types = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-// Vite fingerprints its own bundles (name-HASH.ext); everything else can change between deploys.
+// Vite fingerprints its own bundles (name-HASH.ext), so those never change.
 const fingerprinted = /-[A-Za-z0-9_-]{8}\.(js|css)$/;
+// The page, the service worker and the manifest are how a new version arrives, so they are checked every visit.
+const entry = /^(sw\.js|registerSW\.js|.*\.html|.*\.webmanifest)$/;
+// Pictures and music keep their names between deploys. The service worker skips this cache when it updates,
+// so a week here only delays a changed picture for a browser that has no service worker.
+const WEEK = 'public, max-age=604800';
+
+function cacheControl(path) {
+  if (fingerprinted.test(path)) return 'public, max-age=31536000, immutable';
+  return entry.test(basename(path)) ? 'no-cache' : WEEK;
+}
 
 async function resolveFile(urlPath) {
   const path = normalize(join(root, decodeURIComponent(urlPath)));
@@ -69,7 +79,7 @@ const server = createServer(async (req, res) => {
 
   const headers = {
     'Content-Type': types[extname(file.path).toLowerCase()] ?? 'application/octet-stream',
-    'Cache-Control': fingerprinted.test(file.path) ? 'public, max-age=31536000, immutable' : 'no-cache',
+    'Cache-Control': cacheControl(file.path),
     'Last-Modified': file.info.mtime.toUTCString(),
     'Accept-Ranges': 'bytes',
   };
