@@ -1,8 +1,10 @@
 import { sfx } from '../audio';
 import { AWARDS } from '../core/awards';
-import { isUnlocked } from '../core/progress';
+import { isUnlocked, type Sip } from '../core/progress';
 import { COMBOS, RATINGS, type Combo } from '../core/smoothie';
 import { CATEGORY_LABEL, INGREDIENTS, ingredient } from '../data/ingredients';
+
+type Show = (dialog: HTMLElement) => void;
 import { LEVELS, WORLDS } from '../data/levels';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
@@ -16,7 +18,65 @@ function clue(combo: Combo): string | null {
   return first?.[0] ?? combo.distinct?.pool[0] ?? null;
 }
 
-function trophies(app: App): HTMLElement {
+/** A smoothie from the book, close up: the glass, what Pip made of it, and what went in. */
+function sipCard(sip: Sip): HTMLElement {
+  const rating = RATINGS[sip.rating - 1];
+  const cups = el('div.cups');
+  for (let i = 0; i < 5; i++) cups.append(el('img', { src: asset('assets/smoothie-cup.png'), alt: '', className: i < sip.rating ? '' : 'dim', style: `animation-delay:${i * 0.08}s` }));
+
+  const counts = new Map<string, number>();
+  // An ingredient may have left the game since this was blended.
+  for (const id of sip.items ?? []) if (INGREDIENTS.some((i) => i.id === id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+  const contents = el('div.sip-items');
+  for (const [id, n] of counts) {
+    const item = ingredient(id);
+    contents.append(el('div.sip-item', {}, el('img', { src: asset(item.img), alt: '' }), item.name, n > 1 ? el('b', {}, `×${n}`) : null));
+  }
+
+  const dialog = el(
+    'div.modal',
+    {},
+    el(
+      'div.card.smoothie.sip-card',
+      {},
+      el('h2', {}, sip.name, sip.big ? el('em', {}, 'Super') : null),
+      el(
+        'div.reveal',
+        {},
+        el(
+          `div.taste.reacted.rated-${sip.rating}`,
+          {},
+          el('div.glassful', { style: `--smoothie:${sip.color}` }, el('div.level'), el('div.straw')),
+          el('div.taster', { innerHTML: pipSvg(rating.face) }),
+          el('div.verdict', {}, rating.shout),
+        ),
+        el('div.scorebox', {}, cups, el('div.score', {}, String(sip.points)), el('div.kicker.small', {}, 'smoothie points')),
+      ),
+      counts.size ? contents : el('p.sip-lost', {}, 'Pip has forgotten what went into this one!'),
+      el(
+        'div.row',
+        {},
+        el(
+          'button.btn.purple',
+          {
+            onclick: () => {
+              sfx.tap();
+              dialog.remove();
+            },
+          },
+          'Close',
+        ),
+      ),
+    ),
+  );
+  // A tap on the dimmed page behind the card closes it too.
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.remove();
+  });
+  return dialog;
+}
+
+function trophies(app: App, show: Show): HTMLElement {
   const { save } = app;
   const done = LEVELS.filter((l) => save.levels[l.id]);
   const starCount = done.reduce((sum, l) => sum + save.levels[l.id].stars, 0);
@@ -48,7 +108,12 @@ function trophies(app: App): HTMLElement {
   for (const sip of save.history) {
     const cups = el('div.mini-cups');
     for (let i = 0; i < 5; i++) cups.append(el('img', { src: asset('assets/smoothie-cup.png'), alt: '', className: i < sip.rating ? '' : 'dim' }));
-    recent.append(el('div.sip', {}, el('i', { style: `background:${sip.color}` }), el('span', {}, sip.name, sip.big ? el('em', {}, 'Super') : null), cups, el('b', {}, String(sip.points))));
+    const row = el('div.sip', { role: 'button' }, el('i', { style: `background:${sip.color}` }), el('span', {}, sip.name, sip.big ? el('em', {}, 'Super') : null), cups, el('b', {}, String(sip.points)));
+    onTap(row, () => {
+      sfx.tap();
+      show(sipCard(sip));
+    });
+    recent.append(row);
   }
 
   const stat = (value: string, label: string, icon: string) => el('div.stat', {}, el('img', { src: asset(icon), alt: '' }), el('b', {}, value), el('span', {}, label));
@@ -76,11 +141,16 @@ function trophies(app: App): HTMLElement {
 
 function awards(app: App): HTMLElement {
   const won = new Set(app.save.awards);
-  const grid = el('div.book-awards');
-  for (const award of [...AWARDS].sort((a, b) => Number(won.has(b.id)) - Number(won.has(a.id)))) {
-    grid.append(el(`div.award${won.has(award.id) ? '.won' : ''}`, {}, el('img', { src: asset(award.icon), alt: '' }), el('b', {}, award.name), el('span', {}, award.how)));
+  const page = el('div.book-page', {}, el('p.book-note', {}, `${AWARDS.filter((a) => won.has(a.id)).length} of ${AWARDS.length} awards won.`));
+  for (const group of new Set(AWARDS.map((a) => a.group))) {
+    const awards = AWARDS.filter((a) => a.group === group);
+    const grid = el('div.book-awards');
+    for (const award of awards) {
+      grid.append(el(`div.award${won.has(award.id) ? '.won' : ''}`, {}, el('img', { src: asset(award.icon), alt: '' }), el('b', {}, award.name), el('span', {}, award.how)));
+    }
+    page.append(el('h3', {}, group, el('small', {}, `${awards.filter((a) => won.has(a.id)).length} of ${awards.length}`)), grid);
   }
-  return el('div.book-page', {}, el('p.book-note', {}, `${won.size} of ${AWARDS.length} awards won.`), grid);
+  return page;
 }
 
 function recipes(app: App): HTMLElement {
@@ -90,11 +160,11 @@ function recipes(app: App): HTMLElement {
     const hint = clue(combo);
     grid.append(
       found.has(combo.id)
-        ? el('div.recipe.found', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, combo.name), el('span', {}, `+${combo.pts}`), combo.big ? el('em', {}, 'Super') : null)
+        ? el('div.recipe.known', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, combo.name), el('span', {}, `+${combo.pts}`), combo.big ? el('em', {}, 'Super') : null)
         : el('div.recipe', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, '? ? ?'), el('span', {}, hint ? `Try ${ingredient(hint).name}…` : 'A mystery'), combo.big ? el('em', {}, 'Super') : null),
     );
   }
-  return el('div.book-page', {}, el('p.book-note', {}, `${found.size} of ${COMBOS.length} secret recipes found. Purple ones need the Super Blender.`), grid);
+  return el('div.book-page', {}, el('p.book-note', {}, `${COMBOS.filter((c) => found.has(c.id)).length} of ${COMBOS.length} secret recipes found. Purple ones need the Super Blender.`), grid);
 }
 
 function collection(app: App): HTMLElement {
@@ -128,7 +198,7 @@ export function bookScreen(app: App): HTMLElement {
   const body = el('div.book-body');
   const tabs = el('div.book-tabs');
   const open = (name: keyof typeof pages) => {
-    body.replaceChildren(pages[name](app));
+    body.replaceChildren(pages[name](app, (dialog) => stage.append(dialog)));
     body.scrollTop = 0;
     tabs.querySelectorAll('button').forEach((tab) => tab.classList.toggle('on', tab.textContent === name));
   };

@@ -24,6 +24,8 @@ export interface Sip {
   color: string;
   /** Made in the super blender. */
   big: boolean;
+  /** What went into the jug. Missing on smoothies made before the book kept it. */
+  items?: string[];
 }
 
 const HISTORY = 12;
@@ -238,7 +240,7 @@ export function blend(save: Save, ids: string[], capacity = MAX_JUG): SmoothieRe
   save.points += result.points;
   save.smoothies += 1;
   save.ratings[result.rating - 1] += 1;
-  save.history.unshift({ name: result.name, points: result.points, rating: result.rating, color: result.color, big: capacity > MAX_JUG });
+  save.history.unshift({ name: result.name, points: result.points, rating: result.rating, color: result.color, big: capacity > MAX_JUG, items: jug });
   save.history.length = Math.min(save.history.length, HISTORY);
   if (!save.bestSmoothie || result.points > save.bestSmoothie.points) {
     save.bestSmoothie = { name: result.name, points: result.points };

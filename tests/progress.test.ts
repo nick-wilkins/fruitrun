@@ -180,6 +180,13 @@ describe('the smoothie book', () => {
     expect(save.ratings.reduce((a, b) => a + b, 0)).toBe(2);
   });
 
+  it('remembers what went into each smoothie, so the book can show it', () => {
+    const save = newSave();
+    save.inventory = { apple: 2, honey: 1 };
+    blend(save, ['apple', 'honey', 'apple']);
+    expect(save.history[0].items).toEqual(['apple', 'honey', 'apple']);
+  });
+
   it('opens the super blender once the path to it is finished', () => {
     const save = newSave();
     expect(superBlenderOpen(save)).toBe(false);

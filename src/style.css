@@ -1712,6 +1712,11 @@ button.mix-item {
   padding: 0.3em 0.6em;
   font-size: 1.3cqw;
   border-bottom: 0.12cqw dashed rgba(138, 75, 0, 0.3);
+  cursor: pointer;
+}
+
+.sip:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .sip i {
@@ -1734,6 +1739,63 @@ button.mix-item {
   color: #fff;
   background: linear-gradient(90deg, #b574f2, #7a3fc9);
   border-radius: 99em;
+}
+
+.book h3 small {
+  margin-left: 0.7em;
+  font-size: 0.8em;
+  color: #9a6a3a;
+}
+
+.sip-card em {
+  margin-left: 0.5em;
+  padding: 0 0.5em;
+  font-size: 0.55em;
+  font-style: normal;
+  vertical-align: middle;
+  color: #fff;
+  background: linear-gradient(90deg, #b574f2, #7a3fc9);
+  border-radius: 99em;
+}
+
+/* Room for Pip's speech bubble, which the blender only shows before the score arrives. */
+.sip-card .reveal {
+  gap: 7em;
+}
+
+.sip-items {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4em;
+  max-width: 36em;
+  margin: 0.7em auto 0;
+}
+
+.sip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.15em 0.7em 0.15em 0.3em;
+  font-size: 0.85em;
+  font-weight: 700;
+  background: #fff8e6;
+  border: 0.12em solid #e2b877;
+  border-radius: 99em;
+}
+
+.sip-item img {
+  width: 1.9em;
+  height: 1.9em;
+  object-fit: contain;
+}
+
+.sip-item b {
+  color: #e2551f;
+}
+
+.sip-lost {
+  margin-top: 0.9em;
 }
 
 .mini-cups img {
@@ -1783,17 +1845,17 @@ button.mix-item {
   margin: 0.2em 0 0;
 }
 
-.recipe.found {
+.recipe.known {
   background: #fff8e6;
   border-style: solid;
   border-color: #e2b877;
 }
 
-.recipe.found img {
+.recipe.known img {
   filter: none;
 }
 
-.recipe.found span {
+.recipe.known span {
   color: #e2551f;
 }
 
