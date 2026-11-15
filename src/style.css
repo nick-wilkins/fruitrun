@@ -1839,12 +1839,6 @@ button.mix-item {
   color: #9a6a3a;
 }
 
-.recipe em {
-  grid-column: 2;
-  justify-self: start;
-  margin: 0.2em 0 0;
-}
-
 .recipe.known {
   background: #fff8e6;
   border-style: solid;

@@ -1,7 +1,7 @@
 import { sfx } from '../audio';
 import { AWARDS } from '../core/awards';
 import { isUnlocked, type Sip } from '../core/progress';
-import { COMBOS, RATINGS, type Combo } from '../core/smoothie';
+import { COMBOS, COMBO_GROUPS, RATINGS, type Combo } from '../core/smoothie';
 import { CATEGORY_LABEL, INGREDIENTS, ingredient } from '../data/ingredients';
 
 type Show = (dialog: HTMLElement) => void;
@@ -155,16 +155,21 @@ function awards(app: App): HTMLElement {
 
 function recipes(app: App): HTMLElement {
   const found = new Set(app.save.combosFound);
-  const grid = el('div.book-recipes');
-  for (const combo of [...COMBOS].sort((a, b) => Number(found.has(b.id)) - Number(found.has(a.id)) || Number(a.big ?? false) - Number(b.big ?? false))) {
-    const hint = clue(combo);
-    grid.append(
-      found.has(combo.id)
-        ? el('div.recipe.known', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, combo.name), el('span', {}, `+${combo.pts}`), combo.big ? el('em', {}, 'Super') : null)
-        : el('div.recipe', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, '? ? ?'), el('span', {}, hint ? `Try ${ingredient(hint).name}…` : 'A mystery'), combo.big ? el('em', {}, 'Super') : null),
-    );
+  const page = el('div.book-page', {}, el('p.book-note', {}, `${COMBOS.filter((c) => found.has(c.id)).length} of ${COMBOS.length} secret recipes found.`));
+  for (const group of COMBO_GROUPS) {
+    const combos = COMBOS.filter((c) => c.group === group);
+    const grid = el('div.book-recipes');
+    for (const combo of [...combos].sort((a, b) => Number(found.has(b.id)) - Number(found.has(a.id)))) {
+      const hint = clue(combo);
+      grid.append(
+        found.has(combo.id)
+          ? el('div.recipe.known', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, combo.name), el('span', {}, `+${combo.pts}`))
+          : el('div.recipe', {}, hint ? el('img', { src: asset(ingredient(hint).img), alt: '' }) : null, el('b', {}, '? ? ?'), el('span', {}, hint ? `Try ${ingredient(hint).name}…` : 'A mystery')),
+      );
+    }
+    page.append(el('h3', {}, group, el('small', {}, `${combos.filter((c) => found.has(c.id)).length} of ${combos.length}`)), grid);
   }
-  return el('div.book-page', {}, el('p.book-note', {}, `${COMBOS.filter((c) => found.has(c.id)).length} of ${COMBOS.length} secret recipes found. Purple ones need the Super Blender.`), grid);
+  return page;
 }
 
 function collection(app: App): HTMLElement {
