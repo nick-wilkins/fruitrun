@@ -309,28 +309,29 @@ function generate(level: Level, attempt = 0): CourseBuilder {
 /** Finish at or under these times (seconds) for 5, 4, 3 and 2 stars. Anything slower is 1. */
 export type StarTimes = [number, number, number, number];
 
-const built = new Map<string, { course: Course; starTimes: StarTimes }>();
+const built = new Map<string, { course: Course; starTimes: StarTimes; handsFree: { smart: number; ace: number } }>();
 
 /**
  * Star times come from playing the course hands-free three ways: never steering, a careful player's line, and an
  * expert's line driven for time alone. Five stars means beating the quicker of the two drivers; matching it earns
  * four. The rest are spread evenly from there towards never steering at all, which earns one star.
  */
-function calibrate(course: Course, level: Level): StarTimes {
+function calibrate(course: Course, level: Level): { starTimes: StarTimes; handsFree: { smart: number; ace: number } } {
   const idle = timeCourse(course, level, 'none');
-  const best = Math.min(timeCourse(course, level, 'ace'), timeCourse(course, level, 'smart'), idle - 4);
+  const handsFree = { smart: timeCourse(course, level, 'smart'), ace: timeCourse(course, level, 'ace') };
+  const best = Math.min(handsFree.ace, handsFree.smart, idle - 4);
   const five = Math.floor(best * 0.985);
   const step = Math.max(1, (idle - five) / 4);
   const four = Math.max(Math.ceil(best), Math.round(five + step));
   const three = Math.max(four + 1, Math.round(five + step * 2));
-  return [five, four, three, Math.max(three + 1, Math.round(five + step * 3))];
+  return { starTimes: [five, four, three, Math.max(three + 1, Math.round(five + step * 3))], handsFree };
 }
 
 function prepared(level: Level) {
   let entry = built.get(level.id);
   if (!entry) {
     const course = (level.id === 'level-1' ? appleOrchard() : generate(level)).build(inMood(themeFor(level, ingredient(level.fruit).color), level.mood), level.mood);
-    entry = { course, starTimes: calibrate(course, level) };
+    entry = { course, ...calibrate(course, level) };
     built.set(level.id, entry);
   }
   return entry;
@@ -340,6 +341,9 @@ function prepared(level: Level) {
 export const courseFor = (level: Level): Course => prepared(level).course;
 
 export const starTimesFor = (level: Level): StarTimes => prepared(level).starTimes;
+
+/** How long the careful and the expert hands-free drivers each take over a level. */
+export const handsFreeFor = (level: Level): { smart: number; ace: number } => prepared(level).handsFree;
 
 /**
  * Build courses a few at a time while nothing else is happening, so opening a level never has to wait for one.

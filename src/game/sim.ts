@@ -26,6 +26,21 @@ const SAIL_LOW = 0.76;
 
 export type Autopilot = 'none' | 'smart' | 'ace';
 
+/** A computer rival: one of the hands-free lines, held back to make a fair race of it. */
+export interface Driver {
+  line: 'smart' | 'ace';
+  /** How briskly it steers, 1 being the line's own pace. */
+  pace: number;
+  /** How much of its speed it uses, 1 being all of it. */
+  speed: number;
+  /** How far it wanders either side of its line. */
+  wobble: number;
+  /** How much it slows, at most, when well ahead of the marble it is racing. */
+  easeOff: number;
+  /** Where in its wander it starts, so rivals do not weave in step. */
+  phase: number;
+}
+
 export type SimEvent =
   | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' }
   | { type: 'boost' | 'turbo' | 'crate' | 'pin' | 'bump' | 'ring' | 'jump'; index: number }
@@ -55,6 +70,12 @@ export class Sim {
   /** Set while `steer` comes from a finger swiping on a touch screen. */
   swiping = false;
   autopilot: Autopilot = 'none';
+  /** Set for a computer rival: it drives itself, held back as the driver says. */
+  driver: Driver | null = null;
+  /** For a rival: how far through the course the marble it is racing has got, 0 to 1. */
+  chase: (() => number) | null = null;
+  /** How much of its speed the marble is using right now: 1 unless a driver is holding it back. */
+  gait = 1;
   readonly bonuses: string[] = [];
   /** Counts for the awards: rings threaded, things hit and so on. */
   readonly tally = { rings: 0, hits: 0, pins: 0, turbos: 0, launches: 0 };
@@ -329,14 +350,17 @@ export class Sim {
     const riding = this.onLift();
     if (riding && !this.riding) this.emit({ type: 'lift' });
     this.riding = riding;
-    const wanted = riding ? 0 : this.autopilot === 'ace' ? this.aceLine() : this.autopilot === 'smart' ? this.smartLine() : this.steer;
+    const line = this.driver?.line ?? this.autopilot;
+    let wanted = riding ? 0 : line === 'ace' ? this.aceLine() : line === 'smart' ? this.smartLine() : this.steer;
+    if (this.driver?.wobble && wanted !== null && !riding) wanted += this.driver.wobble * Math.sin(this.clock * 1.9 + this.driver.phase);
     const target = this.finished || this.knockT > 0 ? null : wanted;
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
     const grip = GRIP[this.course.mood];
     if (target !== null) {
       // A swiping finger gets a snappier ball than keys or the mouse: quick enough to cross the road in about a
       // third of a second.
-      const pace = this.swiping || this.autopilot === 'ace' ? { pull: 14, top: 28 } : { pull: 9, top: 16 };
+      const brisk = this.driver?.pace ?? 1;
+      const pace = this.swiping || line === 'ace' ? { pull: 14 * brisk, top: 28 * brisk } : { pull: 9 * brisk, top: 16 * brisk };
       const wanted = clamp((target - this.x) * (riding ? 2.5 : pace.pull), -pace.top, pace.top);
       this.xv += (wanted - this.xv) * Math.min(1, dt * grip);
     } else {
@@ -382,7 +406,12 @@ export class Sim {
 
     // The inside of a bend is a shorter path, so taking the right line is genuinely faster.
     let before = this.s;
-    this.s += (this.v * dt) / clamp(1 - f.k * this.x, 0.6, 1.5);
+    if (this.driver) {
+      // Well ahead of the marble it is racing, a rival eases off so the race stays close. It is never sped up.
+      const ahead = this.chase ? this.progress() - this.chase() : 0;
+      this.gait = this.driver.speed * (1 - this.driver.easeOff * clamp((ahead - 0.02) / 0.08, 0, 1));
+    }
+    this.s += (this.v * this.gait * dt) / clamp(1 - f.k * this.x, 0.6, 1.5);
 
     if (this.lane === 0) {
       this.s = Math.min(track.length - 2, this.s);
@@ -590,9 +619,10 @@ export class Sim {
 }
 
 /** Play a course hands-free and return the finish time in seconds, or Infinity if it never finishes. */
-export function timeCourse(course: Course, level: Level, autopilot: Autopilot): number {
+export function timeCourse(course: Course, level: Level, by: Autopilot | Driver): number {
   const sim = new Sim(course, level, () => {}, () => 0);
-  sim.autopilot = autopilot;
+  if (typeof by === 'string') sim.autopilot = by;
+  else sim.driver = by;
   sim.skipCountdown();
   for (let step = 0; step < 600 / TICK && !sim.finished; step++) sim.step(TICK);
   return sim.finished ? sim.time : Infinity;

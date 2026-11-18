@@ -1,6 +1,7 @@
 import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { claimAwards, type Award } from './awards';
+import { podiumFruit } from './race';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
 /** What happened on a run, beyond the time: counted by the rules engine. */
@@ -178,11 +179,15 @@ export interface RunResult {
   passed: boolean;
   /** Levels this run has just opened. */
   opened: Level[];
+  /** For a race: where the player finished, and the extra fruit that place won (already counted in `fruits`). */
+  place?: number;
+  podium?: number;
 }
 
 /** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
-export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats): RunResult {
+export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats, place?: number): RunResult {
   const stars = starsForTime(level, seconds);
+  const podium = place === undefined ? 0 : podiumFruit(place);
   const previous = save.levels[level.id];
   const shut = LEVELS.filter((l) => !isUnlocked(save, l));
   // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.
@@ -193,7 +198,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
     time: newBest ? seconds : previous.time,
     courses: COURSES,
   };
-  save.inventory[level.fruit] = (save.inventory[level.fruit] ?? 0) + stars;
+  save.inventory[level.fruit] = (save.inventory[level.fruit] ?? 0) + stars + podium;
   for (const id of bonuses) save.inventory[id] = (save.inventory[id] ?? 0) + 1;
   for (const id of [level.fruit, ...bonuses]) if (!save.seen.includes(id)) save.seen.push(id);
   save.last = level.id;
@@ -213,6 +218,8 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   if (perfect) add('perfect');
   if (clean) add('clean');
   if (perfect && clean && stars === 5) add('flawless');
+  if (place !== undefined) add('races');
+  if (place === 1) add('raceWins');
   if (level.mood !== 'sunny') add(level.mood);
   if (stars === 5 && (level.mood === 'rain' || level.mood === 'snow')) add('slipperyFive');
   if (previous && comparable && newBest) add('newBests');
@@ -220,7 +227,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   return {
     stars,
     time: seconds,
-    fruits: stars,
+    fruits: stars + podium,
     bonuses,
     newBest,
     firstClear: !previous,
@@ -232,6 +239,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
     need: level.need,
     passed: save.levels[level.id].stars >= level.need,
     opened: shut.filter((l) => isUnlocked(save, l)),
+    ...(place === undefined ? {} : { place, podium }),
   };
 }
 
