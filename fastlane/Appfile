@@ -1,3 +1,2 @@
-# Placeholder until the real bundle ID is chosen. It must match appId in capacitor.config.ts and
-# PRODUCT_BUNDLE_IDENTIFIER in ios/App/App.xcodeproj.
-app_identifier('app.smoothiescramble.placeholder')
+# Must match appId in capacitor.config.ts and PRODUCT_BUNDLE_IDENTIFIER in ios/App/App.xcodeproj.
+app_identifier('com.smoothiescramble.app')

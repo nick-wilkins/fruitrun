@@ -16,7 +16,7 @@ The game exactly as it plays today, running as an iPhone and iPad app from files
 
 ## Blocked on Nick
 
-1. **Bundle ID.** A placeholder (`app.smoothiescramble.placeholder`) is used until it arrives. Everything up to the simulator runs without it; the TestFlight upload does not.
+1. **Bundle ID.** A placeholder (`com.smoothiescramble.app`) is used until it arrives. Everything up to the simulator runs without it; the TestFlight upload does not.
 2. **App record** created by hand in App Store Connect once the bundle ID is chosen.
 3. **App Store Connect API key variables** (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`) available in the shell that runs fastlane. They are not set in this one.
 4. **The live site.** Not an issue while this stays on `ios`. Merging to main will break the Laravel Cloud deployment (no `server.mjs`), so take the site down or disconnect the deploy before merging.
@@ -169,4 +169,4 @@ Fifth and last review round, 10 findings, none in the save round trip itself. Re
 Later on 2026-11-18:
 
 - **Dark patch at fork joins fixed** (`2759bcb`). Cause: the road underside's lip stayed where a kerb was left out, and on a banked stretch stuck up through the other road. Evidence: a scan looking down on the road around every fork found 24 points of underside above the surface in level 3 before the fix and none after, and none across all 148 forks in the game; the spot in Nick's recording is clean in a screenshot from the same view. (A first version of the scan could not see the bug at all and was thrown away.)
-- **Renamed to Smoothie Scramble**: home screen name, page title, config, README, fastlane file name. The placeholder bundle ID is now `app.smoothiescramble.placeholder`. The menu artwork still has "Smoothie Adventure" painted in and needs new art from Nick.
+- **Renamed to Smoothie Scramble**: home screen name, page title, config, README, fastlane file name. The placeholder bundle ID is now `com.smoothiescramble.app`. The menu artwork still has "Smoothie Adventure" painted in and needs new art from Nick.
