@@ -10,11 +10,12 @@ These override anything below that says otherwise.
 - **Paywall:** AI opponents and multiplayer both sit behind the one purchase. £2.99, Family Sharing on.
 - **Minimum iOS 16.** Android is "maybe later".
 - **Races:** up to 3 AI opponents. A race rewards more fruit the higher the podium place.
-- **Listing:** Kids Category. Age band still to pick (Apple offers only 5 and under, 6 to 8, 9 to 11).
+- **Listing:** Kids Category, age band 6 to 8.
 - **Privacy policy:** Nick will create a dedicated web page to host it.
 - **Release order:** hold 1.0 until multiplayer is done. Phases 5a and 5b therefore come before the store release in section 10.
 - **Multiplayer transport:** peer to peer Wi-Fi through Network framework. Each player has their own crates and fruit.
-- **Still open:** bundle ID and store name, age band, oldest test devices.
+- **Old devices:** assumed fine for now (the web version has been played on an iPad); checked on the old iPad when it is to hand.
+- **Still open:** bundle ID and store name.
 
 Apple facts below were checked against live pages on 2026-11-18. Anything not confirmed on a live page is marked **unverified**. Sources are numbered at the end.
 
