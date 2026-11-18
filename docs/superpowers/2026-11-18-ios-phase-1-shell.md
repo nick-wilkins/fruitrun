@@ -114,5 +114,10 @@ Runtime verification:
 Independent review (`/code-review medium`, 2026-11-18), 10 findings:
 
 - Fixed: sound not resuming from the "interrupted" state after a call; a lost graphics context after the finish line discarding the result; a level starting while the surface is still lost; startup waiting for ever on the backup; save written to the backup before the game's own storage; signing flag missing from the export step; app version 1.0 against 1.0.0.
-- Left as is: `beta` does not raise the build number itself (same as `mamc-app`: run `bump` first). A stale or corrupt local save still wins over the backup (not a credible case once the local write goes first). The hand-built window alongside the storyboard is Capacitor's own template. The duplicate constant name and settings are style only.
+- Left as is: `beta` does not raise the build number itself (same as `mamc-app`: run `bump` first). A local save that is present always wins over the backup, with no comparison of which is newer; the two are written together, so they differ only if one write fails. The hand-built window alongside the storyboard is Capacitor's own template. The duplicate constant name and settings are style only.
 - After the fixes: `npm test` 806 passed, typecheck and build clean, simulator build succeeded. The fixes were not exercised on a device.
+
+Second review round (scoped to the fixes), 9 findings:
+
+- Fixed: the startup timeout could start a returning player on an empty game and then overwrite the backup, so the timeout is removed and the restore is waited for in full. The two save writes are now independent, so a full disk cannot stop the backup. The "surface lost" flag is replaced by asking the renderer directly; a level tap asks for the surface back once and reloads the game on the next try if it is still gone. A rejected sound resume is caught.
+- Left as is: `export_method: 'app-store'` matches `mamc-app`, which releases with it today; the signing step stays unproven until the first real archive.

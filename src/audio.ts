@@ -35,7 +35,7 @@ function audio(): AudioContext | null {
     music.volume = 1;
   }
   // A phone call leaves the context 'interrupted' rather than 'suspended' on an iPhone or iPad.
-  if (ctx.state !== 'running') void ctx.resume();
+  if (ctx.state !== 'running') void ctx.resume().catch(() => {});
   return ctx;
 }
 

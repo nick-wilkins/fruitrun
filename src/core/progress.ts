@@ -131,21 +131,29 @@ export function loadSave(): Save | null {
 }
 
 export function storeSave(save: Save): void {
+  const json = JSON.stringify(save);
   try {
-    const json = JSON.stringify(save);
     localStorage.setItem(KEY, json);
+  } catch {
+    // A full disk: the game still plays, and the backup below may yet remember.
+  }
+  try {
     void backup?.set(json).catch(() => {});
   } catch {
-    // Private browsing or a full disk: the game still plays, it just will not remember.
+    // No backup to be had.
   }
 }
 
 export function clearSave(): void {
   try {
     localStorage.removeItem(KEY);
-    void backup?.remove().catch(() => {});
   } catch {
     // Nothing stored, nothing to clear.
+  }
+  try {
+    void backup?.remove().catch(() => {});
+  } catch {
+    // No backup to be had.
   }
 }
 

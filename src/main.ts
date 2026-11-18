@@ -22,15 +22,18 @@ const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 
 let run: Run | null = null;
-/** True while the device has taken the 3D drawing surface away. */
-let surfaceLost = false;
+/** Set once the device has been asked to hand back a 3D drawing surface it took away. */
+let askedForSurface = false;
+// Fetched now: it cannot be fetched once the surface has gone, which is the only time it is needed.
+const surface = renderer.getContext().getExtension('WEBGL_lose_context');
 let toastTimer = 0;
 const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
 try {
-  // Never let a slow answer from the backup keep the menu from appearing.
-  await Promise.race([restoreSave(localStorage, saveBackup), new Promise((done) => setTimeout(done, 1500))]);
+  // Waited for in full: starting without it would show a returning player an empty game, and their first save
+  // would then replace the backup.
+  await restoreSave(localStorage, saveBackup);
 } catch {
   // No backup to be had: carry on with whatever the game's own storage holds.
 }
@@ -64,10 +67,23 @@ const app: App = {
     ui.replaceChildren(build(app));
   },
   play(level: Level) {
-    if (surfaceLost) {
+    if (renderer.getContext().isContextLost()) {
+      // Ask for the surface back once. If it is still gone at the next try, start the game afresh: progress is
+      // already saved, and a fresh page gets a fresh surface.
+      if (askedForSurface) {
+        location.reload();
+        return;
+      }
+      askedForSurface = true;
+      try {
+        surface?.restoreContext();
+      } catch {
+        // The device took the surface itself and will hand it back in its own time.
+      }
       app.toast('One moment, getting the track ready…');
       return;
     }
+    askedForSurface = false;
     endRun();
     app.world = level.world;
     const hud = createHud(level, {
@@ -135,10 +151,8 @@ onResume(unlockAudio);
 // so its result can still be blended.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
-  surfaceLost = true;
   if (run && !run.sim.finished) app.show('map');
 });
-canvas.addEventListener('webglcontextrestored', () => (surfaceLost = false));
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
