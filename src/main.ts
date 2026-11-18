@@ -1,11 +1,12 @@
 import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
-import { clearSave, completeLevel, isUnlocked, loadSave, newSave, storeSave, type RunResult, type Save } from './core/progress';
+import { backUpSaves, clearSave, completeLevel, isUnlocked, loadSave, newSave, restoreSave, storeSave, type RunResult, type Save } from './core/progress';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
+import { onResume, saveBackup } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -25,6 +26,12 @@ let toastTimer = 0;
 const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
+try {
+  await restoreSave(localStorage, saveBackup);
+} catch {
+  // No backup to be had: carry on with whatever the game's own storage holds.
+}
+backUpSaves(saveBackup);
 const stored = loadSave();
 
 function endRun(): void {
@@ -114,6 +121,14 @@ setMuted(app.save.muted);
 // Browsers hold sound back until the player does something, and differ on which event counts.
 for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(type, unlockAudio, { passive: true });
 startMusic(['track1.mp3', 'track3.m4a', 'track7.m4a', 'track2.mp3', 'track5.m4a', 'track8.m4a', 'track6.m4a'].map((file) => asset(`assets/audio/${file}`)));
+// A phone call or a trip to another app can leave the sound switched off when the game comes back.
+onResume(unlockAudio);
+// The device can take the 3D drawing surface away when it is short of memory. Stop the picture being cleared to
+// white, and go back to the map: the next level starts on a fresh surface.
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault();
+  if (run) app.show('map');
+});
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {

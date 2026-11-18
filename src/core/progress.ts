@@ -64,6 +64,28 @@ export interface Save {
 }
 
 const KEY = 'fruitrun.save.v1';
+export const SAVE_KEY = KEY;
+
+/** A second home for the save, outside the web view's own storage, which the device may wipe when it runs short. */
+export interface Backup {
+  get(): Promise<string | null>;
+  set(value: string): Promise<void>;
+  remove(): Promise<void>;
+}
+
+let backup: Backup | null = null;
+
+/** Copy every save to `to` from now on. */
+export function backUpSaves(to: Backup): void {
+  backup = to;
+}
+
+/** Before the game reads its save: if the device has wiped it, bring it back from the backup. */
+export async function restoreSave(storage: Pick<Storage, 'getItem' | 'setItem'>, from: Backup): Promise<void> {
+  if (storage.getItem(KEY) !== null) return;
+  const kept = await from.get();
+  if (kept !== null) storage.setItem(KEY, kept);
+}
 
 export function newSave(): Save {
   return {
@@ -110,7 +132,9 @@ export function loadSave(): Save | null {
 
 export function storeSave(save: Save): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(save));
+    const json = JSON.stringify(save);
+    void backup?.set(json).catch(() => {});
+    localStorage.setItem(KEY, json);
   } catch {
     // Private browsing or a full disk: the game still plays, it just will not remember.
   }
@@ -118,6 +142,7 @@ export function storeSave(save: Save): void {
 
 export function clearSave(): void {
   try {
+    void backup?.remove().catch(() => {});
     localStorage.removeItem(KEY);
   } catch {
     // Nothing stored, nothing to clear.

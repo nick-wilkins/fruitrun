@@ -1,6 +1,6 @@
 # Smoothie Adventure (fruitrun)
 
-A kids' marble-run game. Roll Pip down a 3D course, win fruit for a fast time, grab extras on the way, then blend smoothies for points.
+A kids' marble-run game for iPhone and iPad. Roll Pip down a 3D course, win fruit for a fast time, grab extras on the way, then blend smoothies for points.
 
 Three.js + TypeScript + Vite. Menu, map and blender are DOM/CSS over the supplied art; courses are generated in code.
 
@@ -8,12 +8,15 @@ Three.js + TypeScript + Vite. Menu, map and blender are DOM/CSS over the supplie
 
 ```sh
 npm install
-npm run dev      # http://localhost:5183 and on your network for an iPad
+npm run dev      # http://localhost:5183, for working on the game in a desktop browser
 npm test         # game rules, data and course checks
-npm run build    # static site in dist/
+npm run ios      # build the game and copy it into the iPhone and iPad app
+npx cap open ios # open the app in Xcode to run it in a simulator or on a device
 ```
 
-`npm run build` also writes a service worker (`src/sw.ts`) that stores the whole game, about 17 MB with the music, on the first visit. After that it opens and plays with no connection, and the menu has an Add to Home Screen button. After a deploy, the first online visit fetches the new version in the background and the visit after that runs it. The service worker is off in `npm run dev`; use `npm run build && npm start` to try it.
+The game ships as an iPhone and iPad app (Capacitor, in `ios/`). Everything it needs is inside the app, so it plays with no connection. `fastlane ios beta` sends a build to TestFlight; see `fastlane/Fastfile`.
+
+The save lives in the web view's storage and is copied to the app's settings store on every write (`src/platform.ts`), so it comes back if the device clears web data.
 
 Landscape only. Steer by holding and sliding a finger or the mouse, or with the arrow keys (A/D also work).
 
@@ -27,7 +30,7 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 - `src/game/track.ts`, `course.ts` track maths and the builder; `world.ts`, `run.ts`, `character.ts` what you see
 - `src/ui/` menu, map, HUD/results and blender screens
 - `tools/music.py` composes and synthesises the extra music tracks (needs macOS `afconvert`)
-- `tools/icons.py` makes the home-screen icons in `public/` from the smoothie cup (needs Pillow)
+- `tools/icons.py` makes the app icon from the smoothie cup (needs Pillow)
 - `tools/slice.py` cuts `tools/source/*.png` sticker sheets into `public/assets/` (needs Pillow)
 
 ## Changing levels

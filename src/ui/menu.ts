@@ -1,9 +1,8 @@
 import { setMuted, sfx } from '../audio';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
-import { installButton } from './install';
 import { pipSvg } from './pip';
-import { enterFullscreen, fullscreenButton, setBackdrop } from './screen';
+import { setBackdrop } from './screen';
 
 export function menuScreen(app: App): HTMLElement {
   const stage = el('div.stage.menu-stage');
@@ -19,8 +18,6 @@ export function menuScreen(app: App): HTMLElement {
       return;
     }
     sfx.tap();
-    // Starting to play is the moment to fill the screen: it needs a tap, and this is one.
-    enterFullscreen();
     app.show('map');
   });
 
@@ -28,7 +25,6 @@ export function menuScreen(app: App): HTMLElement {
   onTap(startNew, () => {
     sfx.tap();
     if (!app.hasSave) {
-      enterFullscreen();
       app.startAgain();
       return;
     }
@@ -63,12 +59,5 @@ export function menuScreen(app: App): HTMLElement {
   const pip = el('div.menu-pip', { innerHTML: pipSvg('cheer') });
   const bubble = el('div.bubble', {}, "Hi, I'm Pip! Let's roll!");
   stage.append(carryOn, startNew, mute, pip, bubble);
-  const fullscreen = fullscreenButton();
-  if (fullscreen) stage.append(fullscreen);
-  const install = installButton(stage);
-  if (install) {
-    if (!fullscreen) install.classList.add('edge');
-    stage.append(install);
-  }
   return stage;
 }

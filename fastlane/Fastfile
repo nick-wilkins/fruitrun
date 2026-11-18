@@ -1,0 +1,65 @@
+require 'json'
+
+ROOT = File.expand_path('..', __dir__)
+PROJECT = File.join(ROOT, 'ios/App/App.xcodeproj')
+PBXPROJ = File.join(PROJECT, 'project.pbxproj')
+PACKAGE_JSON = File.join(ROOT, 'package.json')
+
+def current_version
+  JSON.parse(File.read(PACKAGE_JSON))['version']
+end
+
+def asc_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch('ASC_KEY_ID'),
+    issuer_id: ENV.fetch('ASC_ISSUER_ID'),
+    key_filepath: File.expand_path(ENV.fetch('ASC_KEY_PATH'))
+  )
+end
+
+def build_web
+  sh("cd #{ROOT} && npm run build && env -u GEM_HOME -u GEM_PATH -u RUBYOPT -u RUBYLIB -u BUNDLE_GEMFILE npx cap sync ios")
+end
+
+def build_ios
+  build_app(
+    project: PROJECT,
+    scheme: 'App',
+    configuration: 'Release',
+    export_method: 'app-store',
+    output_directory: File.join(ROOT, 'build'),
+    output_name: "SmoothieAdventure-#{current_version}.ipa",
+    xcargs: '-allowProvisioningUpdates'
+  )
+end
+
+desc 'Set the version and add one to the build number. bump version:1.0.0'
+lane :bump do |options|
+  version = options[:version] || UI.user_error!('Pass version:x.y.z')
+
+  sh("cd #{ROOT} && npm version #{version} --no-git-tag-version --allow-same-version")
+
+  pbx = File.read(PBXPROJ)
+  build = pbx[/CURRENT_PROJECT_VERSION = (\d+);/, 1].to_i + 1
+  pbx = pbx.gsub(/MARKETING_VERSION = [^;]+;/, "MARKETING_VERSION = #{version};")
+           .gsub(/CURRENT_PROJECT_VERSION = \d+;/, "CURRENT_PROJECT_VERSION = #{build};")
+  File.write(PBXPROJ, pbx)
+
+  UI.success("#{version}: build #{build}")
+end
+
+platform :ios do
+  desc 'Build and archive without uploading, to prove the app signs. No API key needed.'
+  lane :archive do
+    build_web
+    build_ios
+  end
+
+  desc 'Build, archive and upload to TestFlight for testers, with no store submission'
+  lane :beta do
+    asc_key
+    build_web
+    build_ios
+    upload_to_testflight(ipa: lane_context[SharedValues::IPA_OUTPUT_PATH], skip_waiting_for_build_processing: true)
+  end
+end

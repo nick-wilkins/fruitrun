@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, completeLevel, isUnlocked, newSave, starsForTime, superBlenderOpen, type Save } from '../src/core/progress';
+import { blend, completeLevel, isUnlocked, newSave, restoreSave, SAVE_KEY, starsForTime, superBlenderOpen, type Backup, type Save } from '../src/core/progress';
 import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
@@ -200,5 +200,31 @@ describe('the smoothie book', () => {
     blend(save, Array.from({ length: 20 }, () => 'apple'), 20);
     expect(save.inventory.apple).toBeUndefined();
     expect(save.history[0].big).toBe(true);
+  });
+});
+
+describe('restoreSave', () => {
+  const memory = (initial: Record<string, string> = {}) => {
+    const items = new Map(Object.entries(initial));
+    return { getItem: (key: string) => items.get(key) ?? null, setItem: (key: string, value: string) => void items.set(key, value) };
+  };
+  const backupOf = (value: string | null): Backup => ({ get: async () => value, set: async () => {}, remove: async () => {} });
+
+  it('brings the save back from the backup when the device has wiped the game’s own storage', async () => {
+    const storage = memory();
+    await restoreSave(storage, backupOf('{"version":1,"points":40}'));
+    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":40}');
+  });
+
+  it('leaves a save that is already there alone', async () => {
+    const storage = memory({ [SAVE_KEY]: '{"version":1,"points":90}' });
+    await restoreSave(storage, backupOf('{"version":1,"points":40}'));
+    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":90}');
+  });
+
+  it('starts fresh when there is no backup either', async () => {
+    const storage = memory();
+    await restoreSave(storage, backupOf(null));
+    expect(storage.getItem(SAVE_KEY)).toBeNull();
   });
 });

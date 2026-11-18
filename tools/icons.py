@@ -1,18 +1,16 @@
-"""Make the home-screen icons in public/ from the smoothie cup (needs Pillow)."""
+"""Make the app icon from the smoothie cup (needs Pillow). A stand-in until the proper icon is drawn."""
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 SKY = (76, 192, 255, 255)
+SIZE = 1024
 
 cup = Image.open(ROOT / "tools/source/smoothie-cup.png").convert("RGBA")
-
-for name, size in (("icon-512.png", 512), ("icon-192.png", 192), ("apple-touch-icon.png", 180)):
-    # The cup fills 60% of the height, which keeps it inside the circle Android may crop the icon to.
-    height = round(size * 0.6)
-    scaled = cup.resize((round(cup.width * height / cup.height), height), Image.LANCZOS)
-    icon = Image.new("RGBA", (size, size), SKY)
-    icon.alpha_composite(scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2))
-    icon.convert("RGB").save(ROOT / "public" / name, optimize=True)
-    print(name)
+height = round(SIZE * 0.6)
+scaled = cup.resize((round(cup.width * height / cup.height), height), Image.LANCZOS)
+icon = Image.new("RGBA", (SIZE, SIZE), SKY)
+icon.alpha_composite(scaled, ((SIZE - scaled.width) // 2, (SIZE - scaled.height) // 2))
+# The App Store refuses an icon with transparency.
+icon.convert("RGB").save(ROOT / "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png", optimize=True)

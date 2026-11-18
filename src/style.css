@@ -636,31 +636,6 @@ body::before {
   height: 58%;
 }
 
-.menu-stage .fullscreen {
-  right: 6.4cqw;
-  top: 1.6cqw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.menu-stage .install {
-  right: 11.2cqw;
-  top: 1.6cqw;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* No full screen button on this device, so take its place. */
-.menu-stage .install.edge {
-  right: 6.4cqw;
-}
-
-.menu-stage .install.waiting {
-  display: none;
-}
-
 .topbar {
   position: absolute;
   right: 1.4cqw;

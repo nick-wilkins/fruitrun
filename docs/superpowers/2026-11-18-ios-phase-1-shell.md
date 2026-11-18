@@ -1,6 +1,6 @@
 # iOS phase 1: Capacitor shell to TestFlight
 
-Date: 2026-11-18. Status: brief awaiting approval. Background and sources: `2026-11-18-ios-app-research.md`.
+Date: 2026-11-18. Status: approved 2026-11-18 and built on branch `ios`; TestFlight upload waits on the bundle ID. Background and sources: `2026-11-18-ios-app-research.md`.
 
 ## Intent
 
@@ -11,7 +11,7 @@ The game exactly as it plays today, running as an iPhone and iPad app from files
 - Capacitor 8.6.2 with Swift Package Manager. Xcode 27.0 is installed and meets the requirement.
 - Minimum iOS 16, iPhone and iPad, landscape only.
 - Kids Category rules apply from this build: no third party SDKs, no network calls, no links out.
-- Checkout: main (as chosen for this session). Commit and push when green.
+- Checkout: branch `ios` (Laravel Cloud deploys only from main, so the live site is untouched). Commit and push when green.
 - The old iPad check is assumed fine for now and done when the device is to hand.
 
 ## Blocked on Nick
@@ -19,7 +19,7 @@ The game exactly as it plays today, running as an iPhone and iPad app from files
 1. **Bundle ID.** A placeholder (`app.smoothieadventure.placeholder`) is used until it arrives. Everything up to the simulator runs without it; the TestFlight upload does not.
 2. **App record** created by hand in App Store Connect once the bundle ID is chosen.
 3. **App Store Connect API key variables** (`ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_PATH`) available in the shell that runs fastlane. They are not set in this one.
-4. **The live site.** Removing the service worker and `server.mjs` breaks the Laravel Cloud deployment if main deploys there automatically. Take the site down, or disconnect the deploy, before task 1 is pushed.
+4. **The live site.** Not an issue while this stays on `ios`. Merging to main will break the Laravel Cloud deployment (no `server.mjs`), so take the site down or disconnect the deploy before merging.
 
 ## Global Constraints
 
@@ -32,14 +32,14 @@ The game exactly as it plays today, running as an iPhone and iPad app from files
 
 ## UI intent
 
-No visual change to the game. Removed from the screens: the Add to Home Screen button, the full screen buttons on the menu and map, and the "turn your screen" card. The app opens full screen in landscape with no status bar, the home indicator dimmed, and a plain launch screen in the menu's sky blue (`#4cc0ff`) so the first frame does not flash white. The icon is the existing smoothie cup art from `tools/icons.py`.
+No visual change to the game. Removed from the screens: the Add to Home Screen button, the full screen buttons on the menu and map, The "turn your screen" card stays: the app is locked to landscape, but a resized window on a newer iPad can still be taller than it is wide. The app opens full screen in landscape with no status bar, the home indicator dimmed, and a plain launch screen in the menu's sky blue (`#4cc0ff`) so the first frame does not flash white. The icon is a stand-in made from the smoothie cup by `tools/icons.py`; Nick is drawing the real one.
 
 ## Tasks
 
 1. **Remove the web-only parts.**
    - Delete `src/sw.ts`, `src/ui/install.ts`, `server.mjs`, the PWA plugin and manifest from `vite.config.ts`, and the `vite-plugin-pwa` and `workbox-*` packages.
    - In `src/ui/screen.ts` keep only `setBackdrop`; remove the calls in `src/ui/menu.ts` and `src/ui/map.ts`.
-   - Remove the rotate card from `index.html` and `src/style.css`, the web app meta tags, and the `start` script.
+   - Remove the web app meta tags and the `start` script. The rotate card stays.
    - Update `README.md` to describe the app build.
    - Acceptance: `npm run build` produces a `dist/` with no service worker or manifest; tests pass; the game still plays in the desktop browser with `npm run dev`.
 
@@ -82,4 +82,31 @@ No visual change to the game. Removed from the screens: the Add to Home Screen b
 
 ## Results
 
-Not started.
+Built 2026-11-18 on branch `ios`. Tasks 1 to 8 done; task 9 partly done, the rest waits on Nick.
+
+Changes from the brief:
+- The home indicator is not hidden by an override: Capacitor's view controller owns that setting and does not allow it. Deferring edge swipes dims the indicator and gives the "second swipe to leave" behaviour on its own.
+- `fastlane ios archive` was added (build and sign without uploading). It has **not been run**: automatic signing would register the placeholder bundle ID on the Apple developer account.
+- `UIRequiresFullScreen` is set so the iPad build may be landscape only.
+
+Runtime verification:
+
+| Check | Result | Evidence |
+|---|---|---|
+| `npm test` | PASS | 7 files, 806 tests, including 3 new `restoreSave` tests (seen failing first: "restoreSave is not a function") |
+| `npm run typecheck`, `npm run build` | PASS | clean; `dist/` holds only `index.html` and `assets/` |
+| Debug build, iOS simulator | PASS | `xcodebuild` BUILD SUCCEEDED, Xcode 27.0 |
+| Release build for a real device, unsigned | PASS | `xcodebuild -configuration Release CODE_SIGNING_ALLOWED=NO` BUILD SUCCEEDED |
+| Launch on iPad mini (A17 Pro) simulator | PASS | menu shown in landscape, no status bar, no install or full screen buttons (screenshot) |
+| Launch on iPhone 17 simulator | PASS | same (screenshot) |
+| Privacy manifest in the built app | PASS | `PrivacyInfo.xcprivacy` present in `App.app` |
+| Full run of level 1, results, blend screen | PASS in desktop Chrome only | autopilot run finished in 42.18 s, 3 stars, Blend opened the blender, no console errors |
+| Save copied to the backup on every write | PASS in desktop Chrome | backup value equals the save after the run |
+| Save restored when the game's storage is wiped | PASS in desktop Chrome | removed the save, reloaded, level 1 record came back |
+| Lost graphics context returns to the map | PASS in desktop Chrome | dispatched `webglcontextlost` mid-run: run ended, map shown |
+| Play-through inside the simulator (touch steering, sound, offline) | NOT DONE | no tool here can tap inside the simulator; needs Nick in Xcode or on a device |
+| Edge swipe needs a second swipe; no rotation to portrait | NOT DONE | needs a hand on a device |
+| Background and return mid-run, sound resumes | NOT DONE | needs a device |
+| Save survives clearing web data in the real app | NOT DONE | proven in the browser only; the native store is Capacitor Preferences |
+| Real device frame rate; old iPad | NOT DONE | Nick |
+| `fastlane ios beta` upload | BLOCKED | bundle ID, app record, API key variables |
