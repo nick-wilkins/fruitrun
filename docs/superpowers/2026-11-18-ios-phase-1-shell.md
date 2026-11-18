@@ -114,10 +114,27 @@ Runtime verification:
 Independent review (`/code-review medium`, 2026-11-18), 10 findings:
 
 - Fixed: sound not resuming from the "interrupted" state after a call; a lost graphics context after the finish line discarding the result; a level starting while the surface is still lost; startup waiting for ever on the backup; save written to the backup before the game's own storage; signing flag missing from the export step; app version 1.0 against 1.0.0.
-- Left as is: `beta` does not raise the build number itself (same as `mamc-app`: run `bump` first). A local save that is present always wins over the backup, with no comparison of which is newer; the two are written together, so they differ only if one write fails. The hand-built window alongside the storyboard is Capacitor's own template. The duplicate constant name and settings are style only.
+- Left as is: `beta` does not raise the build number itself (same as `mamc-app`: run `bump` first). (Superseded in round three: the newer copy now wins.) The hand-built window alongside the storyboard is Capacitor's own template. The duplicate constant name and settings are style only.
 - After the fixes: `npm test` 806 passed, typecheck and build clean, simulator build succeeded. The fixes were not exercised on a device.
 
 Second review round (scoped to the fixes), 9 findings:
 
 - Fixed: the startup timeout could start a returning player on an empty game and then overwrite the backup, so the timeout is removed and the restore is waited for in full. The two save writes are now independent, so a full disk cannot stop the backup. The "surface lost" flag is replaced by asking the renderer directly; a level tap asks for the surface back once and reloads the game on the next try if it is still gone. A rejected sound resume is caught.
 - Left as is: `export_method: 'app-store'` matches `mamc-app`, which releases with it today; the signing step stays unproven until the first real archive.
+
+Third review round (scoped to the round two fixes), 10 findings. This round changed the design instead of patching:
+
+- **Save:** every save is stamped with when it was stored. On launch the more recent of the game's own copy and the backup wins, and a copy that is missing or unreadable loses to any readable one. The two writes stay independent. Nothing is copied to the backup until the restore has answered; if it takes over 3 seconds the menu appears anyway, and a save that turns up late reloads the game with it.
+- **Lost graphics surface:** no flag. A level tap asks the renderer; if the surface is lost it asks for it back and shows "One moment". Only if it has been gone more than 5 seconds does a tap reload the game.
+- Left as is: none of the findings.
+
+Evidence after round three (2026-11-18):
+
+| Check | Result | Evidence |
+|---|---|---|
+| `npm test` | PASS | 810 tests. 4 new ones seen failing first: backup wins when newer, own save kept when newer, unreadable save replaced, backup still written and stamped when the game's own storage refuses the write |
+| `npm run typecheck`, `npm run ios` | PASS | clean, sync finished |
+| Real surface loss in desktop Chrome (`WEBGL_lose_context`) | PASS | run ended, next tap refused with the toast, surface came back, level then drew (pixel read back non-blank), no console errors |
+| Newer backup wins on launch, desktop Chrome | PASS | own copy set to 1 point and an older stamp, backup to 777 points: game launched with 777 |
+| Backup equals the save after a write | PASS | compared 200 ms after `persist()` |
+| Any of this inside the app on a device | NOT DONE | Nick |

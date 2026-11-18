@@ -61,6 +61,8 @@ export interface Save {
   /** Ids of awards earned. */
   awards: string[];
   muted: boolean;
+  /** When this was last stored, in milliseconds: tells the newer of two copies apart. Missing on older saves. */
+  saved?: number;
 }
 
 const KEY = 'fruitrun.save.v1';
@@ -80,11 +82,36 @@ export function backUpSaves(to: Backup): void {
   backup = to;
 }
 
-/** Before the game reads its save: if the device has wiped it, bring it back from the backup. */
-export async function restoreSave(storage: Pick<Storage, 'getItem' | 'setItem'>, from: Backup): Promise<void> {
-  if (storage.getItem(KEY) !== null) return;
+/** How recent a stored save is: nothing for one that is missing or cannot be read, so any readable copy beats it. */
+function age(raw: string | null): number {
+  if (raw === null) return -1;
+  try {
+    const parsed = JSON.parse(raw) as Partial<Save> | null;
+    return parsed?.version === 1 ? (parsed.saved ?? 0) : -1;
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * Before the game reads its save: if the backup holds a more recent one, or the game's own has been wiped or
+ * spoiled, bring the backup's copy back. Answers whether it did.
+ */
+export async function restoreSave(storage: Pick<Storage, 'getItem' | 'setItem'>, from: Backup): Promise<boolean> {
   const kept = await from.get();
-  if (kept !== null) storage.setItem(KEY, kept);
+  if (age(kept) <= age(storage.getItem(KEY))) return false;
+  storage.setItem(KEY, kept!);
+  return true;
+}
+
+/** Do something with the backup, if there is one, without ever letting it trip the game up. */
+function withBackup(action: (to: Backup) => Promise<void>): void {
+  if (!backup) return;
+  try {
+    void action(backup).catch(() => {});
+  } catch {
+    // No backup to be had.
+  }
 }
 
 export function newSave(): Save {
@@ -131,17 +158,14 @@ export function loadSave(): Save | null {
 }
 
 export function storeSave(save: Save): void {
+  save.saved = Date.now();
   const json = JSON.stringify(save);
   try {
     localStorage.setItem(KEY, json);
   } catch {
-    // A full disk: the game still plays, and the backup below may yet remember.
+    // A full disk: the game still plays, and the backup may yet remember. Being the more recent, it wins next time.
   }
-  try {
-    void backup?.set(json).catch(() => {});
-  } catch {
-    // No backup to be had.
-  }
+  withBackup((to) => to.set(json));
 }
 
 export function clearSave(): void {
@@ -150,11 +174,7 @@ export function clearSave(): void {
   } catch {
     // Nothing stored, nothing to clear.
   }
-  try {
-    void backup?.remove().catch(() => {});
-  } catch {
-    // No backup to be had.
-  }
+  withBackup((to) => to.remove());
 }
 
 /**

@@ -22,22 +22,32 @@ const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 
 let run: Run | null = null;
-/** Set once the device has been asked to hand back a 3D drawing surface it took away. */
-let askedForSurface = false;
-// Fetched now: it cannot be fetched once the surface has gone, which is the only time it is needed.
-const surface = renderer.getContext().getExtension('WEBGL_lose_context');
+/** When the device last took the 3D drawing surface away. */
+let surfaceLostAt = 0;
+/** How long to wait for the surface to come back before starting the game afresh to get a new one. */
+const SURFACE_WAIT = 5000;
+// Fetched now so the renderer still holds it later: it cannot be fetched once the surface has gone.
+renderer.extensions.get('WEBGL_lose_context');
+// The device can take the surface away when it is short of memory. A run in progress cannot be drawn, so it ends;
+// one that has crossed the line stays, so its result can still be blended.
+canvas.addEventListener('webglcontextlost', () => {
+  surfaceLostAt = performance.now();
+  if (run && !run.sim.finished) app.show('map');
+});
 let toastTimer = 0;
 const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
-try {
-  // Waited for in full: starting without it would show a returning player an empty game, and their first save
-  // would then replace the backup.
-  await restoreSave(localStorage, saveBackup);
-} catch {
-  // No backup to be had: carry on with whatever the game's own storage holds.
+// Bring back the save from the backup if the game's own copy is gone or older. Nothing is copied to the backup
+// until that has been answered, so a game started in the meantime can never replace a save still on its way.
+const restoring = restoreSave(localStorage, saveBackup).catch(() => false);
+const answered = await Promise.race([restoring.then(() => true), new Promise<boolean>((done) => setTimeout(() => done(false), 3000))]);
+if (answered) {
+  backUpSaves(saveBackup);
+} else {
+  // Too slow to hold the menu up for. If a save does turn up, start again with it.
+  void restoring.then((restored) => (restored ? location.reload() : backUpSaves(saveBackup)));
 }
-backUpSaves(saveBackup);
 const stored = loadSave();
 
 function endRun(): void {
@@ -68,22 +78,16 @@ const app: App = {
   },
   play(level: Level) {
     if (renderer.getContext().isContextLost()) {
-      // Ask for the surface back once. If it is still gone at the next try, start the game afresh: progress is
-      // already saved, and a fresh page gets a fresh surface.
-      if (askedForSurface) {
+      // The device usually hands the surface back within moments. If it has been gone a good while, start the
+      // game afresh for a new one: everything blended is saved, and a retry gives up its run in any case.
+      if (performance.now() - surfaceLostAt > SURFACE_WAIT) {
         location.reload();
         return;
       }
-      askedForSurface = true;
-      try {
-        surface?.restoreContext();
-      } catch {
-        // The device took the surface itself and will hand it back in its own time.
-      }
+      renderer.forceContextRestore();
       app.toast('One moment, getting the track ready…');
       return;
     }
-    askedForSurface = false;
     endRun();
     app.world = level.world;
     const hud = createHud(level, {
@@ -146,13 +150,6 @@ for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'])
 startMusic(['track1.mp3', 'track3.m4a', 'track7.m4a', 'track2.mp3', 'track5.m4a', 'track8.m4a', 'track6.m4a'].map((file) => asset(`assets/audio/${file}`)));
 // A phone call or a trip to another app can leave the sound switched off when the game comes back.
 onResume(unlockAudio);
-// The device can take the 3D drawing surface away when it is short of memory. Asking to keep the canvas lets it
-// hand the surface back later. A run in progress cannot be drawn, so it ends; one that has crossed the line stays,
-// so its result can still be blended.
-canvas.addEventListener('webglcontextlost', (e) => {
-  e.preventDefault();
-  if (run && !run.sim.finished) app.show('map');
-});
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {
