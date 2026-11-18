@@ -4,6 +4,7 @@ import { COURSES, isUnlocked, superBlenderOpen } from '../core/progress';
 import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { newOn, starTimesFor } from '../game/courses';
+import { rivalDrivers } from '../game/rivals';
 import type { App } from './app';
 import { asset, countOf, el, formatTime, onTap, stars } from './dom';
 import { pipSvg } from './pip';
@@ -73,6 +74,16 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
         ),
       );
       starts.replaceWith(pick);
+      // Setting the rivals up takes a few trial runs of the course. Do it now, a difficulty at a time and the
+      // likeliest first, so the race starts at once when one is picked.
+      const order = [last, ...DIFFICULTIES.map(({ id }) => id).filter((id) => id !== last)];
+      const prepare = () => {
+        const next = order.shift();
+        if (!next || !pick.isConnected) return;
+        rivalDrivers(level, next);
+        window.setTimeout(prepare, 30);
+      };
+      window.setTimeout(prepare, 50);
     };
     starts.append(race);
   }

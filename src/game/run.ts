@@ -27,6 +27,7 @@ import { Rig } from './camera';
 import { buildPip, type Pip } from './character';
 import type { Course } from './course';
 import { seeded } from './random';
+import { GRID } from './rivals';
 import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type Driver, type SimEvent } from './sim';
 import { blobTexture } from './textures';
 import { makeFrame } from './track';
@@ -58,9 +59,6 @@ export interface RaceResult {
   order: Finisher[];
   place: number;
 }
-
-/** Where across the road each marble starts a race: the three rivals, then the player. */
-const GRID = [-3.3, -1.1, 3.3, 1.1];
 
 interface Racer {
   rival: Rival;
@@ -286,7 +284,9 @@ export class Run {
       sim.driver = field.drivers[i];
       sim.chase = () => this.sim.progress();
       sim.x = GRID[i] ?? 0;
-      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: [rival.deep, '#ffffff', rival.color] });
+      // In the dark only the player carries a lamp, so the rivals glow a little to stay in sight.
+      const dark = course.mood === 'night' || course.mood === 'midnight';
+      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: [rival.deep, '#ffffff', rival.color], glow: dark ? 0.55 : 0 });
       pip.root.matrixAutoUpdate = false;
       const shadow = this.makeShadow();
       this.world.scene.add(pip.root, shadow);

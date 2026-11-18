@@ -264,6 +264,18 @@ export class Sim {
     return this.clock * (o.speed ?? 1) + (o.phase ?? 0);
   }
 
+  /** Is there something to steer round on this road a little way ahead? */
+  private blockerAhead(): boolean {
+    for (const i of this.byLane[this.lane]) {
+      const o = this.course.objects[i];
+      const ahead = o.s - this.s;
+      if (ahead > 30) break;
+      if (ahead < -2 || this.done[i]) continue;
+      if (o.kind === 'crate' || o.kind === 'goo' || o.kind === 'slider' || o.kind === 'pendulum' || o.kind === 'spinner' || o.kind === 'windmill') return true;
+    }
+    return false;
+  }
+
   /** A careful player's line, for the hands-free test runs: go for everything, give blockers a wide berth. */
   private smartLine(): number {
     const hazards: { s: number; x: number; wide: number }[] = [];
@@ -354,7 +366,8 @@ export class Sim {
     this.riding = riding;
     const line = this.driver?.line ?? this.autopilot;
     let wanted = riding ? 0 : line === 'ace' ? this.aceLine() : line === 'smart' ? this.smartLine() : this.steer;
-    if (this.driver && wanted !== null && !riding) {
+    if (this.driver && wanted !== null && !riding && !this.blockerAhead()) {
+      // Running wide and wandering are for open road only: with something to dodge, the line is followed exactly.
       // Never asked for beyond the kerb: that would only scrape speed off.
       const [lo, hi] = this.bounds();
       wanted = clamp(wanted + (this.driver.bias ?? 0) + this.driver.wobble * Math.sin(this.clock * 1.9 + this.driver.phase), lo + 0.3, hi - 0.3);
@@ -417,7 +430,10 @@ export class Sim {
       const ahead = this.chase ? this.progress() - this.chase() : 0;
       this.gait = this.driver.speed * (1 - this.driver.easeOff * clamp((ahead - 0.02) / 0.08, 0, 1));
     }
-    this.s += (this.v * this.gait * dt) / clamp(1 - f.k * this.x, 0.6, 1.5);
+    // In the air and on an escalator a held-back rival still covers the full distance: a jump's arc is made for
+    // it, and an escalator carries everyone alike.
+    const stride = this.h > 0 || riding ? 1 : this.gait;
+    this.s += (this.v * stride * dt) / clamp(1 - f.k * this.x, 0.6, 1.5);
 
     if (this.lane === 0) {
       this.s = Math.min(track.length - 2, this.s);

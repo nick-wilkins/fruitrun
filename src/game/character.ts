@@ -27,6 +27,8 @@ export interface PipLook {
   leaf: string;
   /** The bubble's stripes. */
   bands: string[];
+  /** How brightly it shines with its own light, 0 to 1, for marbles with no lamp in the dark. */
+  glow?: number;
 }
 
 const PIP: PipLook = { skin: '#8fe04a', belly: '#d8f7a0', leaf: '#2fa23a', bands: ['#ff7a1a', '#ffffff', '#ffd23f'] };
@@ -36,8 +38,9 @@ export function buildPip(look: PipLook = PIP): Pip {
   const root = new Group();
   const body = new Group();
 
-  const skin = new MeshLambertMaterial({ color: look.skin });
-  const belly = new MeshLambertMaterial({ color: look.belly });
+  const glow = look.glow ?? 0;
+  const skin = new MeshLambertMaterial({ color: look.skin, emissive: look.skin, emissiveIntensity: glow });
+  const belly = new MeshLambertMaterial({ color: look.belly, emissive: look.belly, emissiveIntensity: glow });
   const white = new MeshLambertMaterial({ color: '#ffffff' });
   const black = new MeshLambertMaterial({ color: '#1d1d2b' });
   const pink = new MeshLambertMaterial({ color: '#ff8fb0' });

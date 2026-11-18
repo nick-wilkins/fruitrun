@@ -1,7 +1,8 @@
 import type { Difficulty } from '../core/race';
 import type { Level } from '../data/levels';
 import { courseFor, handsFreeFor, starTimesFor } from './courses';
-import { timeCourse, type Driver } from './sim';
+import type { Course } from './course';
+import { Sim, TICK, type Driver } from './sim';
 
 /**
  * How good each of the three rivals is, on the same scale as the stars a run earns: a rival at 3.2 finishes a
@@ -12,6 +13,22 @@ const FORM: Record<Difficulty, [number, number, number]> = {
   medium: [3.6, 3.2, 2.8],
   hard: [4.7, 4.3, 4.0],
 };
+
+/** Where across the road each marble starts a race: the three rivals, then the player. */
+export const GRID = [-3.3, -1.1, 3.3, 1.1];
+
+/**
+ * How long rival number `index` takes when left to run its own race, started exactly as a race starts it: from
+ * its place on the grid, after the countdown. The countdown matters: everything that swings or spins keeps moving
+ * through it, so a rival meets it all at different moments than a run that skips straight to racing.
+ */
+export function raceTime(course: Course, level: Level, driver: Driver, index: number): number {
+  const sim = new Sim(course, level, () => {}, () => 0);
+  sim.driver = driver;
+  sim.x = GRID[index] ?? 0;
+  for (let step = 0; step < 600 / TICK && !sim.finished; step++) sim.step(TICK);
+  return sim.finished ? sim.time : Infinity;
+}
 
 /** How much a rival slows, at most, when well ahead of the player. The hard ones never wait. */
 const EASE_OFF: Record<Difficulty, number> = { easy: 0.3, medium: 0.15, hard: 0 };
@@ -36,7 +53,8 @@ export function rivalDrivers(level: Level, difficulty: Difficulty): Driver[] {
     const handsFree = handsFreeFor(level);
     const course = courseFor(level);
     drivers = rivalTargets(level, difficulty).map((target, i) => {
-      const line = handsFree.smart <= target ? 'smart' : 'ace';
+      // The careful line if that is quick enough; if neither is, whichever is the quicker here.
+      const line = handsFree.smart <= target || handsFree.smart <= handsFree.ace ? 'smart' : 'ace';
       const driver: Driver = {
         line,
         pace: difficulty === 'easy' ? 0.8 : 1,
@@ -51,7 +69,7 @@ export function rivalDrivers(level: Level, difficulty: Difficulty): Driver[] {
       let best = { ...driver };
       let nearest = Infinity;
       for (let tries = 0; tries < 6; tries++) {
-        const time = timeCourse(course, level, driver);
+        const time = raceTime(course, level, driver, i);
         if (!Number.isFinite(time)) break;
         const off = Math.abs(time - target) / target;
         if (off < nearest) {

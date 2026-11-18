@@ -3,7 +3,7 @@ import { completeLevel, newSave } from '../src/core/progress';
 import { finishingOrder, podiumFruit, RIVALS } from '../src/core/race';
 import { LEVELS } from '../src/data/levels';
 import { courseFor, starTimesFor } from '../src/game/courses';
-import { rivalDrivers, rivalTargets } from '../src/game/rivals';
+import { raceTime, rivalDrivers, rivalTargets } from '../src/game/rivals';
 import { timeCourse, type Driver } from '../src/game/sim';
 
 const sample = [LEVELS[0], LEVELS[6], LEVELS[29]];
@@ -31,7 +31,7 @@ describe('rivals', () => {
     for (const difficulty of ['easy', 'medium', 'hard'] as const) {
       const targets = rivalTargets(level, difficulty);
       rivalDrivers(level, difficulty).forEach((driver, i) => {
-        const time = timeCourse(course, level, driver);
+        const time = raceTime(course, level, driver, i);
         expect(time, `${difficulty} rival ${i}`).toBeLessThan(Infinity);
         expect(Math.abs(time - targets[i]) / targets[i], `${difficulty} rival ${i}: ${time.toFixed(1)}s against ${targets[i].toFixed(1)}s`).toBeLessThan(0.12);
       });
@@ -40,7 +40,7 @@ describe('rivals', () => {
 
   it('are slowest on easy and quickest on hard', () => {
     for (const level of sample) {
-      const best = (difficulty: 'easy' | 'medium' | 'hard') => Math.min(...rivalDrivers(level, difficulty).map((driver) => timeCourse(courseFor(level), level, driver)));
+      const best = (difficulty: 'easy' | 'medium' | 'hard') => Math.min(...rivalDrivers(level, difficulty).map((driver, i) => raceTime(courseFor(level), level, driver, i)));
       expect(best('easy')).toBeGreaterThan(best('medium'));
       expect(best('medium')).toBeGreaterThan(best('hard'));
     }
@@ -57,7 +57,7 @@ describe('rivals', () => {
   it('drive the same race every time', () => {
     const level = sample[2];
     const [driver] = rivalDrivers(level, 'hard');
-    expect(timeCourse(courseFor(level), level, driver)).toBe(timeCourse(courseFor(level), level, driver));
+    expect(raceTime(courseFor(level), level, driver, 0)).toBe(raceTime(courseFor(level), level, driver, 0));
   });
 });
 
