@@ -35,6 +35,7 @@ const RELOADED = 'fruitrun.reloadedForSurface';
 canvas.addEventListener('webglcontextlost', () => {
   if (run && !run.sim.finished) app.show('map');
 });
+canvas.addEventListener('webglcontextrestored', () => (waitingSince = 0));
 let toastTimer = 0;
 const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
@@ -75,9 +76,9 @@ const app: App = {
   },
   play(level: Level) {
     if (renderer.getContext().isContextLost()) {
-      // The device usually hands the surface back within moments of being asked. If it is still gone a good while
-      // after the first ask, start the game afresh, once, for a new one: everything blended is saved, and a
-      // retry gives up its run in any case.
+      // The device usually hands the surface back by itself within moments; the ask below only helps where the
+      // loss was not the device's own doing. If it is still gone a good while after the first tap, start the
+      // game afresh, once, for a new one: everything blended is saved, and a retry gives up its run in any case.
       waitingSince ||= performance.now();
       if (performance.now() - waitingSince > SURFACE_WAIT && !sessionStorage.getItem(RELOADED)) {
         sessionStorage.setItem(RELOADED, '1');

@@ -229,6 +229,12 @@ describe('keeping the save', () => {
     expect(await store.get()).toBeNull();
   });
 
+  it('carries on playing when the store fails', () => {
+    keepSavesIn({ get: async () => null, set: () => Promise.reject(new Error('full')), remove: () => { throw new Error('gone'); } });
+    expect(() => storeSave(newSave())).not.toThrow();
+    expect(() => clearSave()).not.toThrow();
+  });
+
   it('starts fresh when nothing is stored or it cannot be read', () => {
     expect(readSave(null)).toBeNull();
     expect(readSave('{"version":1,"poi')).toBeNull();

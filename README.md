@@ -23,7 +23,7 @@ Landscape only. Steer by holding and sliding a finger or the mouse, or with the 
 ## Where things are
 
 - `src/data/` ingredients (28 fruits, 58 extras); `levels.ts` has the three worlds and their 68 levels: where each sits on its map, its fruit, and which level leads to it
-- `src/core/` smoothie scoring and save/progress rules (localStorage key `fruitrun.save.v1`)
+- `src/core/` smoothie scoring and save/progress rules (kept in the app's settings store under `fruitrun.save.v1`)
 - `src/game/sim.ts` the rules of a run, with no rendering: steering, speed, forks, every obstacle
 - `src/game/pieces.ts` the library of course pieces; `courses.ts` the recipe for each level and the generator
 - `src/game/themes.ts` the look of each level

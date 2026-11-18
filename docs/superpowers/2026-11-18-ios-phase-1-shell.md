@@ -153,3 +153,15 @@ Evidence after round four (2026-11-18):
 | Save round trip, desktop Chrome | PASS | level 1 finished and blended, reloaded: 4 stars and Carry On present |
 | Two surface losses in a row, desktop Chrome | PASS | each: run ended, tap refused with the toast, surface restored, level drew |
 | Inside the app on a device | NOT DONE | Nick |
+
+Fifth and last review round, 10 findings, none in the save round trip itself. Reviews stop here.
+
+- Fixed: the surface wait is cleared when the surface comes back, so an old wait cannot trigger an instant reload later; a misleading comment; a stale README line; a test restored for a store that fails (it passed at once, as the behaviour already existed: coverage, not new behaviour).
+- Not changed, for Nick to know:
+  - No migration from the old web storage key. There are no installed apps and no web version to migrate.
+  - A failed write to the settings store is silent: the session plays on and that progress is not kept.
+  - If the surface is still lost after the one reload, taps keep showing "One moment" until the app is restarted.
+  - A real device loss is restored by the system, not by the game's ask; only the simulated loss is proven.
+  - The launch waits on the settings store with no timeout (accepted above).
+  - `clearSave` before a fresh save, and the module-level store, could be tidied away.
+- After these: `npm test` 807 passed, typecheck clean.
