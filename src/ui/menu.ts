@@ -6,7 +6,7 @@ import { setBackdrop } from './screen';
 
 export function menuScreen(app: App): HTMLElement {
   const stage = el('div.stage.menu-stage');
-  stage.append(el('img.bg', { src: asset('assets/ui/menu.webp'), alt: 'Smoothie Adventure', draggable: false }));
+  stage.append(el('img.bg', { src: asset('assets/ui/menu.webp'), alt: 'Smoothie Scramble', draggable: false }));
 
   const carryOn = el('button.hit.menu-carry', { ariaLabel: 'Carry on' });
   if (!app.hasSave) carryOn.classList.add('off');

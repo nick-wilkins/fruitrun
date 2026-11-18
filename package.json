@@ -1,7 +1,7 @@
 {
   "name": "fruitrun",
   "version": "1.0.0",
-  "description": "Fruit Run: a kids marble-run smoothie game",
+  "description": "Smoothie Scramble: a kids marble-run smoothie game",
   "directories": {
     "doc": "docs"
   },

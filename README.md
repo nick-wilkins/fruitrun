@@ -1,4 +1,4 @@
-# Smoothie Adventure (fruitrun)
+# Smoothie Scramble (fruitrun)
 
 A kids' marble-run game for iPhone and iPad. Roll Pip down a 3D course, win fruit for a fast time, grab extras on the way, then blend smoothies for points.
 

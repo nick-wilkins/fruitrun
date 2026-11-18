@@ -28,7 +28,7 @@ def build_ios
     configuration: 'Release',
     export_method: 'app-store',
     output_directory: File.join(ROOT, 'build'),
-    output_name: "SmoothieAdventure-#{current_version}.ipa",
+    output_name: "SmoothieScramble-#{current_version}.ipa",
     xcargs: '-allowProvisioningUpdates',
     export_xcargs: '-allowProvisioningUpdates'
   )
