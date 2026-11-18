@@ -15,7 +15,8 @@ These override anything below that says otherwise.
 - **Release order:** hold 1.0 until multiplayer is done. Phases 5a and 5b therefore come before the store release in section 10.
 - **Multiplayer transport:** peer to peer Wi-Fi through Network framework. Each player has their own crates and fruit.
 - **Old devices:** assumed fine for now (the web version has been played on an iPad); checked on the old iPad when it is to hand.
-- **Still open:** bundle ID and store name.
+- **Name and bundle ID:** Smoothie Scramble, `com.smoothiescramble.app`.
+- **Web:** no public web version. Races are built and tried in a desktop browser locally and shipped only in the app.
 
 Apple facts below were checked against live pages on 2026-11-18. Anything not confirmed on a live page is marked **unverified**. Sources are numbered at the end.
 
