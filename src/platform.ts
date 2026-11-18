@@ -1,9 +1,12 @@
 import { App as NativeApp } from '@capacitor/app';
 import { Preferences } from '@capacitor/preferences';
-import { SAVE_KEY, type Backup } from './core/progress';
+import { SAVE_KEY, type SaveStore } from './core/progress';
 
-/** The save's second home: the app's own settings store, which the device never clears on its own. */
-export const saveBackup: Backup = {
+/**
+ * The save lives in the app's own settings store. A web view's storage can be cleared by the device when it runs
+ * short of space; this cannot.
+ */
+export const saveStore: SaveStore = {
   get: async () => (await Preferences.get({ key: SAVE_KEY })).value,
   set: (value) => Preferences.set({ key: SAVE_KEY, value }),
   remove: () => Preferences.remove({ key: SAVE_KEY }),

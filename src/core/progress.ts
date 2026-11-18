@@ -61,56 +61,31 @@ export interface Save {
   /** Ids of awards earned. */
   awards: string[];
   muted: boolean;
-  /** When this was last stored, in milliseconds: tells the newer of two copies apart. Missing on older saves. */
-  saved?: number;
 }
 
-const KEY = 'fruitrun.save.v1';
-export const SAVE_KEY = KEY;
+export const SAVE_KEY = 'fruitrun.save.v1';
 
-/** A second home for the save, outside the web view's own storage, which the device may wipe when it runs short. */
-export interface Backup {
+/** Where the save is kept between visits. */
+export interface SaveStore {
   get(): Promise<string | null>;
   set(value: string): Promise<void>;
   remove(): Promise<void>;
 }
 
-let backup: Backup | null = null;
+let store: SaveStore | null = null;
 
-/** Copy every save to `to` from now on. */
-export function backUpSaves(to: Backup): void {
-  backup = to;
+/** Keep the save in `to` from now on. */
+export function keepSavesIn(to: SaveStore): void {
+  store = to;
 }
 
-/** How recent a stored save is: nothing for one that is missing or cannot be read, so any readable copy beats it. */
-function age(raw: string | null): number {
-  if (raw === null) return -1;
+/** Do something with the store without ever letting a failure there trip the game up: it still plays, it just will not remember. */
+function withStore(action: (to: SaveStore) => Promise<void>): void {
+  if (!store) return;
   try {
-    const parsed = JSON.parse(raw) as Partial<Save> | null;
-    return parsed?.version === 1 ? (parsed.saved ?? 0) : -1;
+    void action(store).catch(() => {});
   } catch {
-    return -1;
-  }
-}
-
-/**
- * Before the game reads its save: if the backup holds a more recent one, or the game's own has been wiped or
- * spoiled, bring the backup's copy back. Answers whether it did.
- */
-export async function restoreSave(storage: Pick<Storage, 'getItem' | 'setItem'>, from: Backup): Promise<boolean> {
-  const kept = await from.get();
-  if (age(kept) <= age(storage.getItem(KEY))) return false;
-  storage.setItem(KEY, kept!);
-  return true;
-}
-
-/** Do something with the backup, if there is one, without ever letting it trip the game up. */
-function withBackup(action: (to: Backup) => Promise<void>): void {
-  if (!backup) return;
-  try {
-    void action(backup).catch(() => {});
-  } catch {
-    // No backup to be had.
+    // Nowhere to keep it.
   }
 }
 
@@ -133,9 +108,9 @@ export function newSave(): Save {
   };
 }
 
-export function loadSave(): Save | null {
+/** The save held in `raw`, as it came from the store, or null if there is none or it cannot be read. */
+export function readSave(raw: string | null): Save | null {
   try {
-    const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Save & { unlocked?: number };
     if (parsed.version !== 1) return null;
@@ -158,23 +133,12 @@ export function loadSave(): Save | null {
 }
 
 export function storeSave(save: Save): void {
-  save.saved = Date.now();
   const json = JSON.stringify(save);
-  try {
-    localStorage.setItem(KEY, json);
-  } catch {
-    // A full disk: the game still plays, and the backup may yet remember. Being the more recent, it wins next time.
-  }
-  withBackup((to) => to.set(json));
+  withStore((to) => to.set(json));
 }
 
 export function clearSave(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    // Nothing stored, nothing to clear.
-  }
-  withBackup((to) => to.remove());
+  withStore((to) => to.remove());
 }
 
 /**

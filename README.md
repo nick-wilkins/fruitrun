@@ -16,7 +16,7 @@ npx cap open ios # open the app in Xcode to run it in a simulator or on a device
 
 The game ships as an iPhone and iPad app (Capacitor, in `ios/`). Everything it needs is inside the app, so it plays with no connection. `fastlane ios beta` sends a build to TestFlight; see `fastlane/Fastfile`.
 
-The save lives in the web view's storage and is copied to the app's settings store on every write (`src/platform.ts`), so it comes back if the device clears web data.
+The save lives in the app's own settings store (`src/platform.ts`), not the web view's storage, which a device may clear when it is short of space.
 
 Landscape only. Steer by holding and sliding a finger or the mouse, or with the arrow keys (A/D also work).
 

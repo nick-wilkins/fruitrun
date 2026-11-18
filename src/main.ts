@@ -1,12 +1,12 @@
 import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
-import { backUpSaves, clearSave, completeLevel, isUnlocked, loadSave, newSave, restoreSave, storeSave, type RunResult, type Save } from './core/progress';
+import { clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, storeSave, type RunResult, type Save } from './core/progress';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
-import { onResume, saveBackup } from './platform';
+import { onResume, saveStore } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -22,33 +22,30 @@ const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 
 let run: Run | null = null;
-/** When the device last took the 3D drawing surface away. */
-let surfaceLostAt = 0;
+// Held from the start: it cannot be fetched once the surface has gone, which is the only time it is needed.
+const surface = renderer.getContext().getExtension('WEBGL_lose_context');
+/** When the player first asked for a level while the 3D drawing surface was gone, or 0 if it is not being waited for. */
+let waitingSince = 0;
 /** How long to wait for the surface to come back before starting the game afresh to get a new one. */
 const SURFACE_WAIT = 5000;
-// Fetched now so the renderer still holds it later: it cannot be fetched once the surface has gone.
-renderer.extensions.get('WEBGL_lose_context');
+/** Kept across a reload, so a device that cannot supply a surface at all is not reloaded over and over. */
+const RELOADED = 'fruitrun.reloadedForSurface';
 // The device can take the surface away when it is short of memory. A run in progress cannot be drawn, so it ends;
 // one that has crossed the line stays, so its result can still be blended.
 canvas.addEventListener('webglcontextlost', () => {
-  surfaceLostAt = performance.now();
   if (run && !run.sim.finished) app.show('map');
 });
 let toastTimer = 0;
 const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
-// Bring back the save from the backup if the game's own copy is gone or older. Nothing is copied to the backup
-// until that has been answered, so a game started in the meantime can never replace a save still on its way.
-const restoring = restoreSave(localStorage, saveBackup).catch(() => false);
-const answered = await Promise.race([restoring.then(() => true), new Promise<boolean>((done) => setTimeout(() => done(false), 3000))]);
-if (answered) {
-  backUpSaves(saveBackup);
-} else {
-  // Too slow to hold the menu up for. If a save does turn up, start again with it.
-  void restoring.then((restored) => (restored ? location.reload() : backUpSaves(saveBackup)));
+keepSavesIn(saveStore);
+let stored: Save | null = null;
+try {
+  stored = readSave(await saveStore.get());
+} catch {
+  // The store cannot be read: start as a new player.
 }
-const stored = loadSave();
 
 function endRun(): void {
   run?.dispose();
@@ -78,16 +75,21 @@ const app: App = {
   },
   play(level: Level) {
     if (renderer.getContext().isContextLost()) {
-      // The device usually hands the surface back within moments. If it has been gone a good while, start the
-      // game afresh for a new one: everything blended is saved, and a retry gives up its run in any case.
-      if (performance.now() - surfaceLostAt > SURFACE_WAIT) {
+      // The device usually hands the surface back within moments of being asked. If it is still gone a good while
+      // after the first ask, start the game afresh, once, for a new one: everything blended is saved, and a
+      // retry gives up its run in any case.
+      waitingSince ||= performance.now();
+      if (performance.now() - waitingSince > SURFACE_WAIT && !sessionStorage.getItem(RELOADED)) {
+        sessionStorage.setItem(RELOADED, '1');
         location.reload();
         return;
       }
-      renderer.forceContextRestore();
+      surface?.restoreContext();
       app.toast('One moment, getting the track ready…');
       return;
     }
+    waitingSince = 0;
+    sessionStorage.removeItem(RELOADED);
     endRun();
     app.world = level.world;
     const hud = createHud(level, {

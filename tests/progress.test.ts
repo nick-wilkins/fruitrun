@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, completeLevel, isUnlocked, newSave, backUpSaves, restoreSave, SAVE_KEY, starsForTime, storeSave, superBlenderOpen, type Backup, type Save } from '../src/core/progress';
+import { blend, clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, starsForTime, storeSave, superBlenderOpen, type Save, type SaveStore } from '../src/core/progress';
 import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
@@ -203,59 +203,34 @@ describe('the smoothie book', () => {
   });
 });
 
-describe('restoreSave', () => {
-  const memory = (initial: Record<string, string> = {}) => {
-    const items = new Map(Object.entries(initial));
-    return { getItem: (key: string) => items.get(key) ?? null, setItem: (key: string, value: string) => void items.set(key, value) };
+describe('keeping the save', () => {
+  const memoryStore = () => {
+    let kept: string | null = null;
+    const store: SaveStore = {
+      get: async () => kept,
+      set: async (value) => void (kept = value),
+      remove: async () => void (kept = null),
+    };
+    return store;
   };
-  const backupOf = (value: string | null): Backup => ({ get: async () => value, set: async () => {}, remove: async () => {} });
 
-  it('brings the save back from the backup when the device has wiped the game’s own storage', async () => {
-    const storage = memory();
-    await restoreSave(storage, backupOf('{"version":1,"points":40}'));
-    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":40}');
-  });
-
-  it('leaves a save that is already there alone', async () => {
-    const storage = memory({ [SAVE_KEY]: '{"version":1,"points":90}' });
-    await restoreSave(storage, backupOf('{"version":1,"points":40}'));
-    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":90}');
-  });
-
-  it('takes the backup when it is the more recent of the two', async () => {
-    const storage = memory({ [SAVE_KEY]: '{"version":1,"points":40,"saved":100}' });
-    expect(await restoreSave(storage, backupOf('{"version":1,"points":90,"saved":200}'))).toBe(true);
-    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":90,"saved":200}');
-  });
-
-  it('keeps the game’s own save when that is the more recent', async () => {
-    const storage = memory({ [SAVE_KEY]: '{"version":1,"points":90,"saved":200}' });
-    expect(await restoreSave(storage, backupOf('{"version":1,"points":40,"saved":100}'))).toBe(false);
-    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":90,"saved":200}');
-  });
-
-  it('replaces a save that cannot be read with the backup', async () => {
-    const storage = memory({ [SAVE_KEY]: '{"version":1,"poi' });
-    await restoreSave(storage, backupOf('{"version":1,"points":40}'));
-    expect(storage.getItem(SAVE_KEY)).toBe('{"version":1,"points":40}');
-  });
-
-  it('starts fresh when there is no backup either', async () => {
-    const storage = memory();
-    await restoreSave(storage, backupOf(null));
-    expect(storage.getItem(SAVE_KEY)).toBeNull();
-  });
-});
-
-describe('storeSave', () => {
-  it('still reaches the backup, stamped with when it was saved, when the game’s own storage refuses the write', async () => {
-    // There is no localStorage under test, so the game's own write fails just as it would on a full disk.
-    const written: string[] = [];
-    backUpSaves({ get: async () => null, set: async (value) => void written.push(value), remove: async () => {} });
+  it('reads back what was stored', async () => {
+    const store = memoryStore();
+    keepSavesIn(store);
     storeSave({ ...newSave(), points: 70 });
-    expect(written).toHaveLength(1);
-    const kept = JSON.parse(written[0]);
-    expect(kept.points).toBe(70);
-    expect(kept.saved).toBeGreaterThan(0);
+    expect(readSave(await store.get())?.points).toBe(70);
+  });
+
+  it('forgets the save when the game is started again', async () => {
+    const store = memoryStore();
+    keepSavesIn(store);
+    storeSave({ ...newSave(), points: 70 });
+    clearSave();
+    expect(await store.get()).toBeNull();
+  });
+
+  it('starts fresh when nothing is stored or it cannot be read', () => {
+    expect(readSave(null)).toBeNull();
+    expect(readSave('{"version":1,"poi')).toBeNull();
   });
 });

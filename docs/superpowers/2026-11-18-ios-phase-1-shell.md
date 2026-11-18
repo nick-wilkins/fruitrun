@@ -138,3 +138,18 @@ Evidence after round three (2026-11-18):
 | Newer backup wins on launch, desktop Chrome | PASS | own copy set to 1 point and an older stamp, backup to 777 points: game launched with 777 |
 | Backup equals the save after a write | PASS | compared 200 ms after `persist()` |
 | Any of this inside the app on a device | NOT DONE | Nick |
+
+Fourth review round, 10 findings, most of them in the two-copy save design (timeout path, failed restore write, clock-based stamps, late reload). The design was the problem, so it is replaced:
+
+- **Save: one store.** The save now lives only in the app's settings store (Capacitor Preferences) and is read once before the menu. No second copy, no stamps, no restore step, no timeout. This supersedes task 5 and everything about backups above. Accepted limit: if the native bridge never answers, the app stays on the launch colour; that is a broken install, not a state to design around.
+- **Lost graphics surface.** The restore handle is held by the game (three.js drops its own after a restore, which broke a second loss). The 5 second wait runs from the first tap that asked, and a reload happens at most once in a row.
+
+Evidence after round four (2026-11-18):
+
+| Check | Result | Evidence |
+|---|---|---|
+| `npm test` | PASS | 806 tests. 3 new store tests seen failing first ("keepSavesIn is not a function"); the 7 two-copy tests are removed with the code |
+| `npm run typecheck`, `npm run ios`, simulator build | PASS | clean; BUILD SUCCEEDED |
+| Save round trip, desktop Chrome | PASS | level 1 finished and blended, reloaded: 4 stars and Carry On present |
+| Two surface losses in a row, desktop Chrome | PASS | each: run ended, tap refused with the toast, surface restored, level drew |
+| Inside the app on a device | NOT DONE | Nick |
