@@ -1,6 +1,7 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { COURSES, isUnlocked, superBlenderOpen } from '../core/progress';
+import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { newOn, starTimesFor } from '../game/courses';
 import type { App } from './app';
@@ -31,6 +32,50 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
   starTimesFor(level).forEach((limit, i) => {
     targets.append(el('div.target', {}, stars(5 - i, 5), el('span', {}, `under ${formatTime(limit).slice(0, -2)}`)));
   });
+  const play = el(
+    'button.btn.green.big',
+    {
+      onclick: () => {
+        sfx.tap();
+        app.play(level);
+      },
+    },
+    '▶ Play',
+  );
+  const starts = el('div.starts', {}, play);
+  if (racesUnlocked()) {
+    // Race swaps the two buttons for the choice of how hard, with the one picked last time standing out.
+    const race = el('button.btn.purple.big', {}, '🏁 Race');
+    race.onclick = () => {
+      sfx.tap();
+      const last = app.save.race ?? 'easy';
+      const pick = el(
+        'div.race-pick',
+        {},
+        el('p', {}, 'Race three friends! How fast should they be?'),
+        el(
+          'div.starts',
+          {},
+          ...DIFFICULTIES.map(({ id, name }) =>
+            el(
+              `button.btn.${id === last ? 'green.big' : 'blue'}`,
+              {
+                onclick: () => {
+                  sfx.tap();
+                  app.save.race = id;
+                  app.persist();
+                  app.play(level, id);
+                },
+              },
+              name,
+            ),
+          ),
+        ),
+      );
+      starts.replaceWith(pick);
+    };
+    starts.append(race);
+  }
   return el(
     'div.modal',
     { onclick: (e: MouseEvent) => e.target === e.currentTarget && close() },
@@ -45,16 +90,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
       targets,
-      el(
-        'button.btn.green.big',
-        {
-          onclick: () => {
-            sfx.tap();
-            app.play(level);
-          },
-        },
-        '▶ Play',
-      ),
+      starts,
     ),
   );
 }

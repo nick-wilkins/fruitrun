@@ -1,7 +1,7 @@
 import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { claimAwards, type Award } from './awards';
-import { podiumFruit } from './race';
+import { podiumFruit, type Difficulty } from './race';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
 /** What happened on a run, beyond the time: counted by the rules engine. */
@@ -62,6 +62,8 @@ export interface Save {
   /** Ids of awards earned. */
   awards: string[];
   muted: boolean;
+  /** How hard the last race was set: offered first next time. */
+  race?: Difficulty;
 }
 
 export const SAVE_KEY = 'fruitrun.save.v1';

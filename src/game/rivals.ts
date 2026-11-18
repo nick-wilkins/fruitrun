@@ -44,15 +44,29 @@ export function rivalDrivers(level: Level, difficulty: Difficulty): Driver[] {
         wobble: difficulty === 'hard' ? 0.4 : 0.25,
         easeOff: EASE_OFF[difficulty],
         phase: level.n * 1.7 + i * 2.1,
+        bias: [0, -1.2, 1.2][i],
       };
       // Going slower changes more than the pace: jumps fall short, bumpers are met at other moments. So try the
-      // course and correct the speed until the time is right.
-      for (let tries = 0; tries < 3; tries++) {
+      // course, correct, and keep whichever try came nearest the time.
+      let best = { ...driver };
+      let nearest = Infinity;
+      for (let tries = 0; tries < 6; tries++) {
         const time = timeCourse(course, level, driver);
-        if (!Number.isFinite(time) || Math.abs(time - target) / target < 0.02) break;
-        driver.speed = Math.min(1, (driver.speed * time) / target);
+        if (!Number.isFinite(time)) break;
+        const off = Math.abs(time - target) / target;
+        if (off < nearest) {
+          nearest = off;
+          best = { ...driver };
+        }
+        if (off < 0.02) break;
+        // Flat out and still behind its time: running wide of the best line, then wandering about it, is costing
+        // too much, so give those up in turn.
+        if (driver.speed < 1 || time < target) driver.speed = Math.min(1, (driver.speed * time) / target);
+        else if (driver.bias) driver.bias = 0;
+        else if (driver.wobble) driver.wobble = 0;
+        else break;
       }
-      return driver;
+      return best;
     });
     prepared.set(key, drivers);
   }

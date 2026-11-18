@@ -2192,3 +2192,109 @@ button.mix-item {
     animation-duration: 0.01s !important;
   }
 }
+
+/* ---- races ---- */
+
+.progress .rival-dot {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0.8em;
+  height: 0.8em;
+  margin: -0.4em 0 0 -0.4em;
+  border: 0.12em solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0.08em 0.15em rgba(0, 0, 0, 0.4);
+}
+
+/* Where the player is running, beside the timer. */
+.place {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 0.6em;
+  min-width: 2.6em;
+  padding: 0.12em 0.5em;
+  font-size: 1.5em;
+  line-height: 1.1;
+  text-align: center;
+  color: #fff;
+  background: #7a5cff;
+  border: 0.1em solid #fff;
+  border-radius: 99em;
+  box-shadow: 0 0.12em 0 rgba(0, 0, 0, 0.3);
+}
+
+.place:empty {
+  display: none;
+}
+
+.place[data-place='1'] {
+  background: #f5a800;
+}
+
+.place.pop {
+  animation: star-pop 0.35s;
+}
+
+/* Two by two, so the results card stays short enough for a phone: first and second on top. */
+.race-order {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2em 0.5em;
+  margin: 0.2em auto 0.3em;
+  text-align: left;
+  font-size: 0.9em;
+}
+
+/* The finishing order shows the time too, so the big one makes room for it. */
+.results.raced .time {
+  font-size: 1.3em;
+}
+
+.results.raced .stars img {
+  width: 2.5em;
+  height: 2.5em;
+}
+
+.race-row {
+  display: grid;
+  grid-template-columns: 2.4em 1em 1fr auto;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.12em 0.7em;
+  border-radius: 99em;
+  background: rgba(120, 80, 30, 0.1);
+}
+
+.race-row.you {
+  color: #fff;
+  background: #4cc02a;
+}
+
+.race-row b {
+  font-weight: inherit;
+}
+
+.race-row i {
+  width: 1em;
+  height: 1em;
+  border: 0.1em solid #fff;
+  border-radius: 50%;
+}
+
+.race-row em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Play or race on the level card, then how hard a race. */
+.level-card .starts {
+  display: flex;
+  justify-content: center;
+  gap: 0.7em;
+}
+
+.level-card .race-pick p {
+  margin: 0 0 0.4em;
+}

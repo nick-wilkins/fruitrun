@@ -39,6 +39,8 @@ export interface Driver {
   easeOff: number;
   /** Where in its wander it starts, so rivals do not weave in step. */
   phase: number;
+  /** How far to one side of its line it likes to run, so rivals on the same line are not one on top of another. */
+  bias?: number;
 }
 
 export type SimEvent =
@@ -352,7 +354,11 @@ export class Sim {
     this.riding = riding;
     const line = this.driver?.line ?? this.autopilot;
     let wanted = riding ? 0 : line === 'ace' ? this.aceLine() : line === 'smart' ? this.smartLine() : this.steer;
-    if (this.driver?.wobble && wanted !== null && !riding) wanted += this.driver.wobble * Math.sin(this.clock * 1.9 + this.driver.phase);
+    if (this.driver && wanted !== null && !riding) {
+      // Never asked for beyond the kerb: that would only scrape speed off.
+      const [lo, hi] = this.bounds();
+      wanted = clamp(wanted + (this.driver.bias ?? 0) + this.driver.wobble * Math.sin(this.clock * 1.9 + this.driver.phase), lo + 0.3, hi - 0.3);
+    }
     const target = this.finished || this.knockT > 0 ? null : wanted;
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
     const grip = GRIP[this.course.mood];

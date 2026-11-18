@@ -1,6 +1,6 @@
 # iOS phase 2: AI races
 
-Date: 2026-11-18. Status: brief awaiting approval. Background: `2026-11-18-ios-app-research.md` section 4.
+Date: 2026-11-18. Status: approved 2026-11-18 and built on branch `ios`; device play waits on Nick. Background: `2026-11-18-ios-app-research.md` section 4.
 
 ## Intent
 
@@ -79,4 +79,35 @@ Follow the existing screens; no new art.
 
 ## Results
 
-Not started.
+Built 2026-11-18 on branch `ios`.
+
+Changes from the brief:
+- **Difficulty is set from the star times, not fixed percentages.** Each rival has a form on the stars' scale (easy 2.0, 1.6, 1.2; medium 3.6, 3.2, 2.8; hard 4.7, 4.3, 4.0) and uses just enough of its speed to finish on the matching time. So a place goes hand in hand with the stars for the same run: a two star run ties the best easy rival (a tie goes to the player), and hard needs four or five stars. The speed is found by trial runs when a race is first set up, because going slower also changes jumps and bumpers.
+- Two rivals favour a side of the road so the three are not on top of one another; the quickest keeps the ideal line.
+- The player starts side by side with the rivals, a bubble's width apart, instead of in the middle of the road.
+- The podium fruit is part of the "You won" line ("You won 7 strawberries: 3 for coming 1st!"), and the finishing order is two by two with a smaller time, so the results card still fits a phone.
+- The developer shortcut takes a difficulty: `__fr.play(3, 'hard')`.
+
+Runtime verification (desktop Chrome, sound off, 2026-11-18):
+
+| Check | Result | Evidence |
+|---|---|---|
+| `npm test` | PASS | see the line under this table; `tests/race.test.ts` was written first and failed ("Cannot find module '../src/core/race'") |
+| Star times unchanged | PASS | pinned for levels 1, 7 and 30; a rival with nothing held back matches the calibration drivers exactly |
+| Every rival finishes every level near its set time | PASS | 68 levels, 3 difficulties, 3 rivals, each within 12% |
+| `npm run typecheck`, `npm run build`, simulator build | PASS | see the line under this table |
+| Race from the level card | PASS | Play and Race buttons; Race shows Easy, Medium, Hard with the remembered one standing out; card fits 844x390 |
+| Rivals visible, coloured, on the road | PASS | screenshot at 8.6 s on level 3: blue and orange ahead, pink alongside, badge "3rd" |
+| Place badge and progress dots | PASS | badge changed 1st to 3rd as rivals passed an unsteered player; three dots at 31.0%, 31.4%, 28.8% matched the rivals' progress |
+| Results | PASS | order "1st You 0:36.6, 2nd Mango 0:41.6, 3rd Berry 0:42.2, 4th Plum 0:45.1"; 4 stars plus 3 podium = "You won 7 strawberries: 3 for coming 1st!" |
+| Retry keeps nothing and stays a race | PASS | fruit 0 and races 0 before and after; three rivals again |
+| Blend banks it | PASS | strawberries 9 (7 won plus 2 picked up on the course), races 1, wins 1 |
+| Frame time, one marble against four | PASS | median 16.7 ms both; the rules for four marbles cost 0.008 ms per frame |
+| A normal run | PASS | no badge, dots or order; "You won 4 strawberries!" |
+| Results card on a phone-sized screen | PARTLY | buttons fit at 844x390 (bottom at 383 of 390); on the busiest card (3 awards, two rows of extras) the small print under them is cut off |
+| Rivals through a fork, a loop and a jump, watched | NOT WATCHED | covered by the finish-every-level test, not by eye |
+| On a device | NOT DONE | Nick |
+
+After the last change: `npm test` 885 passed, `npm run typecheck` clean, `npm run ios` built and synced, simulator `xcodebuild` BUILD SUCCEEDED.
+
+Known and left: a rival can pass through a crate the player still sees standing, because each marble has its own copy of the course (as designed). Rivals on the same racing line can overlap each other on the inside of a bend.

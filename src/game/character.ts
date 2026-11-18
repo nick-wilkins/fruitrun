@@ -20,17 +20,28 @@ export interface Pip {
   leaves: Group;
 }
 
+/** The colours of a sprout: Pip's own unless told otherwise, so the marbles in a race can be told apart. */
+export interface PipLook {
+  skin: string;
+  belly: string;
+  leaf: string;
+  /** The bubble's stripes. */
+  bands: string[];
+}
+
+const PIP: PipLook = { skin: '#8fe04a', belly: '#d8f7a0', leaf: '#2fa23a', bands: ['#ff7a1a', '#ffffff', '#ffd23f'] };
+
 /** Pip the sprout: a round green seedling with a two-leaf quiff, riding inside a striped bubble. */
-export function buildPip(): Pip {
+export function buildPip(look: PipLook = PIP): Pip {
   const root = new Group();
   const body = new Group();
 
-  const skin = new MeshLambertMaterial({ color: '#8fe04a' });
-  const belly = new MeshLambertMaterial({ color: '#d8f7a0' });
+  const skin = new MeshLambertMaterial({ color: look.skin });
+  const belly = new MeshLambertMaterial({ color: look.belly });
   const white = new MeshLambertMaterial({ color: '#ffffff' });
   const black = new MeshLambertMaterial({ color: '#1d1d2b' });
   const pink = new MeshLambertMaterial({ color: '#ff8fb0' });
-  const leaf = new MeshLambertMaterial({ color: '#2fa23a' });
+  const leaf = new MeshLambertMaterial({ color: look.leaf });
   const foot = new MeshLambertMaterial({ color: '#ff9f1c' });
   const ball = new SphereGeometry(1, 18, 14);
 
@@ -72,7 +83,7 @@ export function buildPip(): Pip {
   const shell = new Mesh(
     new SphereGeometry(BALL_RADIUS, 32, 22),
     new MeshPhongMaterial({
-      map: bubbleTexture(),
+      map: bubbleTexture(look.bands),
       transparent: true,
       depthWrite: false,
       shininess: 120,

@@ -2,8 +2,10 @@ import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
 import { clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, storeSave, type RunResult, type Save } from './core/progress';
+import { RIVALS, type Difficulty, type Finisher } from './core/race';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
+import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import { onResume, saveStore } from './platform';
@@ -74,7 +76,7 @@ const app: App = {
     }[screen];
     ui.replaceChildren(build(app));
   },
-  play(level: Level) {
+  play(level: Level, race?: Difficulty) {
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
       // loss was not the device's own doing. If it is still gone a good while after the first tap, start the
@@ -93,43 +95,56 @@ const app: App = {
     sessionStorage.removeItem(RELOADED);
     endRun();
     app.world = level.world;
-    const hud = createHud(level, {
-      pause: (paused) => run?.setPaused(paused),
-      restart: () => app.play(level),
-      quit: () => app.show('map'),
-      blend: () => {
-        if (draft) {
-          app.save = draft;
+    const hud = createHud(
+      level,
+      {
+        pause: (paused) => run?.setPaused(paused),
+        // Starting again keeps the kind of run it was: a race stays a race, as hard as before.
+        restart: () => app.play(level, race),
+        quit: () => app.show('map'),
+        blend: () => {
+          if (draft) {
+            app.save = draft;
+            app.persist();
+          }
+          app.show('blender');
+        },
+        muted: () => app.save.muted,
+        toggleSound: () => {
+          app.save.muted = !app.save.muted;
+          setMuted(app.save.muted);
           app.persist();
-        }
-        app.show('blender');
+          return app.save.muted;
+        },
       },
-      muted: () => app.save.muted,
-      toggleSound: () => {
-        app.save.muted = !app.save.muted;
-        setMuted(app.save.muted);
-        app.persist();
-        return app.save.muted;
-      },
-    });
+      race ? RIVALS : [],
+    );
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');
     let result: RunResult | null = null;
     let draft: Save | null = null;
+    let order: Finisher[] | undefined;
     // Night levels get their own dreamy tune.
     musicFor(level.mood === 'night' || level.mood === 'midnight' ? asset('assets/audio/track4.m4a') : null);
-    run = new Run(renderer, courseFor(level), level, {
-      hud: (state) => hud.update(state),
-      pickup: (id) => hud.pickup(id),
-      finish: (time, bonuses, feats) => {
-        // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
-        // retrying throws the whole run away, fruit, stars and all.
-        draft = structuredClone(app.save);
-        result = completeLevel(draft, level, time, bonuses, feats);
-        hud.finished();
+    run = new Run(
+      renderer,
+      courseFor(level),
+      level,
+      {
+        hud: (state) => hud.update(state),
+        pickup: (id) => hud.pickup(id),
+        finish: (time, bonuses, feats, raced) => {
+          // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
+          // retrying throws the whole run away, fruit, stars, podium place and all.
+          draft = structuredClone(app.save);
+          result = completeLevel(draft, level, time, bonuses, feats, raced?.place);
+          order = raced?.order;
+          hud.finished();
+        },
+        results: () => result && hud.results(result, order),
       },
-      results: () => result && hud.results(result),
-    });
+      race ? { rivals: RIVALS, drivers: rivalDrivers(level, race) } : null,
+    );
     run.start();
   },
   startAgain() {
@@ -179,8 +194,8 @@ if (import.meta.env.DEV) {
         return Number(timeCourse(courseFor(level), level, mode).toFixed(2));
       },
       /** Jump straight into a level, skipping the map and unlocks. */
-      play(n: number) {
-        app.play(levelById(`level-${n}`));
+      play(n: number, race?: Difficulty) {
+        app.play(levelById(`level-${n}`), race);
       },
     },
   });

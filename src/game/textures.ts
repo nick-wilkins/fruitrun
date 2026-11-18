@@ -213,12 +213,11 @@ export function bumperTexture(a = '#ff4fa3', b = '#ffffff'): Texture {
 }
 
 /** The bubble Pip rolls in: mostly clear, with swirling bands so the spin reads at speed. */
-export function bubbleTexture(): Texture {
+export function bubbleTexture(bands = ['#ff7a1a', '#ffffff', '#ffd23f']): Texture {
   const [el, g] = canvas(512, 256);
   g.clearRect(0, 0, 512, 256);
   g.fillStyle = 'rgba(170, 235, 255, 0.24)';
   g.fillRect(0, 0, 512, 256);
-  const bands = ['#ff7a1a', '#ffffff', '#ffd23f'];
   for (let i = 0; i < 6; i++) {
     g.fillStyle = bands[i % bands.length];
     g.globalAlpha = 0.92;

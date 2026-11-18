@@ -1,5 +1,6 @@
 import { sfx } from '../audio';
 import type { RunResult } from '../core/progress';
+import type { Finisher, Rival } from '../core/race';
 import { ingredient } from '../data/ingredients';
 import type { Level } from '../data/levels';
 import type { HudState } from '../game/run';
@@ -22,10 +23,14 @@ export interface Hud {
   pickup(id: string): void;
   /** The line is crossed: nothing left to pause or quit. */
   finished(): void;
-  results(result: RunResult): void;
+  /** `order` is everyone in finishing order, for a race. */
+  results(result: RunResult, order?: Finisher[]): void;
 }
 
-export function createHud(level: Level, handlers: HudHandlers): Hud {
+const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
+
+/** `rivals` are the marbles being raced, if this run is a race. */
+export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = []): Hud {
   const fruit = ingredient(level.fruit);
   const root = el('div.hud');
 
@@ -37,7 +42,9 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   prizeIcons[level.need - 1].classList.add('needed');
   const goalNote = el('div.goal-note', {}, `Keep ${level.need} to move on`);
   const progressFill = el('div.fill');
-  const progress = el('div.progress', {}, progressFill, el('div.flag', {}, '🏁'));
+  const dots = rivals.map((rival) => el('div.rival-dot', { style: `background:${rival.color}`, title: rival.name }));
+  const progress = el('div.progress', {}, progressFill, ...dots, el('div.flag', {}, '🏁'));
+  const place = rivals.length ? el('div.place', {}, '') : null;
   const speedFill = el('div.fill');
   const speed = el('div.speed', {}, el('span', {}, 'SPEED'), el('div.gauge', {}, speedFill));
   const bagCount = el('span', {}, '0');
@@ -78,10 +85,11 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
   };
   onTap(pauseButton, () => setPaused(true));
 
-  root.append(el('div.hud-top', {}, timer, prizes, goalNote, progress), speed, bag, count, hint, pauseButton, pauseMenu);
+  root.append(el('div.hud-top', {}, timer, place, prizes, goalNote, progress), speed, bag, count, hint, pauseButton, pauseMenu);
 
   let lastStars = 5;
   let lastCount = '';
+  let lastPlace = 0;
   return {
     root,
     update(state) {
@@ -89,6 +97,15 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
       progressFill.style.width = `${state.progress * 100}%`;
       speedFill.style.width = `${Math.max(6, state.speed * 100)}%`;
       speed.classList.toggle('boost', state.boosting);
+      state.rivals.forEach((at, i) => (dots[i].style.left = `${at * 100}%`));
+      if (place && state.place !== null && state.place !== lastPlace && state.countdown === null) {
+        lastPlace = state.place;
+        place.textContent = ORDINAL[state.place];
+        place.dataset.place = String(state.place);
+        place.classList.remove('pop');
+        void place.offsetWidth;
+        place.classList.add('pop');
+      }
       if (state.stars !== lastStars) {
         lastStars = state.stars;
         prizeIcons.forEach((icon, i) => icon.classList.toggle('lost', i >= state.stars));
@@ -123,8 +140,22 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
     finished() {
       pauseButton.classList.add('hidden');
     },
-    results(result) {
+    results(result, order) {
       root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
+      // A race: who came where, and what the place was worth.
+      const podium = result.podium ?? 0;
+      const table = order
+        ? el(
+            'div.race-order',
+            {},
+            ...order.map((row, i) =>
+              el(`div.race-row${row.you ? '.you' : ''}`, {}, el('b', {}, ORDINAL[i + 1]), el('i', { style: `background:${row.color}` }), el('span', {}, row.name), el('em', {}, formatTime(row.time))),
+            ),
+          )
+        : null;
+      // One line for the fruit: in a race it says what the place added, or what a podium would.
+      const won = `You won ${countOf(result.fruits, fruit.name)}`;
+      const wonLine = !order || !result.place ? `${won}!` : podium ? `${won}: ${podium} for coming ${ORDINAL[result.place]}!` : `${won}. Reach the podium for more!`;
       const starRow = stars(0);
       const loot = el('div.loot');
       for (let i = 0; i < result.fruits; i++) loot.append(el('img', { src: asset(fruit.img), alt: fruit.name, style: `animation-delay:${1.1 + i * 0.12}s` }));
@@ -160,13 +191,14 @@ export function createHud(level: Level, handlers: HudHandlers): Hud {
         'div.modal.clear',
         {},
         el(
-          'div.card.results',
+          `div.card.results${order ? '.raced' : ''}`,
           {},
           el('img.banner', { src: asset('assets/ui/level-complete.png'), alt: 'Level complete!' }),
           el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
           el('div.time', {}, formatTime(result.time), result.newBest && !result.firstClear ? el('span.new-best', {}, 'New best!') : null),
           starRow,
-          el('div.kicker', {}, `You won ${countOf(result.fruits, fruit.name)}!`),
+          table,
+          el('div.kicker', {}, wonLine),
           loot,
           goal,
           feats,

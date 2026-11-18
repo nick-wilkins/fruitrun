@@ -21,11 +21,13 @@ import {
 } from 'three';
 import { sfx } from '../audio';
 import { starsForTime, type Feats } from '../core/progress';
+import { finishingOrder, type Finisher, type Rival } from '../core/race';
 import type { Level } from '../data/levels';
 import { Rig } from './camera';
 import { buildPip, type Pip } from './character';
 import type { Course } from './course';
-import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type SimEvent } from './sim';
+import { seeded } from './random';
+import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type Driver, type SimEvent } from './sim';
 import { blobTexture } from './textures';
 import { makeFrame } from './track';
 import { buildWorld, PIVOT, standing, type World } from './world';
@@ -40,13 +42,38 @@ export interface HudState {
   /** Seconds left before the start, or null once racing. */
   countdown: number | null;
   boosting: boolean;
+  /** In a race: where the player is running, 1 being the lead, and how far along each rival is, 0 to 1. */
+  place: number | null;
+  rivals: number[];
+}
+
+/** A race: who the player is up against, and how each of them drives. */
+export interface Field {
+  rivals: Rival[];
+  drivers: Driver[];
+}
+
+/** How a race ended: everyone in finishing order, and where the player came. */
+export interface RaceResult {
+  order: Finisher[];
+  place: number;
+}
+
+/** Where across the road each marble starts a race: the three rivals, then the player. */
+const GRID = [-3.3, -1.1, 3.3, 1.1];
+
+interface Racer {
+  rival: Rival;
+  sim: Sim;
+  pip: Pip;
+  shadow: Mesh;
 }
 
 export interface RunHooks {
   hud(state: HudState): void;
   pickup(id: string): void;
   /** The line has been crossed: bank the result now. */
-  finish(time: number, bonuses: string[], feats: Feats): void;
+  finish(time: number, bonuses: string[], feats: Feats, race: RaceResult | null): void;
   /** The celebration has played: show the results. */
   results(): void;
 }
@@ -193,6 +220,7 @@ export class Run {
   private readonly canvas: HTMLCanvasElement;
   private readonly flying: Flying[] = [];
   private readonly weather: Weather | null;
+  private readonly racers: Racer[] = [];
 
   /** Where the steering finger is across the screen, -0.5 to 0.5, or null when nothing is held. */
   private pointerAcross: number | null = null;
@@ -216,6 +244,7 @@ export class Run {
   private readonly v1 = new Vector3();
   private readonly v2 = new Vector3();
   private readonly v3 = new Vector3();
+  private readonly v4 = new Vector3();
   private readonly camPos = new Vector3();
   private readonly camLook = new Vector3();
   private readonly camUp = new Vector3(0, 1, 0);
@@ -230,6 +259,7 @@ export class Run {
     readonly course: Course,
     readonly level: Level,
     private readonly hooks: RunHooks,
+    field: Field | null = null,
   ) {
     this.canvas = renderer.domElement;
     this.sim = new Sim(course, level, (event) => this.react(event));
@@ -246,19 +276,22 @@ export class Run {
       this.pip.root.add(lamp);
     }
 
-    this.shadow = new Mesh(
-      new PlaneGeometry(3, 3),
-      new MeshBasicMaterial({
-        map: blobTexture('rgba(0,0,0,0.5)', 'rgba(0,0,0,0)'),
-        transparent: true,
-        depthWrite: false,
-        polygonOffset: true,
-        polygonOffsetFactor: -3,
-        polygonOffsetUnits: -3,
-      }),
-    );
-    this.shadow.matrixAutoUpdate = false;
+    this.shadow = this.makeShadow();
     this.world.scene.add(this.shadow, this.sparks.points);
+    // Line the field up side by side across the road, a bubble's width apart.
+    if (field) this.sim.x = GRID[3];
+    field?.rivals.forEach((rival, i) => {
+      // A rival has its own copy of the course: what it smashes or collects is its own affair, and makes no sound.
+      const sim = new Sim(course, level, () => {}, seeded(level.n * 31 + i));
+      sim.driver = field.drivers[i];
+      sim.chase = () => this.sim.progress();
+      sim.x = GRID[i] ?? 0;
+      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: [rival.deep, '#ffffff', rival.color] });
+      pip.root.matrixAutoUpdate = false;
+      const shadow = this.makeShadow();
+      this.world.scene.add(pip.root, shadow);
+      this.racers.push({ rival, sim, pip, shadow });
+    });
     this.weather = course.mood === 'rain' || course.mood === 'snow' ? new Weather(course.mood) : null;
     if (this.weather) this.world.scene.add(this.weather.object);
 
@@ -272,7 +305,23 @@ export class Run {
     window.addEventListener('blur', this.dropInput);
     window.addEventListener('resize', this.resize);
     this.resize();
-    this.place(0);
+    this.settle(0);
+  }
+
+  private makeShadow(): Mesh {
+    const shadow = new Mesh(
+      new PlaneGeometry(3, 3),
+      new MeshBasicMaterial({
+        map: blobTexture('rgba(0,0,0,0.5)', 'rgba(0,0,0,0)'),
+        transparent: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -3,
+        polygonOffsetUnits: -3,
+      }),
+    );
+    shadow.matrixAutoUpdate = false;
+    return shadow;
   }
 
   // ---- input ----
@@ -369,6 +418,7 @@ export class Run {
     this.owed += dt;
     while (this.owed >= TICK) {
       this.sim.step(TICK);
+      for (const racer of this.racers) racer.sim.step(TICK);
       this.owed -= TICK;
     }
     this.animate(dt);
@@ -390,7 +440,31 @@ export class Run {
       bonuses: sim.bonuses.length,
       countdown: sim.countdown > 0 ? sim.countdown : null,
       boosting: sim.boostT > 0,
+      place: this.racers.length ? this.place() : null,
+      rivals: this.racers.map((racer) => racer.sim.progress()),
     };
+  }
+
+  /** Where the player is running: one more than the number of rivals in front. */
+  private place(): number {
+    const sim = this.sim;
+    const ahead = (rival: Sim) => (sim.finished ? rival.finished && rival.time < sim.time : rival.finished || rival.progress() > sim.progress());
+    return 1 + this.racers.filter((racer) => ahead(racer.sim)).length;
+  }
+
+  /** The line is crossed: bring home anyone still out on the course, so the result is complete. */
+  private raceResult(): RaceResult | null {
+    if (!this.racers.length) return null;
+    for (const racer of this.racers) {
+      if (racer.sim.finished) continue;
+      // They run their own race from here, out of sight: nobody waits for a player who has already finished.
+      racer.sim.chase = null;
+      for (let step = 0; step < 600 / TICK && !racer.sim.finished; step++) racer.sim.step(TICK);
+      racer.pip.root.visible = false;
+      racer.shadow.visible = false;
+    }
+    const order = finishingOrder(this.sim.time, this.racers.map((racer) => ({ name: racer.rival.name, color: racer.rival.color, time: racer.sim.time })));
+    return { order, place: order.findIndex((row) => row.you) + 1 };
   }
 
   // ---- reactions ----
@@ -491,7 +565,7 @@ export class Run {
         break;
       }
       case 'finish': {
-        this.hooks.finish(sim.time, sim.bonuses, sim.feats());
+        this.hooks.finish(sim.time, sim.bonuses, sim.feats(), this.raceResult());
         sfx.finish();
         const f = sim.frameAt(sim.s, this.f);
         this.sparks.burst(this.ballAt(2, this.v1), 90, ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#ffffff'], 14, this.v2.copy(f.t).multiplyScalar(sim.v * 0.5));
@@ -505,28 +579,38 @@ export class Run {
 
   // ---- presentation ----
 
-  /** Put the ball, shadow and camera where the rules say they are. */
-  private place(dt: number): void {
-    const sim = this.sim;
-    // The rules move in fixed steps that rarely line up with the screen's frames. Draw the ball where it will be
-    // by now, part-way into the next step, so its motion is even rather than a step ahead or behind.
-    const lead = sim.countdown > 0 || sim.finished ? 0 : this.owed;
-    const s = sim.s + sim.v * lead;
+  /** Put a marble and its shadow where its rules say they are, `lead` seconds into the step to come. */
+  private seat(sim: Sim, pip: Pip, shadow: Mesh, lead: number): void {
+    const s = sim.s + sim.v * sim.gait * lead;
     const x = sim.x + sim.xv * lead;
     const h = sim.h > 0 ? Math.max(0, sim.h + sim.vh * lead) : 0;
-
     const f = sim.frameAt(s, this.f);
     this.v1.copy(f.r).negate();
     this.v2.copy(f.p).addScaledVector(f.r, x).addScaledVector(f.u, BALL_RADIUS + h);
-    this.pip.root.matrix.makeBasis(this.v1, f.u, f.t).setPosition(this.v2);
-    this.pip.root.matrixWorldNeedsUpdate = true;
+    pip.root.matrix.makeBasis(this.v1, f.u, f.t).setPosition(this.v2);
+    pip.root.matrixWorldNeedsUpdate = true;
 
     const shrink = 1 / (1 + h * 0.45);
     this.v3.copy(f.p).addScaledVector(f.r, x).addScaledVector(f.u, 0.06);
-    this.shadow.matrix.makeBasis(f.r, f.t, f.u).scale(this.camUp.set(shrink, shrink, 1)).setPosition(this.v3);
-    this.shadow.matrixWorldNeedsUpdate = true;
+    shadow.matrix.makeBasis(f.r, f.t, f.u).scale(this.v4.set(shrink, shrink, 1)).setPosition(this.v3);
+    shadow.matrixWorldNeedsUpdate = true;
     // Nothing to cast a shadow on where the road has been taken away.
-    this.shadow.visible = !sim.overGap();
+    shadow.visible = pip.root.visible && !sim.overGap();
+  }
+
+  /** Put the marbles, their shadows and the camera where the rules say they are. */
+  private settle(dt: number): void {
+    const sim = this.sim;
+    // The rules move in fixed steps that rarely line up with the screen's frames. Draw each marble where it will
+    // be by now, part-way into the next step, so its motion is even rather than a step ahead or behind.
+    const lead = sim.countdown > 0 || sim.finished ? 0 : this.owed;
+    for (const racer of this.racers) this.seat(racer.sim, racer.pip, racer.shadow, racer.sim.finished ? 0 : lead);
+    // The player last: the camera works from what is left behind.
+    this.seat(sim, this.pip, this.shadow, lead);
+    const s = sim.s + sim.v * lead;
+    const x = sim.x + sim.xv * lead;
+    const h = sim.h > 0 ? Math.max(0, sim.h + sim.vh * lead) : 0;
+    const f = this.f;
 
     this.rig.update(sim, s, x, h, dt);
     this.camPos.copy(this.rig.pos);
@@ -562,6 +646,12 @@ export class Run {
     if (racing) {
       this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (sim.v * dt) / BALL_RADIUS));
       this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisZ, (sim.xv * dt) / BALL_RADIUS));
+    }
+    for (const racer of this.racers) {
+      if (racer.sim.countdown > 0) continue;
+      racer.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (racer.sim.v * racer.sim.gait * dt) / BALL_RADIUS));
+      racer.pip.leaves.rotation.x = -clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.9;
+      racer.pip.body.rotation.z = clamp(racer.sim.xv * 0.035, -0.5, 0.5);
     }
     const pace = clamp(sim.v / MAX_SPEED, 0, 1);
     this.pip.leaves.rotation.x = -pace * 0.9 + Math.sin(sim.clock * 13) * 0.06;
@@ -640,7 +730,7 @@ export class Run {
       this.sparks.burst(sim.point(sim.s - 0.6, sim.x + (Math.random() - 0.5) * 0.8, 0.5, this.v1), hot ? 3 : 1, hot ? ['#ff5a2a', '#ffd23f'] : ['#eaff3d', '#ffffff'], 2);
     }
     this.sparks.update(dt);
-    this.place(dt);
+    this.settle(dt);
     this.weather?.update(dt, sim.clock, this.camPos);
   }
 
