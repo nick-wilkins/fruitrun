@@ -559,13 +559,27 @@ function addTrack(scene: Scene, course: Course, theme: Theme): void {
           scene.add(new Mesh(extrude(track, [[-half, dip, -1], [half, dip, 1]], { s0: cuts[i], s1: cuts[i + 1], vScale: 0.1 }), roads[tint]));
         }
       }
-      scene.add(new Mesh(extrude(track, [[half + 0.9, -0.6 + dip, 1], [half * 0.55, -1.5 + dip, 1], [-half * 0.55, -1.5 + dip, -1], [-half - 0.9, -0.6 + dip, -1]], { s0, s1, stride: 2 }), underMaterial));
     }
-    for (const [s0, s1] of clip(kerbRuns(course.lanes, index, -1), solid)) {
+    const leftKerbs = clip(kerbRuns(course.lanes, index, -1), solid);
+    const rightKerbs = clip(kerbRuns(course.lanes, index, 1), solid);
+    for (const [s0, s1] of leftKerbs) {
       scene.add(new Mesh(extrude(track, [[-half - 0.9, -0.6, -1], [-half - 0.9, 0.6, -1], [-half, 0.6, -1], [-half, 0, -1]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
     }
-    for (const [s0, s1] of clip(kerbRuns(course.lanes, index, 1), solid)) {
+    for (const [s0, s1] of rightKerbs) {
       scene.add(new Mesh(extrude(track, [[half, 0, 1], [half, 0.6, 1], [half + 0.9, 0.6, 1], [half + 0.9, -0.6, 1]], { s0, s1, vScale: 0.25, stride: 2 }), kerbMaterial));
+    }
+    // The underside reaches out to the foot of each kerb. Where a kerb is left out because another road lies
+    // there, that lip is left out too: on a banked stretch it would otherwise stick up through the other road.
+    const within = (runs: [number, number][], s: number) => runs.some(([a, b]) => s >= a && s <= b);
+    for (const [s0, s1] of solid) {
+      const cuts = [...new Set([s0, s1, ...[...leftKerbs, ...rightKerbs].flat().filter((c) => c > s0 && c < s1)])].sort((a, b) => a - b);
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const middle = (cuts[i] + cuts[i + 1]) / 2;
+        const profile: [number, number, number][] = [[half * 0.55, -1.5 + dip, 1], [-half * 0.55, -1.5 + dip, -1]];
+        if (within(rightKerbs, middle)) profile.unshift([half + 0.9, -0.6 + dip, 1]);
+        if (within(leftKerbs, middle)) profile.push([-half - 0.9, -0.6 + dip, -1]);
+        scene.add(new Mesh(extrude(track, profile, { s0: cuts[i], s1: cuts[i + 1], stride: 2 }), underMaterial));
+      }
     }
   });
 
