@@ -34,7 +34,8 @@ function audio(): AudioContext | null {
     ctx.createMediaElementSource(music).connect(musicGain).connect(ctx.destination);
     music.volume = 1;
   }
-  if (ctx.state === 'suspended') void ctx.resume();
+  // A phone call leaves the context 'interrupted' rather than 'suspended' on an iPhone or iPad.
+  if (ctx.state !== 'running') void ctx.resume();
   return ctx;
 }
 

@@ -133,8 +133,8 @@ export function loadSave(): Save | null {
 export function storeSave(save: Save): void {
   try {
     const json = JSON.stringify(save);
-    void backup?.set(json).catch(() => {});
     localStorage.setItem(KEY, json);
+    void backup?.set(json).catch(() => {});
   } catch {
     // Private browsing or a full disk: the game still plays, it just will not remember.
   }
@@ -142,8 +142,8 @@ export function storeSave(save: Save): void {
 
 export function clearSave(): void {
   try {
-    void backup?.remove().catch(() => {});
     localStorage.removeItem(KEY);
+    void backup?.remove().catch(() => {});
   } catch {
     // Nothing stored, nothing to clear.
   }

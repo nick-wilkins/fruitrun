@@ -22,12 +22,15 @@ const ui = document.querySelector<HTMLDivElement>('#ui')!;
 const renderer = new WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 
 let run: Run | null = null;
+/** True while the device has taken the 3D drawing surface away. */
+let surfaceLost = false;
 let toastTimer = 0;
 const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
 try {
-  await restoreSave(localStorage, saveBackup);
+  // Never let a slow answer from the backup keep the menu from appearing.
+  await Promise.race([restoreSave(localStorage, saveBackup), new Promise((done) => setTimeout(done, 1500))]);
 } catch {
   // No backup to be had: carry on with whatever the game's own storage holds.
 }
@@ -61,6 +64,10 @@ const app: App = {
     ui.replaceChildren(build(app));
   },
   play(level: Level) {
+    if (surfaceLost) {
+      app.toast('One moment, getting the track ready…');
+      return;
+    }
     endRun();
     app.world = level.world;
     const hud = createHud(level, {
@@ -123,12 +130,15 @@ for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'])
 startMusic(['track1.mp3', 'track3.m4a', 'track7.m4a', 'track2.mp3', 'track5.m4a', 'track8.m4a', 'track6.m4a'].map((file) => asset(`assets/audio/${file}`)));
 // A phone call or a trip to another app can leave the sound switched off when the game comes back.
 onResume(unlockAudio);
-// The device can take the 3D drawing surface away when it is short of memory. Stop the picture being cleared to
-// white, and go back to the map: the next level starts on a fresh surface.
+// The device can take the 3D drawing surface away when it is short of memory. Asking to keep the canvas lets it
+// hand the surface back later. A run in progress cannot be drawn, so it ends; one that has crossed the line stays,
+// so its result can still be blended.
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
-  if (run) app.show('map');
+  surfaceLost = true;
+  if (run && !run.sim.finished) app.show('map');
 });
+canvas.addEventListener('webglcontextrestored', () => (surfaceLost = false));
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('visibilitychange', () => {

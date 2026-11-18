@@ -29,7 +29,8 @@ def build_ios
     export_method: 'app-store',
     output_directory: File.join(ROOT, 'build'),
     output_name: "SmoothieAdventure-#{current_version}.ipa",
-    xcargs: '-allowProvisioningUpdates'
+    xcargs: '-allowProvisioningUpdates',
+    export_xcargs: '-allowProvisioningUpdates'
   )
 end
 
