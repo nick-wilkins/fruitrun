@@ -2,6 +2,7 @@ import { Vector3 } from 'three';
 import type { Feats } from '../core/progress';
 import type { Level } from '../data/levels';
 import { GRIP, LEVEL_FRUIT, type Course, type CourseObj } from './course';
+import { seeded } from './random';
 import { makeFrame, type Frame } from './track';
 
 export const BALL_RADIUS = 1;
@@ -26,22 +27,58 @@ const SAIL_LOW = 0.76;
 
 export type Autopilot = 'none' | 'smart' | 'ace';
 
-/** A computer rival: one of the hands-free lines, held back to make a fair race of it. */
+/**
+ * A computer rival. It follows one of the hands-free lines, but the way a person would. It looks, decides, and only
+ * then steers, a few times a second. It turns the marble smoothly instead of snapping to its line, and leaves well
+ * alone while it is near enough. It wanders, has good spells and off spells, picks a side to pass another marble,
+ * makes its mind up early about a fork, and now and then gets something wrong.
+ */
 export interface Driver {
   line: 'smart' | 'ace';
-  /** How briskly it steers, 1 being the line's own pace. */
-  pace: number;
   /** How much of its speed it uses, 1 being all of it. */
   speed: number;
-  /** How far it wanders either side of its line. */
-  wobble: number;
   /** How much it slows, at most, when well ahead of the marble it is racing. */
   easeOff: number;
-  /** Where in its wander it starts, so rivals do not weave in step. */
-  phase: number;
-  /** How far to one side of its line it likes to run, so rivals on the same line are not one on top of another. */
-  bias?: number;
+  /** Seconds between one look at the road and the next: its reaction time. */
+  react: number;
+  /** How firmly it steers towards where it wants to be: higher gets there sooner. */
+  turn: number;
+  /** How far it wanders either side of its line on open road. */
+  drift: number;
+  /** How far from where it wants to be it will let the marble run before correcting. */
+  slack: number;
+  /** The chance, each time it looks, of a mistake: not looking for a moment, or misjudging where to go. */
+  slip: number;
+  /** How much its pace rises and falls over a race: its good spells and off spells. */
+  swing: number;
+  /** The chance it takes a fork's side road when it comes to one. */
+  fork: number;
+  /** How far ahead it plans, 1 being just enough for a marble that turns in an instant. */
+  far: number;
+  /** How far to one side of its line it likes to run. */
+  side: number;
+  /** How much room it likes to leave round other marbles and things in the road, 1 being a normal amount. */
+  care: number;
+  /** How many seconds ahead it notices something in its way: short for a late dodger, long for a careful one. */
+  sight: number;
+  /** Makes each rival's wandering and mistakes its own, and the same every time. */
+  seed: number;
 }
+
+/** Another marble on the course, as a rival sees it. */
+export interface Traffic {
+  lane: number;
+  s: number;
+  x: number;
+  v: number;
+  gait: number;
+  /** A rival's driver, or null for the player's marble. */
+  driver: Driver | null;
+  progress(): number;
+}
+
+/** How many strips across the road a rival weighs up when choosing where to be. */
+const SLOTS = 15;
 
 export type SimEvent =
   | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' }
@@ -76,6 +113,40 @@ export class Sim {
   driver: Driver | null = null;
   /** For a rival: how far through the course the marble it is racing has got, 0 to 1. */
   chase: (() => number) | null = null;
+  /** For a rival: the other marbles, so it can make room instead of driving through them. */
+  traffic: (() => Traffic[]) | null = null;
+  /** True for a moment after a rival has been knocked by something: it shows in how the marble sits. */
+  get rattled(): boolean {
+    return this.knockT > 0;
+  }
+
+  /** A rival's own dice, made from its seed the first time they are needed. */
+  private dice: (() => number) | null = null;
+  /** Where the rival last decided to go, and how long until it looks again. */
+  private goal = 0;
+  private lookT = 0;
+  /** While this runs the rival is not paying attention: it holds its last decision. */
+  private lapseT = 0;
+  /** How long after the start the rival takes to get going. */
+  private getaway = 0;
+  /** How much the rival is taking it easy to let the player back into the race, 0 to 1. */
+  private relaxed = 0;
+  /** How far off its line the rival has wandered: carried from look to look, so it meanders instead of jittering. */
+  private astray = 0;
+  /** How its pace is running against its usual: drifts up and down over a race, always pulled back to nothing. */
+  private form = 0;
+  /** Where it last settled on going, and how dangerous each strip of road looked when it last looked. */
+  private aim = 0;
+  private readonly danger = new Float32Array(SLOTS);
+  private readonly sees = new Float32Array(SLOTS);
+  /** After a mistake, how long before it can make another, and how long it goes on not seeing far enough ahead. */
+  private steadyT = 0;
+  private blinkT = 0;
+  /** Which way it went at the last fork it came to, so it does not always do the same. */
+  private lastFork = false;
+  /** Forks the rival has made its mind up about, and the side road it is heading for, if any. */
+  private readonly settled = new Set<number>();
+  private heading = 0;
   /** How much of its speed the marble is using right now: 1 unless a driver is holding it back. */
   gait = 1;
   readonly bonuses: string[] = [];
@@ -264,6 +335,192 @@ export class Sim {
     return this.clock * (o.speed ?? 1) + (o.phase ?? 0);
   }
 
+  /**
+   * Where a rival wants to be across the road right now. It only looks every so often, and what it does between
+   * looks is what makes it seem to be driven by someone.
+   */
+  private decide(driver: Driver, dt: number): number {
+    const dice = (this.dice ??= seeded(driver.seed));
+    // Three dice together give mostly middling numbers and the odd large one, as people's variations do.
+    const bell = () => ((dice() + dice() + dice()) * 2) / 3 - 1;
+    if (this.getaway === 0) {
+      this.getaway = driver.react * (0.6 + dice() * 1.6);
+      this.goal = this.aim = this.x;
+    }
+    const [lo, hi] = this.bounds();
+    const busy = this.blockerAhead();
+    this.lapseT -= dt;
+    this.steadyT -= dt;
+    this.blinkT -= dt;
+    this.lookT -= dt;
+    if (this.lookT <= 0) {
+      // Taking it easy shows in the driving, not only the pace: slower to look, and running wider.
+      const ease = this.relaxed;
+      this.lookT = driver.react * (1 + ease) * (0.7 + dice() * 0.6);
+      // Wandering, and how its pace is running: each a small step from where it was, pulled gently back, so it
+      // meanders and has its spells instead of jittering.
+      const reach = driver.drift * (1 + ease);
+      this.astray = clamp(this.astray * 0.9 + bell() * reach * 0.45, -reach, reach);
+      this.form = clamp(this.form * 0.96 + bell() * driver.swing * 0.5, -2.5 * driver.swing, 2.5 * driver.swing);
+      if (this.lapseT <= 0) {
+        // The faster it is going, the further ahead it has to plan.
+        const far = driver.far * Math.max(1, this.v / CRUISE);
+        const pick = driver.line === 'ace' ? this.aceLine(far) : this.smartLine(far);
+        // It sticks with what it decided unless the road now asks for something clearly different: no fidgeting
+        // between two lines that are much the same.
+        if (busy || Math.abs(pick - this.goal) > driver.slack) this.goal = pick;
+        // A mistake, but never two in quick succession: that would look broken, not human.
+        if (this.steadyT <= 0 && dice() < driver.slip) {
+          this.steadyT = 4;
+          // Half the time its mind wanders and it holds its line for a moment, whatever is coming; otherwise it
+          // misjudges: heads a little to one side of where it meant to, and is slow to see what is in the way.
+          if (dice() < 0.5) this.lapseT = 0.6 + dice() * 0.9;
+          else {
+            this.goal += bell() * 2.5;
+            this.blinkT = 1.2;
+          }
+        }
+        this.lookForFork(driver, dice);
+        this.aim = this.weighUp(driver, lo, hi, busy);
+      }
+    }
+    // Taking a side road is one long deliberate move: over to the side it leaves from in good time, then following
+    // where the side road will be a moment from now, because by the time the roads part it has to be on it.
+    if (this.heading && this.lane === 0) {
+      const from = this.course.lanes[this.heading].from!;
+      const into = this.s - from.s0;
+      if (into < from.decide) {
+        const soon = Math.floor(into + this.v * 0.7);
+        return clamp(soon < 0 ? from.side * 3.6 : from.spread[Math.min(from.decide, soon)], lo + 0.3, hi - 0.3);
+      }
+      this.heading = 0;
+    }
+    // Near enough is good enough: while the marble is heading for somewhere close to where it wants to be, it is
+    // left to run straight. Only with something to dodge does every bit count.
+    const bound = this.x + this.xv * 0.4;
+    if (!busy && this.danger[this.slotOf(this.x, lo, hi)] < 0.1 && Math.abs(this.aim - bound) < driver.slack) return clamp(bound, lo + 0.3, hi - 0.3);
+    return clamp(this.aim, lo + 0.3, hi - 0.3);
+  }
+
+  private slotOf(x: number, lo: number, hi: number): number {
+    return clamp(Math.round(((x - lo - 0.3) / Math.max(0.1, hi - lo - 0.6)) * (SLOTS - 1)), 0, SLOTS - 1);
+  }
+
+  /**
+   * Choose where across the road to be. The road is cut into strips; everything in the way marks the strips it
+   * makes dangerous, and where the rival would like to be marks how much each strip appeals. It then takes the
+   * most appealing strip it can get to without crossing worse danger than it is already in. So it goes round a
+   * whole knot of marbles in one move, never dives through a crate for a speed pad, and is boxed in when it is.
+   */
+  private weighUp(driver: Driver, lo: number, hi: number, busy: boolean): number {
+    const width = Math.max(0.1, hi - lo - 0.6);
+    const at = (slot: number) => lo + 0.3 + (slot / (SLOTS - 1)) * width;
+    const seen = this.sees.fill(0);
+    // Only what will be reached within its sight counts, and more the sooner; a misjudgment shortens its sight.
+    const sight = driver.sight * (this.blinkT > 0 ? 0.4 : 1);
+    const pace = Math.max(1, this.v * this.gait);
+    // Something `across` the road, `wide` either side, mattering `much`: full danger over its own width, then
+    // a skirt that falls away, wider for a rival that likes more room.
+    const mark = (across: number, wide: number, much: number) => {
+      const skirt = 1.4 * driver.care;
+      for (let slot = 0; slot < SLOTS; slot++) {
+        const off = Math.abs(at(slot) - across);
+        const level = off < wide ? much : off < wide + skirt ? much * (1 - (off - wide) / skirt) : 0;
+        if (level > seen[slot]) seen[slot] = level;
+      }
+    };
+    for (const other of this.traffic?.() ?? []) {
+      if (other.lane !== this.lane) continue;
+      const gap = other.s - this.s;
+      // Anyone alongside is in the way. Anyone ahead only if they are being caught: a marble at racing pace is
+      // left alone, or nobody would ever get past anybody.
+      if (Math.abs(gap) < 3.5) mark(other.x, 2, 1);
+      else if (gap > 0) {
+        const closing = pace - other.v * other.gait;
+        const reached = closing > 0.5 ? gap / closing : Infinity;
+        if (reached < sight * 2) mark(other.x, 2, clamp(1 - reached / (sight * 2), 0, 1));
+      }
+    }
+    for (const i of this.byLane[this.lane]) {
+      const o = this.course.objects[i];
+      const ahead = o.s - this.s;
+      if (ahead > pace * sight) break;
+      if (ahead < -1 || this.done[i]) continue;
+      const much = clamp(1.15 - ahead / (pace * sight), 0, 1);
+      if (o.kind === 'crate') mark(o.x, 2.15, much);
+      else if (o.kind === 'goo') mark(o.x, 2, much * 0.8);
+      else if (o.kind === 'slider' || o.kind === 'pendulum') mark(this.swingX(o), 2.1, much);
+      else if (o.kind === 'spinner') mark(o.x, (o.len ?? 3.2) + 0.4, much);
+      else if (o.kind === 'windmill') for (const x of this.sailsAt(o)) mark(x, 2.4, much);
+    }
+    // What it saw last time lingers, so danger builds over a look or two and it does not twitch at every flicker.
+    for (let slot = 0; slot < SLOTS; slot++) this.danger[slot] = this.danger[slot] * 0.4 + seen[slot] * 0.6;
+
+    // Where it would like to be: its line, shifted by the side it favours and how far it has wandered.
+    const calm = busy ? 0.25 : 1;
+    const home = clamp(this.goal + (driver.side + this.astray) * calm, lo + 0.3, hi - 0.3);
+
+    // From where it is, it can reach a strip only by going through strips no more dangerous than its own.
+    const here = this.slotOf(this.x, lo, hi);
+    const ceiling = Math.max(this.danger[here], 0.12);
+    let left = here;
+    let right = here;
+    while (left > 0 && this.danger[left - 1] <= ceiling) left--;
+    while (right < SLOTS - 1 && this.danger[right + 1] <= ceiling) right++;
+    // Of those, the one that appeals most: near home, and clear. Home never stops appealing altogether, so a
+    // rival squeezed to the kerb still knows which way is back.
+    let best = here;
+    let most = -Infinity;
+    for (let slot = left; slot <= right; slot++) {
+      const appeal = 1 - (0.85 * Math.abs(at(slot) - home)) / width - this.danger[slot] * 1.5;
+      if (appeal > most) {
+        most = appeal;
+        best = slot;
+      }
+    }
+    // The strips are coarse: where home itself is reachable and clear, go exactly there.
+    const homeSlot = this.slotOf(home, lo, hi);
+    return homeSlot >= left && homeSlot <= right && this.danger[homeSlot] < 0.1 && Math.abs(best - homeSlot) <= 1 ? home : at(best);
+  }
+
+  /**
+   * How much a rival out in front takes it easy so the player is not left racing alone, 0 to 1. Never near the
+   * player, where it would show; never in the first seconds, when the field should spread out; and the rivals in
+   * front ease together, by how far ahead they are between them, so they keep their distance from one another
+   * instead of bunching up to be passed in one go. A rival is never sped up.
+   */
+  private takingItEasy(): number {
+    if (!this.chase || !this.driver?.easeOff || this.time < 8) return 0;
+    const player = this.chase();
+    let lead = this.progress() - player;
+    if (lead < 0.02) return 0;
+    let count = 1;
+    for (const other of this.traffic?.() ?? []) {
+      const theirs = other.driver ? other.progress() - player : 0;
+      if (theirs >= 0.02) {
+        lead += theirs;
+        count++;
+      }
+    }
+    return clamp((lead / count - 0.02) / 0.08, 0, 1);
+  }
+
+  /** Coming up to a fork, make up its mind, once and in good time, whether to take the side road. */
+  private lookForFork(driver: Driver, dice: () => number): void {
+    if (this.lane !== 0) return;
+    this.course.lanes.forEach((lane, index) => {
+      const from = lane.from;
+      if (!from || this.settled.has(index)) return;
+      const ahead = from.s0 - this.s;
+      if (ahead < 0 || ahead > 50) return;
+      this.settled.add(index);
+      // Not the same choice time after time: having just done one thing, it leans a little towards the other.
+      const chance = clamp(driver.fork + (this.lastFork ? -0.2 : 0.2) * (this.settled.size > 1 ? 1 : 0), 0, 1);
+      this.lastFork = dice() < chance;
+      if (this.lastFork) this.heading = index;
+    });
+  }
+
   /** Is there something to steer round on this road a little way ahead? */
   private blockerAhead(): boolean {
     for (const i of this.byLane[this.lane]) {
@@ -277,13 +534,13 @@ export class Sim {
   }
 
   /** A careful player's line, for the hands-free test runs: go for everything, give blockers a wide berth. */
-  private smartLine(): number {
+  private smartLine(far = 1): number {
     const hazards: { s: number; x: number; wide: number }[] = [];
     const wants: number[] = [];
     for (const i of this.byLane[this.lane]) {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
-      if (ahead < 0.5 || ahead > 36 || this.done[i]) continue;
+      if (ahead < 0.5 || ahead > 36 * far || this.done[i]) continue;
       if (o.kind === 'crate' || o.kind === 'goo') hazards.push({ s: ahead, x: o.x, wide: 2.3 });
       else if (o.kind === 'slider' || o.kind === 'pendulum') hazards.push({ s: ahead, x: this.swingX(o), wide: 2.4 });
       else if (o.kind === 'spinner') hazards.push({ s: ahead, x: o.x, wide: (o.len ?? 3.2) + 0.6 });
@@ -294,7 +551,7 @@ export class Sim {
     const edge = this.limit - 0.6;
     // Never drift across a parting fork by accident: stay on the route the ball is on.
     wants.push(clamp(this.ahead.k * 160, -edge, edge), clamp(this.x, -edge, edge));
-    const safe = (x: number) => hazards.every((h) => h.s > 20 || Math.abs(h.x - x) > h.wide);
+    const safe = (x: number) => hazards.every((h) => h.s > 20 * far || Math.abs(h.x - x) > h.wide);
     const pick = wants.find(safe);
     if (pick !== undefined) return pick;
     const room = (x: number) => Math.min(...hazards.map((h) => Math.abs(h.x - x) - h.wide));
@@ -305,9 +562,9 @@ export class Sim {
    * An expert's line, driving for time alone: it sets the five-star time. It heads for the next speed pad, ring or
    * ramp it can actually reach, takes the inside of bends otherwise, and sidesteps blockers at the last moment.
    */
-  private aceLine(): number {
+  private aceLine(far = 1): number {
     const edge = this.limit - 0.4;
-    const reach = (ahead: number) => (26 * ahead) / Math.max(this.v, 20) + 0.8;
+    const reach = (ahead: number) => (26 * ahead) / Math.max(this.v, 20) / far + 0.8;
     const blockers: { s: number; x: number; wide: number }[] = [];
     let goal: number | null = null;
     for (const i of this.byLane[this.lane]) {
@@ -330,7 +587,7 @@ export class Sim {
       goal = Math.abs(this.ahead.k) > 0.004 ? clamp(this.ahead.k * 400, -edge, edge) : clamp(this.x, -edge, edge);
     }
     // Anything about to be hit on this line: step round it by the shorter way that stays on the road.
-    const soon = Math.max(8, this.v * 0.32);
+    const soon = Math.max(8, this.v * 0.32) * far;
     const inWay = blockers.filter((b) => b.s > -1 && b.s < soon);
     const clear = (x: number) => inWay.every((b) => Math.abs(b.x - x) > b.wide);
     if (!clear(goal)) {
@@ -364,22 +621,23 @@ export class Sim {
     const riding = this.onLift();
     if (riding && !this.riding) this.emit({ type: 'lift' });
     this.riding = riding;
-    const line = this.driver?.line ?? this.autopilot;
-    let wanted = riding ? 0 : line === 'ace' ? this.aceLine() : line === 'smart' ? this.smartLine() : this.steer;
-    if (this.driver && wanted !== null && !riding && !this.blockerAhead()) {
-      // Running wide and wandering are for open road only: with something to dodge, the line is followed exactly.
-      // Never asked for beyond the kerb: that would only scrape speed off.
-      const [lo, hi] = this.bounds();
-      wanted = clamp(wanted + (this.driver.bias ?? 0) + this.driver.wobble * Math.sin(this.clock * 1.9 + this.driver.phase), lo + 0.3, hi - 0.3);
-    }
+    const driver = this.driver;
+    const line = driver?.line ?? this.autopilot;
+    const wanted = riding ? 0 : driver ? this.decide(driver, dt) : line === 'ace' ? this.aceLine() : line === 'smart' ? this.smartLine() : this.steer;
     const target = this.finished || this.knockT > 0 ? null : wanted;
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
     const grip = GRIP[this.course.mood];
-    if (target !== null) {
+    if (target !== null && driver && !riding) {
+      // A rival turns the marble the way a hand does: it leans towards where it wants to be and eases off as it
+      // arrives, without swinging past, and can only move across as fast as it is rolling allows.
+      const firm = driver.turn * (grip === Infinity ? 1 : grip > 4 ? 0.75 : 0.55);
+      const push = clamp(firm * firm * (target - this.x) - 2 * firm * this.xv, -firm * 11, firm * 11);
+      const most = Math.min(this.v * 0.34, 9);
+      this.xv = clamp(this.xv + push * dt, -most, most);
+    } else if (target !== null) {
       // A swiping finger gets a snappier ball than keys or the mouse: quick enough to cross the road in about a
       // third of a second.
-      const brisk = this.driver?.pace ?? 1;
-      const pace = this.swiping || line === 'ace' ? { pull: 14 * brisk, top: 28 * brisk } : { pull: 9 * brisk, top: 16 * brisk };
+      const pace = this.swiping || line === 'ace' ? { pull: 14, top: 28 } : { pull: 9, top: 16 };
       const wanted = clamp((target - this.x) * (riding ? 2.5 : pace.pull), -pace.top, pace.top);
       this.xv += (wanted - this.xv) * Math.min(1, dt * grip);
     } else {
@@ -426,9 +684,14 @@ export class Sim {
     // The inside of a bend is a shorter path, so taking the right line is genuinely faster.
     let before = this.s;
     if (this.driver) {
-      // Well ahead of the marble it is racing, a rival eases off so the race stays close. It is never sped up.
-      const ahead = this.chase ? this.progress() - this.chase() : 0;
-      this.gait = this.driver.speed * (1 - this.driver.easeOff * clamp((ahead - 0.02) / 0.08, 0, 1));
+      this.relaxed = this.takingItEasy();
+      // Nobody gets away at quite the same moment.
+      const away = clamp(this.time / Math.max(0.01, this.getaway), 0.35, 1);
+      // Nobody keeps the same pace all race either: it comes and goes slowly, with the odd short off spell when
+      // a rival can be caught.
+      const wanted = Math.min(1, this.driver.speed * (1 + this.form)) * away * (1 - this.driver.easeOff * this.relaxed);
+      // Pace changes gently: a marble that slowed or picked up in an instant would give the game away.
+      this.gait = this.time === 0 ? wanted : this.gait + clamp(wanted - this.gait, -0.35 * dt, 0.35 * dt);
     }
     // In the air and on an escalator a held-back rival still covers the full distance: a jump's arc is made for
     // it, and an escalator carries everyone alike.

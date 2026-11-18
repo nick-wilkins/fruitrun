@@ -280,7 +280,7 @@ export class Run {
     if (field) this.sim.x = GRID[3];
     field?.rivals.forEach((rival, i) => {
       // A rival has its own copy of the course: what it smashes or collects is its own affair, and makes no sound.
-      const sim = new Sim(course, level, () => {}, seeded(level.n * 31 + i));
+      const sim = new Sim(course, level, (event) => this.rivalReact(sim, event), seeded(level.n * 31 + i));
       sim.driver = field.drivers[i];
       sim.chase = () => this.sim.progress();
       sim.x = GRID[i] ?? 0;
@@ -292,6 +292,12 @@ export class Run {
       this.world.scene.add(pip.root, shadow);
       this.racers.push({ rival, sim, pip, shadow });
     });
+    // Each rival can see every other marble, the player's included, and makes room for it.
+    const everyone = [this.sim, ...this.racers.map((racer) => racer.sim)];
+    for (const racer of this.racers) {
+      const others = everyone.filter((sim) => sim !== racer.sim);
+      racer.sim.traffic = () => others;
+    }
     this.weather = course.mood === 'rain' || course.mood === 'snow' ? new Weather(course.mood) : null;
     if (this.weather) this.world.scene.add(this.weather.object);
 
@@ -492,6 +498,12 @@ export class Run {
     this.flying.push({ mesh, index: this.world.instance[index], pos, vel, spin: new Vector3(Math.random(), Math.random(), Math.random()).normalize(), angle: 0, life: 1.6 });
   }
 
+  /** A rival's own knocks and boosts: a few sparks where it is, so its mistakes can be seen. No sound. */
+  private rivalReact(sim: Sim, event: SimEvent): void {
+    if (event.type === 'crate' || event.type === 'bump') this.sparks.burst(sim.point(sim.s, sim.x, 0.8, this.v1), 10, ['#ffffff', '#ffd9a8'], 5);
+    else if (event.type === 'boost' || event.type === 'turbo') this.sparks.burst(sim.point(sim.s, sim.x, 0.5, this.v1), 8, ['#eaff3d', '#ffffff'], 4);
+  }
+
   private react(event: SimEvent): void {
     const sim = this.sim;
     switch (event.type) {
@@ -651,7 +663,8 @@ export class Run {
       if (racer.sim.countdown > 0) continue;
       racer.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (racer.sim.v * racer.sim.gait * dt) / BALL_RADIUS));
       racer.pip.leaves.rotation.x = -clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.9;
-      racer.pip.body.rotation.z = clamp(racer.sim.xv * 0.035, -0.5, 0.5);
+      // Knocked by something, it rocks about for a moment; otherwise it leans the way it is steering.
+      racer.pip.body.rotation.z = racer.sim.rattled ? Math.sin(racer.sim.clock * 38) * 0.45 : clamp(racer.sim.xv * 0.06, -0.5, 0.5);
     }
     const pace = clamp(sim.v / MAX_SPEED, 0, 1);
     this.pip.leaves.rotation.x = -pace * 0.9 + Math.sin(sim.clock * 13) * 0.06;

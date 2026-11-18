@@ -111,3 +111,31 @@ Runtime verification (desktop Chrome, sound off, 2026-11-18):
 After the last change: `npm test` 885 passed, `npm run typecheck` clean, `npm run ios` built and synced, simulator `xcodebuild` BUILD SUCCEEDED.
 
 Known and left: a rival can pass through a crate the player still sees standing, because each marble has its own copy of the course (as designed). Rivals on the same racing line can overlap each other on the inside of a bend.
+
+## Rivals that drive like people (2026-11-18, later)
+
+Nick's feedback on the first version: the rivals "move perfectly and really quickly into the line". Asked for: not faster, but realistic. Occasional mistakes, not always the perfect line, human things. Set times are a guide for a rival driving exactly to its level; placings matter more.
+
+Sources read (the ICGA journal article was dropped: abstract only):
+- Game AI Pro: ch38 racing architecture, ch39 track representation, ch40 PID control, ch41 heat vision track positioning, ch42 rubber-banding; Game AI Pro 2: ch5 reaction time, ch18 context steering, ch19 anticipatory collision avoidance; Game AI Pro 3: ch1 illusion of intelligence, ch2 random walks, ch4 player perception of AI opponents, ch17 Driver San Francisco; Game AI Pro ch3 randomness. https://www.gameaipro.com/
+- Reynolds, Steering Behaviors For Autonomous Characters: https://www.red3d.com/cwr/steer/gdc99/
+- Majzer and Szajerman, Steering Behaviors for Vehicle Movement in Racing Computer Games, in Computer Game Innovations 2023.
+- Wikipedia, Dynamic game difficulty balancing.
+
+What was built from them (`src/game/sim.ts`, `src/game/rivals.ts`):
+- **Looks, then steers.** A rival looks at the road every 0.2 to 0.5 s (reaction times from ch5) and holds its decision between looks; it keeps a decision unless the road asks for something clearly different.
+- **Smooth steering.** A damped spring with limited force and no overshoot (Reynolds, ch40), in place of snapping to the line. Peak sideways speed fell from 16 to 28 units a second to about 3.5 to 9.
+- **Near enough is good enough.** It leaves the marble alone inside a tolerance band (Reynolds path following).
+- **Where to be across the road** is chosen from a danger and appeal map of 15 strips (ch18 context steering, ch41): other marbles and things in the road mark danger with a skirt; it takes the most appealing strip reachable without crossing worse danger. Danger lingers from look to look, which gives commitment for free.
+- **Wandering and pace** are mean-reverting random walks from bell-shaped steps (GAIP3 ch2, GAIP ch3): it meanders, and has good spells and off spells.
+- **Mistakes** (ch38 persona, Majzer, GAIP3 ch4): its mind wanders and it holds its line, or it misjudges and is slow to see what is in the way. Never two within 4 seconds. A knocked rival rocks and throws sparks so the mistake can be seen.
+- **Forks:** decides once and early whether to take the side road, leaning away from whatever it did last time.
+- **Three characters** at every difficulty (ch38, ch41): Berry steady, Mango bold, Plum a dreamer, differing in reaction, steering sharpness, room left, how far ahead they notice things, wandering, pace swings, slips and fondness for side roads.
+- **Easing off** (ch42, GAIP3 ch4, the difficulty article): only when well clear of the player, never in the first 8 seconds, the leaders together so they do not bunch, partly by sloppier driving and only ever downward. Never a staged blunder, never a boost.
+
+Evidence (desktop Chrome, sound off, five whole races stepped as the frame loop steps them, player on the careful hands-free line):
+- Level 3 easy: rivals 48.8 to 52.4 s (1 to 2 stars) against the player's 36.7 s. Hard: 38.8 to 41.8 s (3 to 4 stars).
+- Level 30 hard: Mango 64.6 s and Plum 67.6 s beat the player's 72.4 s; each took one side road.
+- Direction changes 16 to 40 a minute; marbles overlapped another for 0 to 3 s of a race; hits 0 to 6 each.
+- `tests/race.test.ts`: every rival finishes every level at every difficulty within a quarter of its guide time; star times unchanged.
+- Not yet watched by eye on a device.
