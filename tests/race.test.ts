@@ -105,6 +105,39 @@ describe('how hard the rivals are', () => {
   });
 });
 
+// Legendary is for an adult who knows the game: the expert hands-free line, which wins on hard, is beaten here.
+describe('how hard the legendary rivals are', () => {
+  const spread = [1, 3, 7, 15, 30, 45, 60].map((n) => LEVELS[n - 1]);
+  const races = (standIn: StandIn) => spread.map((level) => raceAgainst(level, 'legendary', standIn));
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const margins = (outcomes: Outcome[]) => outcomes.map((outcome) => outcome.margin);
+
+  it('the expert line loses more often than it wins, and never wins by much', () => {
+    const ace = races('ace');
+    expect(ace.filter((outcome) => outcome.place > 1).length).toBeGreaterThanOrEqual(4);
+    expect(mean(margins(ace))).toBeLessThan(0);
+    expect(Math.max(...margins(ace))).toBeLessThan(1.5);
+  });
+
+  it('the careful line and a decent player are left well behind', () => {
+    const smart = races('smart');
+    expect(smart.filter((outcome) => outcome.place >= 3).length).toBeGreaterThanOrEqual(6);
+    expect(mean(margins(smart))).toBeLessThan(-2);
+    const steady = races('steady');
+    expect(steady.map((outcome) => outcome.place)).toEqual(spread.map(() => 4));
+    expect(mean(margins(steady))).toBeLessThan(-6);
+  });
+
+  it('they are quicker than the hard ones on the same marble, and never wait', () => {
+    for (const level of spread) {
+      const drivers = rivalDrivers(level, 'legendary');
+      expect(drivers.map((driver) => [driver.speed, driver.easeOff])).toEqual([[1, 0], [1, 0], [1, 0]]);
+      const first = (difficulty: Difficulty) => Math.min(...fieldTimes(courseFor(level), level, rivalDrivers(level, difficulty)));
+      expect(first('legendary')).toBeLessThan(first('hard'));
+    }
+  });
+});
+
 describe('finishing a race', () => {
   const rivals = (times: number[]) => RIVALS.map((rival, i) => ({ ...rival, time: times[i] }));
 

@@ -5,7 +5,7 @@ import { courseFor } from '../src/game/courses';
 import { GRID, rivalDrivers } from '../src/game/rivals';
 import { Sim, TICK, type Driver } from '../src/game/sim';
 
-const hands = { speed: 1, easeOff: 0, fork: 0, wise: 0, roads: [] as number[], side: 0, care: 1, sight: 1.2, seed: 0 };
+const hands = { speed: 1, easeOff: 0, fork: 0, wise: 0, polish: 0, roads: [] as number[], side: 0, care: 1, sight: 1.2, seed: 0 };
 
 /**
  * Players to race the rivals against. `ace` and `smart` are the hands-free lines and `none` never steers. The rest

@@ -9,11 +9,13 @@ import { Sim, TICK, type Driver } from './sim';
  * How good each of the three rivals is, on the same scale as the stars a run earns: a rival at 3.2 finishes a
  * little inside the three-star time. So a place in a race goes hand in hand with the stars for the same run. The
  * hard ones are set times that only an expert's run matches, which leaves them driving as well as they are able.
+ * The legendary ones are set times nobody can do, so all three are flat out and it is their driving that tells.
  */
 const FORM: Record<Difficulty, [number, number, number]> = {
   easy: [2.0, 1.5, 0.9],
   medium: [3.6, 3.2, 2.8],
   hard: [4.9, 4.6, 4.3],
+  legendary: [5.8, 5.7, 5.6],
 };
 
 /** Where across the road each marble starts a race: the three rivals, then the player. */
@@ -46,26 +48,30 @@ export function fieldTimes(course: Course, level: Level, drivers: Driver[]): num
   return sims.map((sim) => (sim.finished ? sim.time : Infinity));
 }
 
-/** How much a rival slows, at most, when well ahead of the player. The hard ones never wait. */
-const EASE_OFF: Record<Difficulty, number> = { easy: 0.25, medium: 0.1, hard: 0 };
+/** How much a rival slows, at most, when well ahead of the player. The hard and legendary ones never wait. */
+const EASE_OFF: Record<Difficulty, number> = { easy: 0.25, medium: 0.1, hard: 0, legendary: 0 };
 
 /**
  * How each difficulty drives. The easy ones are slow to react, have unhurried hands, read only a little of the road
  * ahead, misjudge what swings, wander even with something to aim for, take a side road on a whim and slip up
  * often. The hard ones read well ahead, have quick sure hands, judge a moving gap, tighten up when it matters, know
- * which side roads are short cuts and rarely slip: sharper in every way, but still people.
+ * which side roads are short cuts and rarely slip: sharper in every way, but still people. The legendary ones are
+ * for grown-ups who know the game: hands as quick as a swiping finger, a look at the road a dozen times a second,
+ * every short cut known, next to no wandering or mistakes, away on the instant and not put off by a crowd. They
+ * still ease into and out of every move, but they are meant to look formidable more than fallible.
  */
-const MANNER: Record<Difficulty, Pick<Driver, 'react' | 'turn' | 'quick' | 'drift' | 'slack' | 'slip' | 'swing' | 'ahead' | 'foresee' | 'loose' | 'wise'>> = {
-  easy: { react: 0.42, turn: 3.4, quick: 8, drift: 1.0, slack: 0.9, slip: 0.06, swing: 0.05, ahead: 1.2, foresee: 0.3, loose: 0.7, wise: 0 },
-  medium: { react: 0.3, turn: 5, quick: 10, drift: 0.7, slack: 0.6, slip: 0.04, swing: 0.035, ahead: 1.6, foresee: 0.6, loose: 0.5, wise: 0.4 },
-  hard: { react: 0.2, turn: 12, quick: 16, drift: 0.35, slack: 0.3, slip: 0.008, swing: 0.02, ahead: 2.2, foresee: 1, loose: 0.25, wise: 0.9 },
+const MANNER: Record<Difficulty, Pick<Driver, 'react' | 'turn' | 'quick' | 'drift' | 'slack' | 'slip' | 'swing' | 'ahead' | 'foresee' | 'loose' | 'wise' | 'polish'>> = {
+  easy: { react: 0.42, turn: 3.4, quick: 8, drift: 1.0, slack: 0.9, slip: 0.06, swing: 0.05, ahead: 1.2, foresee: 0.3, loose: 0.7, wise: 0, polish: 0 },
+  medium: { react: 0.3, turn: 5, quick: 10, drift: 0.7, slack: 0.6, slip: 0.04, swing: 0.035, ahead: 1.6, foresee: 0.6, loose: 0.5, wise: 0.4, polish: 0 },
+  hard: { react: 0.2, turn: 12, quick: 16, drift: 0.35, slack: 0.3, slip: 0.008, swing: 0.02, ahead: 2.2, foresee: 1, loose: 0.25, wise: 0.9, polish: 0 },
+  legendary: { react: 0.08, turn: 24, quick: 28, drift: 0.1, slack: 0.15, slip: 0.001, swing: 0.005, ahead: 2.6, foresee: 1, loose: 0.1, wise: 1, polish: 1 },
 };
 
 /** The driver sent round to learn a course: a sharp one with no character, that goes where it is told at a fork. */
-const SCOUT: Driver = { speed: 1, easeOff: 0, react: 0.2, turn: 12, quick: 16, drift: 0, slack: 0.3, slip: 0, swing: 0, fork: 0, wise: 1, roads: [], ahead: 2.2, keen: 1, foresee: 1, loose: 0.25, side: 0, care: 1, sight: 1.2, seed: 1 };
+const SCOUT: Driver = { speed: 1, easeOff: 0, react: 0.2, turn: 12, quick: 16, drift: 0, slack: 0.3, slip: 0, swing: 0, fork: 0, wise: 1, roads: [], ahead: 2.2, keen: 1, foresee: 1, loose: 0.25, polish: 0, side: 0, care: 1, sight: 1.2, seed: 1 };
 
 /** How keen on the speed pads each difficulty is to begin with, before being set to its time. */
-const KEEN: Record<Difficulty, number> = { easy: 0.5, medium: 0.75, hard: 1 };
+const KEEN: Record<Difficulty, number> = { easy: 0.5, medium: 0.75, hard: 1, legendary: 1 };
 
 /**
  * The three rivals are three characters, at every difficulty, so a player comes to know them. Berry is steady:
@@ -141,6 +147,7 @@ export function rivalDrivers(level: Level, difficulty: Difficulty): Driver[] {
       keen: KEEN[difficulty],
       foresee: manner.foresee,
       loose: manner.loose,
+      polish: manner.polish,
       side: character.side,
       care: character.care,
       sight: 1.2 * character.sight,

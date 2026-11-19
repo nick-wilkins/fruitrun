@@ -138,6 +138,7 @@ const GROUPS: [string, Entry[]][] = [
         [50, 'Racing Legend', 'Win 50 races'],
       ]),
       { id: 'hard-win', name: 'Tough Cookie', how: 'Win a race on Hard', icon: item('walnut'), done: (s) => stat(s, 'hardWins') >= 1 },
+      { id: 'legend-win', name: 'Stuff of Legend', how: 'Win a race on Legendary', icon: STAR, done: (s) => stat(s, 'legendWins') >= 1 },
       ...tiers('sweep', STAR, (s) => stat(s, 'sweeps'), [
         [1, 'Clean Sweep', 'Win a level on Easy, Medium and Hard'],
         [10, 'Sweeping Up', 'Win 10 levels at every difficulty'],
@@ -152,6 +153,7 @@ const GROUPS: [string, Entry[]][] = [
         [10, 'Trophy Cabinet', 'Win 10 gold trophies'],
       ]),
       { id: 'cup-hard-gold', name: 'Champion', how: 'Win a gold trophy on Hard', icon: fruit('dragonfruit'), done: (s) => stat(s, 'cupHardGolds') >= 1 },
+      { id: 'cup-legend-gold', name: 'Legend of the Cups', how: 'Win a gold trophy on Legendary', icon: fruit('dragonfruit'), done: (s) => stat(s, 'cupLegendGolds') >= 1 },
       { id: 'cup-perfect', name: 'Perfect Forty', how: 'Win every race in a cup', icon: STAR, done: (s) => stat(s, 'cupPerfect') >= 1 },
     ],
   ],

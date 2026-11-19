@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CUPS, CUP_POINTS, cupOpen, quitCup, scoreCupRace, standings, startCup } from '../src/core/cups';
-import { completeLevel, newSave } from '../src/core/progress';
+import { CUPS, CUP_POINTS, cupLegendaryOpen, cupOpen, quitCup, scoreCupRace, standings, startCup } from '../src/core/cups';
+import { completeLevel, legendaryOpen, newSave, swept } from '../src/core/progress';
 import { RIVALS, type Finisher } from '../src/core/race';
 import { LEVELS, WORLDS } from '../src/data/levels';
 
@@ -108,5 +108,32 @@ describe('racing awards', () => {
     startCup(save, cup, 'easy');
     scoreCupRace(save, [{ name: 'Stranger', color: '#000', time: 1, you: false }, ...order(1)]);
     expect(save.cup?.points[0]).toBe(7);
+  });
+});
+
+describe('legendary', () => {
+  const level = LEVELS[0];
+
+  it('opens on a level once it has been won on Hard, and is no part of a sweep', () => {
+    const save = played();
+    expect(legendaryOpen(save.levels[level.id])).toBe(false);
+    completeLevel(save, level, 50, [], undefined, 2, 'hard');
+    expect(legendaryOpen(save.levels[level.id])).toBe(false);
+    for (const difficulty of ['easy', 'medium', 'hard'] as const) completeLevel(save, level, 50, [], undefined, 1, difficulty);
+    expect(legendaryOpen(save.levels[level.id])).toBe(true);
+    expect(swept(save.levels[level.id])).toBe(true);
+    const won = completeLevel(save, level, 50, [], undefined, 1, 'legendary').awards.map((a) => a.id);
+    expect(won).toContain('legend-win');
+  });
+
+  it('opens in a cup once that cup has been finished on Hard with a trophy', () => {
+    const save = played();
+    expect(cupLegendaryOpen(save, cup)).toBe(false);
+    startCup(save, cup, 'hard');
+    for (let i = 0; i < 4; i++) scoreCupRace(save, order(4));
+    expect(cupLegendaryOpen(save, cup)).toBe(false);
+    startCup(save, cup, 'hard');
+    for (let i = 0; i < 4; i++) scoreCupRace(save, order(2));
+    expect(cupLegendaryOpen(save, cup)).toBe(true);
   });
 });

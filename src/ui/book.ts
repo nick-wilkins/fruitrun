@@ -1,6 +1,6 @@
 import { sfx } from '../audio';
 import { AWARDS } from '../core/awards';
-import { COURSES, isUnlocked, swept, type Sip } from '../core/progress';
+import { COURSES, isUnlocked, legendaryOpen, swept, type Sip } from '../core/progress';
 import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { COMBOS, COMBO_GROUPS, RATINGS, type Combo } from '../core/smoothie';
 import { CATEGORY_LABEL, INGREDIENTS, ingredient } from '../data/ingredients';
@@ -208,7 +208,8 @@ function records(app: App): HTMLElement {
       el(
         'div.book-stats',
         {},
-        ...DIFFICULTIES.map(({ id, name }) => el('div.stat', {}, el('b', {}, `${won(id)}`), el('span', {}, `${name} races won of ${LEVELS.length}`))),
+        // Legendary is only counted once some of it has been opened.
+        ...DIFFICULTIES.filter(({ id }) => id !== 'legendary' || played.some((l) => legendaryOpen(save.levels[l.id]))).map(({ id, name }) => el('div.stat', {}, el('b', {}, `${won(id)}`), el('span', {}, `${name} races won of ${LEVELS.length}`))),
         el('div.stat', {}, el('b', {}, `${played.filter((l) => swept(save.levels[l.id])).length} 🏆`), el('span', {}, 'won at every difficulty')),
       ),
     );
@@ -227,7 +228,7 @@ function records(app: App): HTMLElement {
           el('span', {}, `${level.label}. ${level.name}`),
           stars(record.stars),
           el('b', {}, record.courses === COURSES ? formatTime(record.time) : '-'),
-          racing ? raceMedals(record.races, DIFFICULTIES) : null,
+          racing ? raceMedals(record.races, DIFFICULTIES.filter(({ id }) => id !== 'legendary' || legendaryOpen(record))) : null,
         ),
       );
     }

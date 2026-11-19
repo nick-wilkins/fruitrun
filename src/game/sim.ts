@@ -68,6 +68,11 @@ export interface Driver {
   foresee: number;
   /** How much of its wandering it keeps up when there is something to aim for: low for one that concentrates. */
   loose: number;
+  /**
+   * The last touches of an expert, 0 to 1: away the instant the race starts, holding its line through a crowd unless
+   * somebody is really in the way, and lined up for the rings that hang over a jump.
+   */
+  polish: number;
   /** How far to one side of its line it likes to run. */
   side: number;
   /** How much room it likes to leave round other marbles and things in the road, 1 being a normal amount. */
@@ -440,7 +445,7 @@ export class Sim {
     // Three dice together give mostly middling numbers and the odd large one, as people's variations do.
     const bell = () => ((dice() + dice() + dice()) * 2) / 3 - 1;
     if (this.getaway === 0) {
-      this.getaway = driver.react * (0.6 + dice() * 1.6);
+      this.getaway = Math.max(0.001, driver.react * (0.6 + dice() * 1.6) * (1 - driver.polish));
       this.goal = this.aim = this.x;
     }
     const [lo, hi] = this.bounds();
@@ -559,7 +564,11 @@ export class Sim {
       // Anyone alongside is in the way. Anyone ahead only if they are being caught: a marble at racing pace is
       // left alone, or nobody would ever get past anybody.
       const reached = gap > 0 && pace - other.v * other.gait > 0.5 ? gap / (pace - other.v * other.gait) : Infinity;
-      if (Math.abs(gap) < 3.5) mark(other.x, 2, 1);
+      // A polished driver is not put off its line by a marble that is nowhere near where it is going.
+      const way = this.goal + this.lean;
+      if (driver.polish && (other.x < Math.min(this.x, way) - 2.3 || other.x > Math.max(this.x, way) + 2.3)) continue;
+      // Nor does it give way to one alongside: it holds its line and lets the bump settle it.
+      if (!driver.polish && Math.abs(gap) < 3.5) mark(other.x, 2, 1);
       else if (reached < sight * 2) mark(other.x, 2, clamp(1 - reached / (sight * 2), 0, 1));
       else continue;
       this.crowded = true;
@@ -764,7 +773,9 @@ export class Sim {
       } else if (o.kind === 'turbo') {
         if (this.clock >= this.readyAt[i]) want(3, 2.2);
       } else if (o.kind === 'ring') {
-        if ((o.y ?? 2) < 3 || (flown && Math.abs(o.x - rampX) < 1)) want(0.45, 1.45, true);
+        // Rings hung over a gap in the road are on the way across for anyone who lines up for them.
+        const over = driver.polish > 0 && this.course.gaps.some((g) => g.lane === this.lane && o.s > g.s0 && o.s < g.s1 + (g.s1 - g.s0));
+        if ((o.y ?? 2) < 3 || over || (flown && Math.abs(o.x - rampX) < 1)) want(0.45, 1.45, true);
       } else if (o.kind === 'jump') {
         // In the air from a moment after the ramp until a moment before landing.
         const power = o.power ?? 11.5;

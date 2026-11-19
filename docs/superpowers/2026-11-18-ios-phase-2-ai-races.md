@@ -270,3 +270,56 @@ Checked by the session owner after the tuning agent reported (2026-11-19): `npm 
 Nick asked to see the racers behind him cross the line. Before, everyone still out was brought home out of sight the moment the player finished. Now they race on in view, with no easing off, and the results card waits for any rival who will cross within 7 seconds of the player, plus a moment after. Rivals further back than that are still brought home out of sight, so nobody sits waiting. The player's place is known at the line (rivals already home are ahead); the finishing times in the table come when the card appears.
 
 Evidence, desktop Chrome, sound off, real game loop: level 7 Hard on the expert line (won by 0.1 s): all three rivals crossed in view and the card came 2.1 s after the player's finish, order and times correct. Level 15 Medium and level 3 Easy (rivals 10 s or more behind): card at 1.8 s as before, rivals out of sight. Level 7 Hard never steering (last): card at 1.8 s, placed 4th. `npm test` 922 passed. How it looks in motion has not been watched.
+
+## Legendary (2026-11-19)
+
+Nick played Hard after the retune and "won every game fairly easily". Decision: Hard stays (hard for a child); a fourth difficulty, Legendary, is for an adult who knows the game.
+
+Targets: the expert hands-free line loses to the best rival on most levels, never wins by more than about a second, and averages mid-pack or worse. The careful line and a decent player are last by a clear distance. No speed boost: same marble, same pads, same top speed.
+
+### What was found
+
+- **Quicker hands alone were worth little.** On its own a legendary rival already matched or beat the expert line (level 1: 37.7 s against 37.9). In a race the same three drove 38.0 to 39.6 and the expert line won.
+- **The loss was all in the pack.** The hands-free line gives way to nobody, so it barged through; each rival dropped its line to make room, missed a pad at the start and never got it back. Manner settings (sharper, longer sight, no mistakes at all) moved the result by nothing measurable: 9 or 10 wins for the expert line in 23 every time.
+- **Holding the line fixed it.** A rival that keeps its line beside other marbles, and only goes round one it is actually catching, took the expert line's wins from 10 in 23 to 5.
+
+### What changed
+
+- `src/core/race.ts`: `'legendary'` added to `Difficulty` and to `DIFFICULTIES`, last.
+- `src/game/sim.ts`: one new `Driver` field, `polish` (0 for easy, medium and hard, 1 for legendary). With it a rival is away the instant the race starts, is not put off its line by marbles beside it or nowhere near where it is going, and lines up for rings hung over a gap in the road.
+- `src/game/rivals.ts`: legendary manner: looks every 0.06 to 0.1 s (hard 0.14 to 0.26), hands as quick as a swiping finger (`quick` 28, `turn` 24; hard 16 and 12), reads 2.6 s ahead, knows every short cut (`wise` 1), next to no wandering or slips. Form 5.8/5.7/5.6, which nobody can do, so all three are flat out on every level. No easing off.
+- Easy, Medium and Hard go through the same code as before with `polish` 0. Their six pinned tests pass untouched; star times are unchanged.
+
+### Before and after
+
+"Before" is Hard as committed, the hardest there was. Places over levels 1, 3, 7, 15, 30, 45, 60 in order, wins, and average seconds ahead of the first rival home (minus is behind).
+
+| Stand-in | Hard, 7 levels | Legendary, 7 levels | Hard, 23 levels | Legendary, 23 levels |
+|---|---|---|---|---|
+| Expert line | 1111111, 7 wins, +1.1 | 1244414, 2 wins, -1.4 | 20 wins, place 1.13, +1.7 | 5 wins, place 2.52, -1.6 |
+| Careful line | 1243421, 2 wins, -2.1 | 4344443, 0 wins, -3.8 | 10 wins, place 2.13, -0.6 | 4 wins, place 3.43, -3.6 |
+| Decent player | 4244414, 1 win, -4.2 | 4444444, 0 wins, -10.0 | 0 wins, place 3.70, -6.7 | 0 wins, place 4.00, -10.4 |
+
+- The expert line's biggest win on Legendary is 0.5 s over the seven levels and 1.1 s over the 23 (6.0 s on Hard).
+- The careful line's 4 wins in 23 are on levels where it is the best line there is; its biggest is 0.4 s.
+- Legendary leader against the best hands-free time, in a race: 0.97 (Hard 1.02). Things hit per rival per race: 0.3 (Hard 1.2).
+
+### Evidence
+
+- RED: the three new tests ("how hard the legendary rivals are") run against the committed `sim.ts` and `rivals.ts` all failed: there was no legendary to race.
+- GREEN: `npm test` 927 passed in 12 files. `npx tsc --noEmit` clean.
+- Suite time: `tests/race.test.ts` alone takes 38.9 s with this work and 38.5 s on the committed code, on a busy machine; the legendary tests add about 1.6 s. Legendary is tested on the seven levels only, not all 68, to keep it there.
+- Runtime verification: headless whole races only. PASS for the placings. NOT DONE: nothing watched by eye or on a device, on instruction.
+
+### Trades, and calls for Nick
+
+- **They look more like machines.** Hands up to 28 across the road a second and a fresh look a dozen times a second. They still ease in and out of every move. This was allowed for Legendary; it has not been seen on screen.
+- **They barge.** Holding the line means 5 to 10 knocks each a race where Hard rivals have 0 to 6, and the player will take more of them, mostly in the scramble for the first pad. This is where the win came from, so it cannot be dialled out cheaply. If it feels rough, the place to look is the alongside rule in `weighUp`.
+- **The three are near enough equal.** All flat out, they finish within a second or two of one another, and their characters show less: Mango and Plum give up their favourite side of the road, and nobody wanders much.
+- **A bump from behind pushes the front marble on,** for the player as much as for a rival. In a tight pack that makes everyone a little quicker than a clear road: the leader beats the best hands-free time by 3 percent. It is the contact rule as built, not a boost, but it is why a pack is fast.
+- **Whether an expert adult can win is not known.** The expert line is steadier than any person and still loses 18 in 23. If Legendary proves unwinnable, bring `MANNER.legendary.quick` and `turn` down towards Hard's, or `FORM.legendary` down so the second and third are set a time.
+- **Not done:** legendary rivals on all 68 levels are not individually tested for finishing; the 23 measured all finished.
+
+Checked by the session owner (2026-11-19): `npm test` 927 passed, `npx tsc --noEmit` clean, `npm run build` clean. Real game loop in desktop Chrome, sound off: level 7 Legendary, expert line 54.8 s came 4th behind 51.3 to 53.4 s; level 15 Legendary, expert line 61.5 s came 4th behind 58.8 to 60.1 s; level 7 Legendary, careful line last by 6 s; level 7 Hard unchanged (expert line wins by 0.1 s). The player took 21 to 24 hard knocks in each Legendary race against 4 on Hard. Rival setup on starting a Legendary race took up to 176 ms. Not watched by eye.
+
+Unlocking (owner's side, `src/core/progress.ts`, `src/core/cups.ts`, UI): Legendary opens on a level once it has been won on Hard, and in a cup once that cup has a Hard trophy (Nick: "Legendary only opens up in the cups if you complete hard"). It is not part of a sweep. Awards: Stuff of Legend, Legend of the Cups. Tests in `tests/cups.test.ts` (shown failing first).

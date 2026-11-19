@@ -2904,3 +2904,23 @@ input.name {
     rotate: 720deg;
   }
 }
+
+.btn.locked {
+  filter: grayscale(1);
+  opacity: 0.65;
+}
+
+/* Four choices of how hard: side by side on the level card, wrapping on the narrower cup card. */
+.race-pick .starts {
+  gap: 0.4em;
+}
+
+.race-pick .starts .btn {
+  padding-left: 0.9em;
+  padding-right: 0.9em;
+  font-size: 1em;
+}
+
+.card.small .row {
+  flex-wrap: wrap;
+}

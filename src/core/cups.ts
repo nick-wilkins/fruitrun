@@ -76,6 +76,11 @@ export function cupOpen(save: Save, cup: Cup): boolean {
   return cup.levels.every((id) => save.levels[id]);
 }
 
+/** Legendary opens in a cup once that cup has been finished on Hard with a trophy. */
+export function cupLegendaryOpen(save: Save, cup: Cup): boolean {
+  return Boolean(save.trophies?.[cup.id]?.hard);
+}
+
 export function startCup(save: Save, cup: Cup, difficulty: Difficulty): void {
   save.cup = { id: cup.id, difficulty, race: 0, points: [0, ...RIVALS.map(() => 0)] };
 }
@@ -120,6 +125,7 @@ export function scoreCupRace(save: Save, order: Finisher[]): CupResult | null {
   add('cups');
   if (position === 1 && before !== 1) add('cupGolds');
   if (position === 1 && run.difficulty === 'hard' && before !== 1) add('cupHardGolds');
+  if (position === 1 && run.difficulty === 'legendary' && before !== 1) add('cupLegendGolds');
   if (perfect) add('cupPerfect');
   const result = { cup, difficulty: run.difficulty, position, points, perfect, best, table, awards: claimAwards(save) };
   delete save.cup;

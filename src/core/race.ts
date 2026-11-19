@@ -1,9 +1,10 @@
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'legendary';
 
 export const DIFFICULTIES: { id: Difficulty; name: string }[] = [
   { id: 'easy', name: 'Easy' },
   { id: 'medium', name: 'Medium' },
   { id: 'hard', name: 'Hard' },
+  { id: 'legendary', name: 'Legendary' },
 ];
 
 /** The computer marbles: Pip's friends, told apart by colour. */

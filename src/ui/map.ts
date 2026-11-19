@@ -1,7 +1,7 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { CUPS, cupOpen } from '../core/cups';
-import { COURSES, isUnlocked, superBlenderOpen, swept } from '../core/progress';
+import { COURSES, isUnlocked, legendaryOpen, superBlenderOpen, swept } from '../core/progress';
 import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { newOn, starTimesFor } from '../game/courses';
@@ -50,7 +50,9 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
     const race = el('button.btn.purple.big', {}, '🏁 Race');
     race.onclick = () => {
       sfx.tap();
-      const last = app.save.race ?? 'easy';
+      // Legendary is for whoever has already won here on Hard.
+      const legend = legendaryOpen(app.save.levels[level.id]);
+      const last = app.save.race === 'legendary' && !legend ? 'hard' : (app.save.race ?? 'easy');
       const pick = el(
         'div.race-pick',
         {},
@@ -59,25 +61,36 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
           'div.starts',
           {},
           ...DIFFICULTIES.map(({ id, name }) =>
-            el(
-              `button.btn.${id === last ? 'green.big' : 'blue'}`,
-              {
-                onclick: () => {
-                  sfx.tap();
-                  app.save.race = id;
-                  app.persist();
-                  app.play(level, id);
-                },
-              },
-              name,
-            ),
+            id === 'legendary' && !legend
+              ? el(
+                  'button.btn.blue.locked',
+                  {
+                    onclick: () => {
+                      sfx.nope();
+                      app.toast('Win this race on Hard to open Legendary!');
+                    },
+                  },
+                  `🔒 ${name}`,
+                )
+              : el(
+                  `button.btn.${id === last ? 'green.big' : id === 'legendary' ? 'orange' : 'blue'}`,
+                  {
+                    onclick: () => {
+                      sfx.tap();
+                      app.save.race = id;
+                      app.persist();
+                      app.play(level, id);
+                    },
+                  },
+                  name,
+                ),
           ),
         ),
       );
       starts.replaceWith(pick);
       // Setting the rivals up takes a few trial runs of the course. Do it now, a difficulty at a time and the
       // likeliest first, so the race starts at once when one is picked.
-      const order = [last, ...DIFFICULTIES.map(({ id }) => id).filter((id) => id !== last)];
+      const order = [last, ...DIFFICULTIES.map(({ id }) => id).filter((id) => id !== last && (id !== 'legendary' || legend))];
       const prepare = () => {
         const next = order.shift();
         if (!next || !pick.isConnected) return;
@@ -150,7 +163,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
       record ? el('div.best', {}, stars(record.stars), best, ghost) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
-      record && racesUnlocked() ? raceMedals(record.races, DIFFICULTIES) : null,
+      record && racesUnlocked() ? raceMedals(record.races, DIFFICULTIES.filter(({ id }) => id !== 'legendary' || legendaryOpen(record))) : null,
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
       targets,

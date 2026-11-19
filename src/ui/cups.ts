@@ -1,5 +1,5 @@
 import { sfx } from '../audio';
-import { CUP_POINTS, CUP_RACES, CUPS, cupById, cupOpen, quitCup, standings, type Cup, type Standing } from '../core/cups';
+import { CUP_POINTS, CUP_RACES, CUPS, cupById, cupLegendaryOpen, cupOpen, quitCup, standings, type Cup, type Standing } from '../core/cups';
 import { DIFFICULTIES } from '../core/race';
 import { ingredient } from '../data/ingredients';
 import { levelById, WORLDS } from '../data/levels';
@@ -50,17 +50,28 @@ export function cupsScreen(app: App): HTMLElement {
           'div.row',
           {},
           ...DIFFICULTIES.map(({ id, name }) =>
-            el(
-              `button.btn.${id === (save.race ?? 'easy') ? 'green' : 'blue'}`,
-              {
-                onclick: () => {
-                  sfx.tap();
-                  save.race = id;
-                  app.startCup(cup, id);
-                },
-              },
-              name,
-            ),
+            id === 'legendary' && !cupLegendaryOpen(save, cup)
+              ? el(
+                  'button.btn.blue.locked',
+                  {
+                    onclick: () => {
+                      sfx.nope();
+                      app.toast('Win a trophy in this cup on Hard to open Legendary!');
+                    },
+                  },
+                  `🔒 ${name}`,
+                )
+              : el(
+                  `button.btn.${id === (save.race ?? 'easy') ? 'green' : id === 'legendary' ? 'orange' : 'blue'}`,
+                  {
+                    onclick: () => {
+                      sfx.tap();
+                      save.race = id;
+                      app.startCup(cup, id);
+                    },
+                  },
+                  name,
+                ),
           ),
         ),
       ),
@@ -135,7 +146,7 @@ export function cupsScreen(app: App): HTMLElement {
       const shelf = el(
         'div.cup-won',
         {},
-        ...DIFFICULTIES.map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: trophySvg }), name)),
+        ...DIFFICULTIES.filter(({ id }) => id !== 'legendary' || cupLegendaryOpen(save, cup)).map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: trophySvg }), name)),
       );
       const tile = el(
         `button.cup${open ? '' : '.shut'}${entered === cup ? '.going' : ''}`,

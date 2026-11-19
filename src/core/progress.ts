@@ -2,7 +2,7 @@ import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { claimAwards, type Award } from './awards';
 import type { CupRun } from './cups';
-import { DIFFICULTIES, podiumFruit, type Difficulty } from './race';
+import { podiumFruit, type Difficulty } from './race';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
 /** What happened on a run, beyond the time: counted by the rules engine. */
@@ -55,9 +55,17 @@ function today(): string {
 /** How many best times a level remembers. */
 export const BEST_TIMES = 5;
 
-/** Has every difficulty of race been won on this level? */
+/** The difficulties a child plays through. Legendary sits apart, for grown-ups who have beaten Hard. */
+const SWEEP: Difficulty[] = ['easy', 'medium', 'hard'];
+
+/** Has this level been won on Easy, Medium and Hard? */
 export function swept(record: LevelRecord | undefined): boolean {
-  return DIFFICULTIES.every(({ id }) => record?.races?.[id] === 1);
+  return SWEEP.every((id) => record?.races?.[id] === 1);
+}
+
+/** Legendary races open on a level once it has been won on Hard. */
+export function legendaryOpen(record: LevelRecord | undefined): boolean {
+  return record?.races?.hard === 1;
 }
 
 export interface Save {
@@ -258,6 +266,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   if (place !== undefined) add('races');
   if (place === 1) add('raceWins');
   if (place === 1 && difficulty === 'hard') add('hardWins');
+  if (place === 1 && difficulty === 'legendary') add('legendWins');
   if (level.mood !== 'sunny') add(level.mood);
   if (stars === 5 && (level.mood === 'rain' || level.mood === 'snow')) add('slipperyFive');
   if (previous && comparable && newBest) add('newBests');
