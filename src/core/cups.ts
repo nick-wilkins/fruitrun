@@ -2,7 +2,7 @@ import { ingredient } from '../data/ingredients';
 import { LEVELS, type Level } from '../data/levels';
 import { claimAwards, type Award } from './awards';
 import type { Save } from './progress';
-import { RIVALS, YOUR_COLOR, type Difficulty, type Finisher } from './race';
+import { rivalsFor, YOUR_COLOR, type Difficulty, type Finisher } from './race';
 
 /** Four levels raced one after another, with points for each place and a trophy at the end. */
 export interface Cup {
@@ -50,6 +50,8 @@ export interface Standing {
   color: string;
   points: number;
   you: boolean;
+  /** The legendary rival, drawn with its scowl. */
+  mean?: boolean;
 }
 
 /** Fruit already lending its name to a cup: two worlds can start with the same one, and no two cups share a name. */
@@ -82,7 +84,7 @@ export function cupLegendaryOpen(save: Save, cup: Cup): boolean {
 }
 
 export function startCup(save: Save, cup: Cup, difficulty: Difficulty): void {
-  save.cup = { id: cup.id, difficulty, race: 0, points: [0, ...RIVALS.map(() => 0)] };
+  save.cup = { id: cup.id, difficulty, race: 0, points: [0, ...rivalsFor(difficulty).map(() => 0)] };
 }
 
 export function quitCup(save: Save): void {
@@ -93,7 +95,7 @@ export function quitCup(save: Save): void {
 export function standings(save: Save): Standing[] {
   const run = save.cup;
   if (!run) return [];
-  const rows: Standing[] = [{ name: 'You', color: YOUR_COLOR, points: run.points[0], you: true }, ...RIVALS.map((rival, i) => ({ name: rival.name, color: rival.color, points: run.points[i + 1] ?? 0, you: false }))];
+  const rows: Standing[] = [{ name: 'You', color: YOUR_COLOR, points: run.points[0], you: true }, ...rivalsFor(run.difficulty).map((rival, i) => ({ name: rival.name, color: rival.color, points: run.points[i + 1] ?? 0, you: false, mean: rival.mean }))];
   return rows.sort((a, b) => b.points - a.points || Number(b.you) - Number(a.you));
 }
 
@@ -106,7 +108,7 @@ export function scoreCupRace(save: Save, order: Finisher[]): CupResult | null {
   const cup = run && cupById(run.id);
   if (!run || !cup) return null;
   order.forEach((row, place) => {
-    const rival = RIVALS.findIndex((each) => each.name === row.name);
+    const rival = rivalsFor(run.difficulty).findIndex((each) => each.name === row.name);
     if (!row.you && rival < 0) return;
     const who = row.you ? 0 : rival + 1;
     run.points[who] = (run.points[who] ?? 0) + (CUP_POINTS[place] ?? 0);
@@ -119,7 +121,9 @@ export function scoreCupRace(save: Save, order: Finisher[]): CupResult | null {
   const points = run.points[0];
   const perfect = points === CUP_POINTS[0] * CUP_RACES;
   const before = save.trophies?.[cup.id]?.[run.difficulty];
-  const best = position <= 3 && (!before || position < before);
+  // Three trophies to race for among four; in a legendary duel there is only the one, for winning.
+  const placed = run.difficulty === 'legendary' ? position === 1 : position <= 3;
+  const best = placed && (!before || position < before);
   if (best) save.trophies = { ...save.trophies, [cup.id]: { ...save.trophies?.[cup.id], [run.difficulty]: position } };
   const add = (key: string) => (save.stats[key] = (save.stats[key] ?? 0) + 1);
   add('cups');

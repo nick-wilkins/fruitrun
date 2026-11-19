@@ -29,6 +29,8 @@ export interface PipLook {
   bands: string[];
   /** How brightly it shines with its own light, 0 to 1, for marbles with no lamp in the dark. */
   glow?: number;
+  /** A scowl: heavy brows drawn down over the eyes. */
+  mean?: boolean;
 }
 
 const PIP: PipLook = { skin: '#8fe04a', belly: '#d8f7a0', leaf: '#2fa23a', bands: ['#ff7a1a', '#ffffff', '#ffd23f'] };
@@ -66,6 +68,13 @@ export function buildPip(look: PipLook = PIP): Pip {
     part(skin, side * 0.44, -0.02, 0.02, 0.09, 0.15, 0.09);
   }
   part(black, 0, -0.03, 0.43, 0.07, 0.035, 0.03);
+  if (look.mean) {
+    for (const side of [-1, 1]) {
+      // Brows slanting down to the middle, low enough to cut across the top of each eye.
+      const brow = part(black, side * 0.17, 0.25, 0.4, 0.15, 0.045, 0.07);
+      brow.rotation.z = side * 0.55;
+    }
+  }
 
   const leaves = new Group();
   leaves.position.set(0, 0.45, 0);

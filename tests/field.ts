@@ -2,7 +2,7 @@ import type { Difficulty } from '../src/core/race';
 import type { Level } from '../src/data/levels';
 import { jostle } from '../src/game/contact';
 import { courseFor } from '../src/game/courses';
-import { GRID, rivalDrivers } from '../src/game/rivals';
+import { GRID, gridSlot, rivalDrivers } from '../src/game/rivals';
 import { Sim, TICK, type Driver } from '../src/game/sim';
 
 const hands = { speed: 1, easeOff: 0, fork: 0, wise: 0, polish: 0, roads: [] as number[], side: 0, care: 1, sight: 1.2, seed: 0 };
@@ -38,14 +38,14 @@ export function raceAgainst(level: Level, difficulty: Difficulty, standIn: Stand
   player.x = GRID[3];
   if (standIn === 'ace' || standIn === 'smart') player.autopilot = standIn;
   else if (standIn !== 'none') player.driver = { ...PEOPLE[standIn], seed: level.n * 7 + 3 };
-  const rivals = rivalDrivers(level, difficulty).map((driver, i) => {
+  const rivals = rivalDrivers(level, difficulty).map((driver, i, cast) => {
     const sim = new Sim(course, level, (event) => {
       if (event.type === 'crate' || event.type === 'bump') hits[i]++;
     }, () => 0);
     sim.shareWith(player);
     sim.driver = driver;
     sim.chase = () => player.progress();
-    sim.x = GRID[i];
+    sim.x = gridSlot(i, cast.length);
     return sim;
   });
   const all = [player, ...rivals];

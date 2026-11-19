@@ -178,7 +178,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
         : null;
       // One line for the fruit: in a race it says what the place added, or what a podium would.
       const won = `You won ${countOf(result.fruits, fruit.name)}`;
-      const wonLine = !order || !result.place ? `${won}!` : podium ? `${won}: ${podium} for coming ${ORDINAL[result.place]}!` : `${won}. Reach the podium for more!`;
+      const wonLine = !order || !result.place ? `${won}!` : podium ? `${won}: ${podium} for coming ${ORDINAL[result.place]}!` : rivals.length === 1 ? `${won}. Beat ${rivals[0].name} for more!` : `${won}. Reach the podium for more!`;
       const starRow = stars(0);
       const loot = el('div.loot');
       for (let i = 0; i < result.fruits; i++) loot.append(el('img', { src: asset(fruit.img), alt: fruit.name, style: `animation-delay:${1.1 + i * 0.12}s` }));

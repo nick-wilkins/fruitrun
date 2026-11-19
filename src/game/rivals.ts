@@ -9,17 +9,20 @@ import { Sim, TICK, type Driver } from './sim';
  * How good each of the three rivals is, on the same scale as the stars a run earns: a rival at 3.2 finishes a
  * little inside the three-star time. So a place in a race goes hand in hand with the stars for the same run. The
  * hard ones are set times that only an expert's run matches, which leaves them driving as well as they are able.
- * The legendary ones are set times nobody can do, so all three are flat out and it is their driving that tells.
+ * The legendary one races alone and is set a time nobody can do, so it is flat out and its driving is what tells.
  */
-const FORM: Record<Difficulty, [number, number, number]> = {
+const FORM: Record<Difficulty, number[]> = {
   easy: [2.0, 1.5, 0.9],
   medium: [3.6, 3.2, 2.8],
   hard: [4.9, 4.6, 4.3],
-  legendary: [5.8, 5.7, 5.6],
+  legendary: [5.8],
 };
 
 /** Where across the road each marble starts a race: the three rivals, then the player. */
 export const GRID = [-3.3, -1.1, 3.3, 1.1];
+
+/** Where rival `i` of `count` lines up. A lone rival starts beside the player, not out at the kerb. */
+export const gridSlot = (i: number, count: number) => (count === 1 ? GRID[1] : (GRID[i] ?? 0));
 
 /**
  * How long each rival takes in a race like the real thing: the three of them and a careful hands-free marble in the
@@ -30,7 +33,7 @@ export function fieldTimes(course: Course, level: Level, drivers: Driver[]): num
   const sims = drivers.map((driver, i) => {
     const sim = new Sim(course, level, () => {}, () => 0);
     sim.driver = driver;
-    sim.x = GRID[i] ?? 0;
+    sim.x = gridSlot(i, drivers.length);
     return sim;
   });
   const player = new Sim(course, level, () => {}, () => 0);
@@ -85,6 +88,9 @@ const CHARACTER = [
   { react: 1.2, turn: 0.95, drift: 1.5, slip: 1, swing: 1.6, fork: 0.4, side: 1.1, care: 1, sight: 1 },
 ];
 
+/** The legendary rival: nothing it favours, nothing it is wary of. */
+const LEGEND = { react: 1, turn: 1, drift: 1, slip: 1, swing: 1, fork: 0.5, side: 0, care: 0.8, sight: 1.2 };
+
 /** The finish time each rival is set, if left to run its own race. */
 export function rivalTargets(level: Level, difficulty: Difficulty): number[] {
   const [five, , , two] = starTimesFor(level);
@@ -130,7 +136,7 @@ export function rivalDrivers(level: Level, difficulty: Difficulty): Driver[] {
     const targets = rivalTargets(level, difficulty);
     const manner = MANNER[difficulty];
     const roads = sideRoads(level);
-    const trying: Driver[] = CHARACTER.map((character, i) => ({
+    const trying: Driver[] = (difficulty === 'legendary' ? [LEGEND] : CHARACTER).map((character, i) => ({
       speed: 1,
       easeOff: EASE_OFF[difficulty],
       react: manner.react * character.react,

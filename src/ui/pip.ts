@@ -1,4 +1,4 @@
-export type PipMood = 'happy' | 'cheer' | 'sip' | 'yuck' | 'meh' | 'nice' | 'yum' | 'wow';
+export type PipMood = 'happy' | 'cheer' | 'sip' | 'yuck' | 'meh' | 'nice' | 'yum' | 'wow' | 'mean';
 
 const INK = '#2e2a2a';
 
@@ -18,6 +18,10 @@ const star = (cx: number, cy: number) => {
 };
 
 const FACES: Record<PipMood, { eyes: string; mouth: string; extra?: string; skin?: string; armsUp?: boolean }> = {
+  mean: {
+    eyes: `${openEyes(0, 1)}<path d="M24 40 L47 51 M76 40 L53 51" stroke="${INK}" stroke-width="5.5" stroke-linecap="round"/>`,
+    mouth: `<path d="M38 72 Q50 80 64 69 L62 77 Q50 85 40 79 Z" fill="#fff" stroke="${INK}" stroke-width="2.5" stroke-linejoin="round"/><path d="M46 75 L46 81 M52 76 L52 82 M58 74 L58 80" stroke="${INK}" stroke-width="1.6"/>`,
+  },
   happy: {
     eyes: openEyes(),
     mouth: `<path d="M41 71 Q50 80 59 71" fill="none" stroke="${INK}" stroke-width="3.5" stroke-linecap="round"/>`,

@@ -195,8 +195,10 @@ export function cupTableScreen(app: App): HTMLElement {
 
   if (done) {
     app.cupResult = null;
-    const line = done.position === 1 ? 'You won the cup!' : done.position <= 3 ? `You came ${ORDINAL[done.position]}!` : 'So close! Have another go.';
-    const onPodium = done.position <= 3;
+    const beaten = done.difficulty === 'legendary' && done.position > 1;
+    const line = done.position === 1 ? 'You won the cup!' : beaten ? `${done.table[0].name} takes it. Go again!` : done.position <= 3 ? `You came ${ORDINAL[done.position]}!` : 'So close! Have another go.';
+    // In a legendary duel the only step worth having is the top one.
+    const onPodium = done.difficulty === 'legendary' ? done.position === 1 : done.position <= 3;
     setTimeout(() => stage.isConnected && (onPodium ? sfx.reveal(4) : sfx.tap()), 300);
     // The top three on their steps, silver and bronze either side of gold, with the winner jumping for joy.
     const step = (place: number) => {
@@ -204,7 +206,7 @@ export function cupTableScreen(app: App): HTMLElement {
       return el(
         `div.podium-step.p${place}`,
         {},
-        el(`div.podium-pip${place === 1 ? '.jump' : ''}`, { innerHTML: pipSvg(place === 1 ? 'cheer' : 'happy', row.you ? undefined : row.color) }),
+        el(`div.podium-pip${place === 1 ? '.jump' : ''}`, { innerHTML: pipSvg(row.mean ? 'mean' : place === 1 ? 'cheer' : 'happy', row.you ? undefined : row.color) }),
         el(`div.podium-name${row.you ? '.you' : ''}`, {}, row.name),
         el('div.podium-block', {}, el('b', {}, TROPHY[place]), el('span', {}, `${row.points} pts`)),
       );
@@ -224,7 +226,7 @@ export function cupTableScreen(app: App): HTMLElement {
         {},
         el('div.kicker', {}, `${done.cup.name} · ${DIFFICULTIES.find((d) => d.id === done.difficulty)!.name}`),
         el('h2', {}, line),
-        el('div.podium', {}, step(2), step(1), step(3)),
+        el('div.podium', {}, ...[2, 1, 3].filter((place) => done.table[place - 1]).map(step)),
         fourth ? el('div.kicker.small', {}, `4th: ${fourth.name}, ${fourth.points} pts`) : null,
         done.perfect ? el('div.kicker', {}, '★ Perfect Forty: every race won!') : null,
         done.best && onPodium ? el('div.kicker.small', {}, 'A new trophy for your shelf') : null,

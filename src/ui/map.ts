@@ -56,7 +56,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       const pick = el(
         'div.race-pick',
         {},
-        el('p', {}, 'Race three friends! How fast should they be?'),
+        el('p', {}, legend ? 'Race three friends, or take on Chilli alone!' : 'Race three friends! How fast should they be?'),
         el(
           'div.starts',
           {},

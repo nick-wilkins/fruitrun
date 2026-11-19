@@ -4,7 +4,7 @@ import { asset } from './ui/dom';
 import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
-import { RIVALS, type Difficulty, type Finisher } from './core/race';
+import { rivalsFor, type Difficulty, type Finisher } from './core/race';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
 import { rivalDrivers } from './game/rivals';
@@ -182,7 +182,7 @@ const app: App = {
           return app.save.muted;
         },
       },
-      race ? RIVALS : [],
+      race ? rivalsFor(race) : [],
       cup,
       (app.save.levels[level.id]?.stars ?? 0) >= level.need || !LEVELS.some((l) => l.after.includes(level.n)),
     );
@@ -215,7 +215,7 @@ const app: App = {
           if (result) hud.results(result, order);
         },
       },
-      race ? { rivals: RIVALS, drivers: rivalDrivers(level, race) } : null,
+      race ? { rivals: rivalsFor(race), drivers: rivalDrivers(level, race) } : null,
     );
     run.start();
     // On a run of your own, your best run here rolls alongside. It is fetched while the countdown plays.

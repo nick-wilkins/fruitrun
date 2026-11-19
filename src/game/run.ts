@@ -29,7 +29,7 @@ import { jostle } from './contact';
 import { ghostAt, Recorder, type Ghost } from './ghost';
 import type { Course } from './course';
 import { seeded } from './random';
-import { GRID } from './rivals';
+import { GRID, gridSlot } from './rivals';
 import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type Driver, type SimEvent } from './sim';
 import { blobTexture } from './textures';
 import { makeFrame } from './track';
@@ -296,10 +296,10 @@ export class Run {
       sim.shareWith(this.sim);
       sim.driver = field.drivers[i];
       sim.chase = () => this.sim.progress();
-      sim.x = GRID[i] ?? 0;
+      sim.x = gridSlot(i, field.rivals.length);
       // In the dark only the player carries a lamp, so the rivals glow a little to stay in sight.
       const dark = course.mood === 'night' || course.mood === 'midnight';
-      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: [rival.deep, '#ffffff', rival.color], glow: dark ? 0.55 : 0 });
+      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: rival.mean ? [rival.deep, rival.color, '#ffb000'] : [rival.deep, '#ffffff', rival.color], glow: dark ? 0.55 : rival.mean ? 0.2 : 0, mean: rival.mean });
       pip.root.matrixAutoUpdate = false;
       const shadow = this.makeShadow();
       this.world.scene.add(pip.root, shadow);
@@ -759,6 +759,10 @@ export class Run {
       if (racer.sim.countdown > 0) continue;
       racer.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (racer.sim.v * racer.sim.gait * dt) / BALL_RADIUS));
       racer.pip.leaves.rotation.x = -clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.9;
+      // The mean one burns as it goes.
+      if (racer.rival.mean && !racer.sim.finished && racer.pip.root.visible && dt > 0) {
+        this.sparks.burst(racer.sim.point(racer.sim.s - 1 - Math.random() * 0.8, racer.sim.x + (Math.random() - 0.5) * 0.9, 0.4 + Math.random() * 0.9, this.v1), 5, ['#ff5a2a', '#ffd23f', '#ff2a2a', '#ffffff'], 3);
+      }
       // Knocked by something, it rocks about for a moment; otherwise it leans the way it is steering.
       racer.pip.body.rotation.z = racer.sim.rattled ? Math.sin(racer.sim.clock * 38) * 0.45 : clamp(racer.sim.xv * 0.06, -0.5, 0.5);
     }

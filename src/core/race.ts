@@ -16,6 +16,8 @@ export interface Rival {
   pale: string;
   /** A deeper shade for the leaves and the bubble's stripes. */
   deep: string;
+  /** Set for the one who is out to win and looks it: a scowl, and flames behind. */
+  mean?: boolean;
 }
 
 export const RIVALS: Rival[] = [
@@ -23,6 +25,14 @@ export const RIVALS: Rival[] = [
   { name: 'Mango', color: '#ffa32e', pale: '#ffe2b0', deep: '#e0661a' },
   { name: 'Plum', color: '#ff7ac0', pale: '#ffd9ee', deep: '#c7359a' },
 ];
+
+/** The legendary rival races alone: one red-hot marble, quicker than all of Pip's friends. */
+export const LEGEND: Rival = { name: 'Chilli', color: '#e3262b', pale: '#ffb38a', deep: '#22141a', mean: true };
+
+/** Who the player races at each difficulty. */
+export function rivalsFor(difficulty: Difficulty): Rival[] {
+  return difficulty === 'legendary' ? [LEGEND] : RIVALS;
+}
 
 /** The player's own colour in race displays: Pip's green. */
 export const YOUR_COLOR = '#8fe04a';

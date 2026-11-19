@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CUPS, CUP_POINTS, cupLegendaryOpen, cupOpen, quitCup, scoreCupRace, standings, startCup } from '../src/core/cups';
 import { completeLevel, legendaryOpen, newSave, swept } from '../src/core/progress';
-import { RIVALS, type Finisher } from '../src/core/race';
+import { LEGEND, RIVALS, type Finisher } from '../src/core/race';
 import { LEVELS, WORLDS } from '../src/data/levels';
 
 /** A finishing order with the player in `place` and the rivals in their usual order around them. */
@@ -135,5 +135,35 @@ describe('legendary', () => {
     startCup(save, cup, 'hard');
     for (let i = 0; i < 4; i++) scoreCupRace(save, order(2));
     expect(cupLegendaryOpen(save, cup)).toBe(true);
+  });
+});
+
+describe('a legendary cup', () => {
+  const duel = (won: boolean): Finisher[] => {
+    const rows: Finisher[] = [{ name: LEGEND.name, color: LEGEND.color, time: 50, you: false }];
+    rows.splice(won ? 0 : 1, 0, { name: 'You', color: '#fff', time: 49, you: true });
+    return rows;
+  };
+
+  it('is a duel with the one legendary rival, and only winning it earns the trophy', () => {
+    const save = played();
+    startCup(save, cup, 'legendary');
+    scoreCupRace(save, duel(true));
+    expect(standings(save).map((row) => [row.name, row.points])).toEqual([['You', 10], [LEGEND.name, 7]]);
+    let done = null;
+    for (const won of [false, false, false]) done = scoreCupRace(save, duel(won));
+    expect(done).toMatchObject({ position: 2, points: 31, best: false });
+    expect(save.trophies?.[cup.id]?.legendary).toBeUndefined();
+    startCup(save, cup, 'legendary');
+    for (let i = 0; i < 4; i++) done = scoreCupRace(save, duel(true));
+    expect(done).toMatchObject({ position: 1, best: true });
+    expect(save.trophies?.[cup.id]?.legendary).toBe(1);
+  });
+
+  it('pays the extra fruit for a legendary race only to the winner', () => {
+    const level = LEVELS[0];
+    expect(completeLevel(played(), level, 50, [], undefined, 2, 'legendary').podium).toBe(0);
+    expect(completeLevel(played(), level, 50, [], undefined, 1, 'legendary').podium).toBe(3);
+    expect(completeLevel(played(), level, 50, [], undefined, 2, 'hard').podium).toBe(2);
   });
 });

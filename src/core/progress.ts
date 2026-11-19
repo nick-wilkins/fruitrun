@@ -220,7 +220,8 @@ export interface RunResult {
 /** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
 export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats, place?: number, difficulty?: Difficulty): RunResult {
   const stars = starsForTime(level, seconds);
-  const podium = place === undefined ? 0 : podiumFruit(place);
+  // A legendary race is a duel: the extra fruit goes to the winner alone.
+  const podium = place === undefined ? 0 : difficulty === 'legendary' ? (place === 1 ? podiumFruit(1) : 0) : podiumFruit(place);
   const previous = save.levels[level.id];
   const shut = LEVELS.filter((l) => !isUnlocked(save, l));
   // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.

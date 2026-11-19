@@ -323,3 +323,14 @@ Targets: the expert hands-free line loses to the best rival on most levels, neve
 Checked by the session owner (2026-11-19): `npm test` 927 passed, `npx tsc --noEmit` clean, `npm run build` clean. Real game loop in desktop Chrome, sound off: level 7 Legendary, expert line 54.8 s came 4th behind 51.3 to 53.4 s; level 15 Legendary, expert line 61.5 s came 4th behind 58.8 to 60.1 s; level 7 Legendary, careful line last by 6 s; level 7 Hard unchanged (expert line wins by 0.1 s). The player took 21 to 24 hard knocks in each Legendary race against 4 on Hard. Rival setup on starting a Legendary race took up to 176 ms. Not watched by eye.
 
 Unlocking (owner's side, `src/core/progress.ts`, `src/core/cups.ts`, UI): Legendary opens on a level once it has been won on Hard, and in a cup once that cup has a Hard trophy (Nick: "Legendary only opens up in the cups if you complete hard"). It is not part of a sweep. Awards: Stuff of Legend, Legend of the Cups. Tests in `tests/cups.test.ts` (shown failing first).
+
+## Legendary becomes a duel (2026-11-19)
+
+Nick: "For legendary, let's just have it one other marble and let's restyle it to make him look a bit fast and mean."
+
+- One rival on Legendary: Chilli, red with a dark, red and gold bubble, a scowl, and flames behind it (`LEGEND` and `rivalsFor` in `src/core/race.ts`; `mean` look in `src/game/character.ts` and `src/ui/pip.ts`). It starts beside the player.
+- The barging pack is gone with the other two marbles: the player took 6 to 7 hard knocks in a duel against 21 to 24 in the four-marble version.
+- A legendary race pays its extra fruit only for winning. A legendary cup is the same duel over four races, 10 and 7 points, and only winning it earns the trophy.
+- Measured headless over 12 levels: the expert hands-free line wins 4 (by 0.3 to 1.4 s) and loses 8 (by 0.3 to 4.8 s); the careful line wins 1 of 12; a decent player loses all 12 by 3 to 17 s.
+- Tests: the three pinned legendary tests in `tests/race.test.ts` now describe the duel; `tests/cups.test.ts` gained the legendary cup and fruit rules (shown failing first). `npm test` passed, see the commit.
+- Real game loop, desktop Chrome, sound off: level 7, expert line 53.0 s lost to Chilli's 51.9 s ("Beat Chilli for more!"); level 1, expert line 37.5 s beat Chilli's 38.3 s. One screenshot from behind shows Chilli's colours; the scowl and the flames have not been looked at properly.
