@@ -28,7 +28,7 @@ export interface Level {
   /** Node centre on the map image, as a percentage of its width and height. */
   x: number;
   y: number;
-  /** Whether the map art draws this node wrongly, locked (grey) or with another number, so it is drawn over. Only matters for 'art' worlds. */
+  /** Whether the map art draws this node as locked (grey) rather than open. Only matters for 'art' worlds. */
   artLocked: boolean;
   /** Levels (by `n`) that lead here on the map: finishing any one of them opens this level. Empty for the first. */
   after: number[];
@@ -105,7 +105,7 @@ const BASICS = ['oats', 'honey', 'milk', 'yogurt', 'chia', 'almond', 'ice', 'gra
 
 // ---- World 1: Sunny Meadow. The paths drawn on the map run 1 to 4 in a line, where the way parts: on to 5, or
 // off to 13 (then 14 and the blender). 5 is a junction too: 6 (then 7, 8, 9), or 10 (then 11, 12 and round the
-// castle, 15 to 18). The map paints 5 and 6 the other way round, so those two stones are drawn over.
+// castle, 15 to 18).
 
 const meadow = (n: number, after: number[], fruit: string, name: string, px: number, py: number, specials: string[]): Level => ({
   id: `level-${n}`,
@@ -115,7 +115,7 @@ const meadow = (n: number, after: number[], fruit: string, name: string, px: num
   fruit,
   name,
   ...at(px, py),
-  artLocked: n >= 15 || n === 5 || n === 6,
+  artLocked: n >= 15,
   after,
   need: MEADOW_NEEDS[n - 1],
   difficulty: (n - 1) / 17,
