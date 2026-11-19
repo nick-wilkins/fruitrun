@@ -191,8 +191,9 @@ const app: App = {
     let draft: Save | null = null;
     let order: Finisher[] | undefined;
     let trace: string | null = null;
-    // Night levels get their own dreamy tune.
-    musicFor(level.mood === 'night' || level.mood === 'midnight' ? asset('assets/audio/track4.m4a') : null);
+    // Marble Roll plays in the dark and on the hardest levels; everywhere else the playlist carries on.
+    const dark = level.mood === 'night' || level.mood === 'midnight';
+    musicFor(dark || level.difficulty >= 0.85 ? asset('assets/audio/track9.m4a') : null);
     run = new Run(
       renderer,
       courseFor(level),
