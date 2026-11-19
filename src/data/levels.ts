@@ -28,7 +28,7 @@ export interface Level {
   /** Node centre on the map image, as a percentage of its width and height. */
   x: number;
   y: number;
-  /** Whether the map art draws this node as locked (grey) rather than open. Only matters for 'art' worlds. */
+  /** Whether the map art draws this node wrongly, locked (grey) or with another number, so it is drawn over. Only matters for 'art' worlds. */
   artLocked: boolean;
   /** Levels (by `n`) that lead here on the map: finishing any one of them opens this level. Empty for the first. */
   after: number[];
@@ -103,8 +103,9 @@ const MOODS: Record<number, Level['mood']> = {
 /** Staples that turn up everywhere. */
 const BASICS = ['oats', 'honey', 'milk', 'yogurt', 'chia', 'almond', 'ice', 'granola', 'vanilla', 'dates', 'flax', 'oatmilk'];
 
-// ---- World 1: Sunny Meadow. The paths drawn on the map run 1 to 4 in a line, then a junction with three ways on:
-// 5 (then 7, 8, 9), 6 (then 10, 11, 12 and round the castle, 15 to 18), and 13 (then 14 and the blender).
+// ---- World 1: Sunny Meadow. The paths drawn on the map run 1 to 4 in a line, where the way parts: on to 5, or
+// off to 13 (then 14 and the blender). 5 is a junction too: 6 (then 7, 8, 9), or 10 (then 11, 12 and round the
+// castle, 15 to 18). The map paints 5 and 6 the other way round, so those two stones are drawn over.
 
 const meadow = (n: number, after: number[], fruit: string, name: string, px: number, py: number, specials: string[]): Level => ({
   id: `level-${n}`,
@@ -114,7 +115,7 @@ const meadow = (n: number, after: number[], fruit: string, name: string, px: num
   fruit,
   name,
   ...at(px, py),
-  artLocked: n >= 15,
+  artLocked: n >= 15 || n === 5 || n === 6,
   after,
   need: MEADOW_NEEDS[n - 1],
   difficulty: (n - 1) / 17,
@@ -132,12 +133,12 @@ const MEADOW: Level[] = [
   meadow(2, [1], 'banana', 'Banana Bend', 422, 795, ['peanutbutter', 'cocoa', 'darkchoc', 'frozenbanana', 'peanut', 'coconutflakes', 'lime', 'pecan']),
   meadow(3, [2], 'strawberry', 'Strawberry Fields', 622, 773, ['frozenyogurt', 'sorbet', 'peanutbutter', 'whitechoc', 'cranberry', 'blackberry', 'cashew', 'hemp']),
   meadow(4, [3], 'orange', 'Orange Grove', 830, 750, ['carrot', 'ginger', 'turmeric', 'lime', 'apricot', 'coconutmilk', 'sunflower', 'pistachio']),
-  meadow(5, [4], 'grape', 'Grape Vine Valley', 563, 596, ['peanutbutter', 'almondbutter', 'hemp', 'blackberry', 'pomegranate', 'walnut', 'kale', 'seedmix']),
-  meadow(6, [4], 'pear', 'Pear Pond', 747, 521, ['walnut', 'cinnamon', 'ginger', 'spinach', 'greenapple', 'maple', 'pecan', 'quinoa']),
-  meadow(7, [5], 'watermelon', 'Watermelon Wave', 398, 460, ['cucumber', 'lime', 'melon', 'coconutchips', 'sorbet', 'celery', 'poppy', 'pumpkinseed']),
+  meadow(5, [4], 'grape', 'Grape Vine Valley', 747, 521, ['peanutbutter', 'almondbutter', 'hemp', 'blackberry', 'pomegranate', 'walnut', 'kale', 'seedmix']),
+  meadow(6, [5], 'pear', 'Pear Pond', 563, 596, ['walnut', 'cinnamon', 'ginger', 'spinach', 'greenapple', 'maple', 'pecan', 'quinoa']),
+  meadow(7, [6], 'watermelon', 'Watermelon Wave', 398, 460, ['cucumber', 'lime', 'melon', 'coconutchips', 'sorbet', 'celery', 'poppy', 'pumpkinseed']),
   meadow(8, [7], 'kiwi', 'Kiwi Canyon', 240, 398, ['lime', 'cucumber', 'spinach', 'kale', 'avocado', 'celery', 'wheatgrass', 'pinenut']),
   meadow(9, [8], 'cherry', 'Cherry Hilltop', 173, 241, ['cocoa', 'darkchoc', 'cacaonibs', 'icecream', 'cranberry', 'hazelnut', 'almondmilk', 'brazil']),
-  meadow(10, [6], 'lemon', 'Lemon Falls', 730, 330, ['ginger', 'turmeric', 'lime', 'matcha', 'poppy', 'coconutyogurt', 'cashew', 'beetroot']),
+  meadow(10, [5], 'lemon', 'Lemon Falls', 730, 330, ['ginger', 'turmeric', 'lime', 'matcha', 'poppy', 'coconutyogurt', 'cashew', 'beetroot']),
   meadow(11, [10], 'blueberry', 'Blueberry Ridge', 838, 239, ['quinoa', 'protein', 'blackberry', 'almondmilk', 'whitechoc', 'frozenyogurt', 'macadamia', 'seedmix']),
   meadow(12, [11], 'pineapple', 'Pineapple Peak', 1011, 195, ['coconutmilk', 'coconutflakes', 'coconutchips', 'passionfruit', 'guava', 'macadamia', 'frozenbanana', 'spirulina']),
   meadow(13, [4], 'peach', 'Peach Bridge', 1063, 576, ['icecream', 'apricot', 'pistachio', 'maple', 'cashew', 'coconutyogurt', 'raisins', 'sunflower']),

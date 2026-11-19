@@ -49,11 +49,15 @@ describe('the map', () => {
     expect(LEVELS.filter((l) => isUnlocked(save, l)).map((l) => l.n)).toEqual([1]);
   });
 
-  it('offers three ways on after level 4, as the paths on the map do', () => {
+  it('offers two ways on after level 4, and two more from the junction at level 5, as the paths on the map do', () => {
     const save = newSave();
+    const open = () => LEVELS.filter((l) => isUnlocked(save, l) && !save.levels[l.id]).map((l) => l.n);
     for (const n of [1, 2, 3, 4]) pass(save, n);
-    const open = LEVELS.filter((l) => isUnlocked(save, l) && !save.levels[l.id]).map((l) => l.n);
-    expect(open).toEqual([5, 6, 13]);
+    expect(open()).toEqual([5, 13]);
+    pass(save, 5);
+    expect(open()).toEqual([6, 10, 13]);
+    // Level 5 is the stone at the junction; level 6 is the one out to its left.
+    expect(byNumber(5).x).toBeGreaterThan(byNumber(6).x);
   });
 
   it('follows each branch on its own', () => {
