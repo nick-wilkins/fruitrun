@@ -30,13 +30,12 @@ const SAIL_LOW = 0.76;
 export type Autopilot = 'none' | 'smart' | 'ace';
 
 /**
- * A computer rival. It follows one of the hands-free lines, but the way a person would. It looks, decides, and only
+ * A computer rival. It drives the way a person would. It looks, reads the road ahead for a way through, and only
  * then steers, a few times a second. It turns the marble smoothly instead of snapping to its line, and leaves well
  * alone while it is near enough. It wanders, has good spells and off spells, picks a side to pass another marble,
  * makes its mind up early about a fork, and now and then gets something wrong.
  */
 export interface Driver {
-  line: 'smart' | 'ace';
   /** How much of its speed it uses, 1 being all of it. */
   speed: number;
   /** How much it slows, at most, when well ahead of the marble it is racing. */
@@ -45,6 +44,8 @@ export interface Driver {
   react: number;
   /** How firmly it steers towards where it wants to be: higher gets there sooner. */
   turn: number;
+  /** The fastest it moves the marble across the road: quick hands or unhurried ones. */
+  quick: number;
   /** How far it wanders either side of its line on open road. */
   drift: number;
   /** How far from where it wants to be it will let the marble run before correcting. */
@@ -53,10 +54,20 @@ export interface Driver {
   slip: number;
   /** How much its pace rises and falls over a race: its good spells and off spells. */
   swing: number;
-  /** The chance it takes a fork's side road when it comes to one. */
+  /** The chance it takes a fork's side road when it comes to one, going by whim. */
   fork: number;
-  /** How far ahead it plans, 1 being just enough for a marble that turns in an instant. */
-  far: number;
+  /** How well it knows the course, 0 to 1: one that knows it takes the side roads that save time and no others. */
+  wise: number;
+  /** The seconds each side road saves over staying on the main road, by lane: what there is to know. */
+  roads: number[];
+  /** How many seconds of road ahead it reads when choosing its line. */
+  ahead: number;
+  /** How hard it goes after speed pads, rings and the inside of a bend: 0 takes what is in its path, 1 hunts them. */
+  keen: number;
+  /** How well it judges where a swinging or turning thing will be by the time it gets there, 0 to 1. */
+  foresee: number;
+  /** How much of its wandering it keeps up when there is something to aim for: low for one that concentrates. */
+  loose: number;
   /** How far to one side of its line it likes to run. */
   side: number;
   /** How much room it likes to leave round other marbles and things in the road, 1 being a normal amount. */
@@ -81,6 +92,8 @@ export interface Traffic {
 
 /** How many strips across the road a rival weighs up when choosing where to be. */
 const SLOTS = 15;
+/** The most things on the road ahead a rival plans a way through at once. */
+const GATES = 40;
 
 export type SimEvent =
   | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' | 'knock' }
@@ -139,6 +152,25 @@ export class Sim {
   private form = 0;
   /** Where it last settled on going, and how dangerous each strip of road looked when it last looked. */
   private aim = 0;
+  /** Set when its line is aimed at something, a pad to catch or a gap to thread, and wandering would cost it. */
+  private aiming = false;
+  /** How far off its line it is running just now: the side it favours, its wandering, a misjudgment. */
+  private lean = 0;
+  /** Set while other marbles are close enough to need steering round. */
+  private crowded = false;
+  /** The line it last read: where along the road each thing on it comes, and where across the road to be there. */
+  private readonly routeIn = new Float32Array(GATES);
+  private readonly routeOut = new Float32Array(GATES);
+  private readonly routeX = new Float32Array(GATES);
+  private routeLane = 0;
+  private routeS0 = 0;
+  private routeX0 = 0;
+  /** How far across it can move for each unit of road, and how many seconds up the road it steers for. */
+  private routeRate = 0;
+  private routeLead = 0;
+  private gates = 0;
+  private readonly plan = [new Float32Array(SLOTS), new Float32Array(SLOTS)];
+  private readonly cameBy = new Int8Array(GATES * SLOTS);
   private readonly danger = new Float32Array(SLOTS);
   private readonly sees = new Float32Array(SLOTS);
   /** After a mistake, how long before it can make another, and how long it goes on not seeing far enough ahead. */
@@ -370,16 +402,16 @@ export class Sim {
     return clamp((along - START_S) / (this.course.finishS - START_S), 0, 1);
   }
 
-  /** Where a slider or pendulum is across the road right now. */
-  swingX(o: CourseObj): number {
-    return o.x + (o.amp ?? 0) * Math.sin(this.clock * (o.speed ?? 1) + (o.phase ?? 0));
+  /** Where a slider or pendulum is across the road, now or `lead` seconds from now. */
+  swingX(o: CourseObj, lead = 0): number {
+    return o.x + (o.amp ?? 0) * Math.sin((this.clock + lead) * (o.speed ?? 1) + (o.phase ?? 0));
   }
 
-  /** Where each windmill sail that is low enough to hit is crossing the road right now. */
-  sailsAt(o: CourseObj): number[] {
+  /** Where each windmill sail that is low enough to hit is crossing the road, now or `lead` seconds from now. */
+  sailsAt(o: CourseObj, lead = 0): number[] {
     const out: number[] = [];
     for (let k = 0; k < 4; k++) {
-      const angle = this.spinAngle(o) + (k * Math.PI) / 2;
+      const angle = this.spinAngle(o) + lead * (o.speed ?? 1) + (k * Math.PI) / 2;
       if (Math.cos(angle) > SAIL_LOW) out.push(SAIL * Math.sin(angle));
     }
     return out;
@@ -412,7 +444,6 @@ export class Sim {
       this.goal = this.aim = this.x;
     }
     const [lo, hi] = this.bounds();
-    const busy = this.blockerAhead();
     this.lapseT -= dt;
     this.steadyT -= dt;
     this.blinkT -= dt;
@@ -427,25 +458,28 @@ export class Sim {
       this.astray = clamp(this.astray * 0.9 + bell() * reach * 0.45, -reach, reach);
       this.form = clamp(this.form * 0.96 + bell() * driver.swing * 0.5, -2.5 * driver.swing, 2.5 * driver.swing);
       if (this.lapseT <= 0) {
-        // The faster it is going, the further ahead it has to plan.
-        const far = driver.far * Math.max(1, this.v / CRUISE);
-        const pick = driver.line === 'ace' ? this.aceLine(far) : this.smartLine(far);
-        // It sticks with what it decided unless the road now asks for something clearly different: no fidgeting
-        // between two lines that are much the same.
-        if (busy || Math.abs(pick - this.goal) > driver.slack) this.goal = pick;
+        this.readRoad(driver);
+        this.goal = this.onward();
+        // With something to aim for it concentrates, as far as it is able; on open road it runs where it likes.
+        this.lean = (driver.side + this.astray) * (this.aiming ? driver.loose : 1);
         // A mistake, but never two in quick succession: that would look broken, not human.
+        let lapse = false;
         if (this.steadyT <= 0 && dice() < driver.slip) {
           this.steadyT = 4;
           // Half the time its mind wanders and it holds its line for a moment, whatever is coming; otherwise it
           // misjudges: heads a little to one side of where it meant to, and is slow to see what is in the way.
-          if (dice() < 0.5) this.lapseT = 0.6 + dice() * 0.9;
+          if (dice() < 0.5) lapse = true;
           else {
-            this.goal += bell() * 2.5;
+            this.lean += bell() * 2.5;
             this.blinkT = 1.2;
           }
         }
         this.lookForFork(driver, dice);
-        this.aim = this.weighUp(driver, lo, hi, busy);
+        this.aim = this.weighUp(driver, lo, hi);
+        if (lapse) {
+          this.lapseT = 0.6 + dice() * 0.9;
+          if (!this.crowded) this.aim = clamp(this.goal + this.lean, lo + 0.3, hi - 0.3);
+        }
       }
     }
     // Taking a side road is one long deliberate move: over to the side it leaves from in good time, then following
@@ -459,11 +493,36 @@ export class Sim {
       }
       this.heading = 0;
     }
+    // Between looks it carries on with what it has already read: past one thing, on to the next. In a crowd, or
+    // with its mind elsewhere, it holds to what it last settled on.
+    if (!this.crowded && this.lapseT <= 0) {
+      this.goal = this.onward();
+      this.aim = clamp(this.goal + this.lean, lo + 0.3, hi - 0.3);
+    }
     // Near enough is good enough: while the marble is heading for somewhere close to where it wants to be, it is
-    // left to run straight. Only with something to dodge does every bit count.
+    // left to run straight. Only with something to aim for does every bit count.
     const bound = this.x + this.xv * 0.4;
-    if (!busy && this.danger[this.slotOf(this.x, lo, hi)] < 0.1 && Math.abs(this.aim - bound) < driver.slack) return clamp(bound, lo + 0.3, hi - 0.3);
+    if (!this.aiming && !this.crowded && Math.abs(this.aim - bound) < driver.slack) return clamp(bound, lo + 0.3, hi - 0.3);
     return clamp(this.aim, lo + 0.3, hi - 0.3);
+  }
+
+  /**
+   * Where the line it has read wants the marble: it steers for a point a little way up the road, since the marble
+   * takes a moment to answer, moving across between one thing and the next as early as it can.
+   */
+  private onward(): number {
+    if (this.routeLane !== this.lane) return this.x;
+    const look = this.s + Math.max(MIN_SPEED, this.v * this.gait) * this.routeLead;
+    let x = this.routeX0;
+    let from = this.routeS0;
+    for (let gate = 0; gate < this.gates; gate++) {
+      const to = this.routeX[gate];
+      if (look <= this.routeIn[gate]) return x + clamp(to - x, -1, 1) * Math.min(Math.abs(to - x), this.routeRate * Math.max(0, look - from));
+      if (look <= this.routeOut[gate]) return to;
+      x = to;
+      from = this.routeOut[gate];
+    }
+    return x;
   }
 
   private slotOf(x: number, lo: number, hi: number): number {
@@ -476,7 +535,7 @@ export class Sim {
    * most appealing strip it can get to without crossing worse danger than it is already in. So it goes round a
    * whole knot of marbles in one move, never dives through a crate for a speed pad, and is boxed in when it is.
    */
-  private weighUp(driver: Driver, lo: number, hi: number, busy: boolean): number {
+  private weighUp(driver: Driver, lo: number, hi: number): number {
     const width = Math.max(0.1, hi - lo - 0.6);
     const at = (slot: number) => lo + 0.3 + (slot / (SLOTS - 1)) * width;
     const seen = this.sees.fill(0);
@@ -493,17 +552,17 @@ export class Sim {
         if (level > seen[slot]) seen[slot] = level;
       }
     };
+    this.crowded = false;
     for (const other of this.traffic?.() ?? []) {
       if (other.lane !== this.lane) continue;
       const gap = other.s - this.s;
       // Anyone alongside is in the way. Anyone ahead only if they are being caught: a marble at racing pace is
       // left alone, or nobody would ever get past anybody.
+      const reached = gap > 0 && pace - other.v * other.gait > 0.5 ? gap / (pace - other.v * other.gait) : Infinity;
       if (Math.abs(gap) < 3.5) mark(other.x, 2, 1);
-      else if (gap > 0) {
-        const closing = pace - other.v * other.gait;
-        const reached = closing > 0.5 ? gap / closing : Infinity;
-        if (reached < sight * 2) mark(other.x, 2, clamp(1 - reached / (sight * 2), 0, 1));
-      }
+      else if (reached < sight * 2) mark(other.x, 2, clamp(1 - reached / (sight * 2), 0, 1));
+      else continue;
+      this.crowded = true;
     }
     for (const i of this.byLane[this.lane]) {
       const o = this.course.objects[i];
@@ -511,18 +570,21 @@ export class Sim {
       if (ahead > pace * sight) break;
       if (ahead < -1 || this.gone(i)) continue;
       const much = clamp(1.15 - ahead / (pace * sight), 0, 1);
+      // What swings or turns is judged where it will be on arrival, as well as this rival can judge it.
+      const lead = (Math.max(0, ahead) / pace) * driver.foresee;
       if (o.kind === 'crate') mark(o.x, 2.15, much);
       else if (o.kind === 'goo') mark(o.x, 2, much * 0.8);
-      else if (o.kind === 'slider' || o.kind === 'pendulum') mark(this.swingX(o), 2.1, much);
+      else if (o.kind === 'slider' || o.kind === 'pendulum') mark(this.swingX(o, lead), 2.1, much);
       else if (o.kind === 'spinner') mark(o.x, (o.len ?? 3.2) + 0.4, much);
-      else if (o.kind === 'windmill') for (const x of this.sailsAt(o)) mark(x, 2.4, much);
+      else if (o.kind === 'windmill') for (const x of this.sailsAt(o, lead)) mark(x, 2.4, much);
     }
     // What it saw last time lingers, so danger builds over a look or two and it does not twitch at every flicker.
     for (let slot = 0; slot < SLOTS; slot++) this.danger[slot] = this.danger[slot] * 0.4 + seen[slot] * 0.6;
 
-    // Where it would like to be: its line, shifted by the side it favours and how far it has wandered.
-    const calm = busy ? 0.25 : 1;
-    const home = clamp(this.goal + (driver.side + this.astray) * calm, lo + 0.3, hi - 0.3);
+    // Where it would like to be: its line, shifted by the side it favours and how far it has wandered. The
+    // strips are only for picking a way round a crowd: with the road to itself it drives the line it has read.
+    const home = clamp(this.goal + this.lean * (this.crowded ? 0.25 : 1), lo + 0.3, hi - 0.3);
+    if (!this.crowded) return home;
 
     // From where it is, it can reach a strip only by going through strips no more dangerous than its own.
     const here = this.slotOf(this.x, lo, hi);
@@ -579,32 +641,178 @@ export class Sim {
       if (ahead < 0 || ahead > 50) return;
       this.settled.add(index);
       // Not the same choice time after time: having just done one thing, it leans a little towards the other.
-      const chance = clamp(driver.fork + (this.lastFork ? -0.2 : 0.2) * (this.settled.size > 1 ? 1 : 0), 0, 1);
+      const whim = clamp(driver.fork + (this.lastFork ? -0.2 : 0.2) * (this.settled.size > 1 ? 1 : 0), 0, 1);
+      // A second either way is neither here nor there, and left to whim.
+      const saves = driver.roads[index] ?? 0;
+      const chance = whim + driver.wise * ((saves > 1 ? 1 : saves < -1 ? 0 : whim) - whim);
       this.lastFork = dice() < chance;
       if (this.lastFork) this.heading = index;
     });
   }
 
-  /** Is there something to steer round on this road a little way ahead? */
-  private blockerAhead(): boolean {
+  /** How firmly a rival can turn the marble on this road: less on a wet one, less still on ice. */
+  private firmness(driver: Driver): number {
+    const grip = GRIP[this.course.mood];
+    return driver.turn * (grip === Infinity ? 1 : grip > 4 ? 0.75 : 0.55);
+  }
+
+  /**
+   * A rival's line: what it makes of the road it can see. It runs its eye over everything coming up, speed pads,
+   * rings, crates, things that swing, the bends, and works out the best way through that its own hands can manage:
+   * it does not set off for a pad it cannot get across to, or thread a gap that will have closed. How far ahead it
+   * reads, how keen it is to go out of its way, and how well it judges moving things are what separate a sharp
+   * driver from a casual one.
+   */
+  private readRoad(driver: Driver): void {
+    const pace = Math.max(MIN_SPEED, this.v * this.gait);
+    // A misjudgment shortens how far it is reading for a moment.
+    const horizon = Math.max(22, pace * driver.ahead * (this.blinkT > 0 ? 0.4 : 1));
+    // The road narrows and widens: it thinks across the widest of what is coming, and keeps to what each part allows.
+    const halfAt = (s: number) => this.course.lanes[this.lane].track.halfAt(Math.max(0, s)) - BALL_RADIUS - 0.4;
+    const edge = Math.max(0.5, halfAt(this.s), halfAt(this.s + horizon / 2), halfAt(this.s + horizon));
+    const strip = (2 * edge) / (SLOTS - 1);
+    const at = (slot: number) => -edge + slot * strip;
+    // How far across it can get for each unit of road: its hands are only so quick.
+    const rate = (Math.min((this.v * 0.34 * driver.quick) / 9, driver.quick) * 0.8) / pace;
+    // Going out of its way is an effort, and more of one for a rival that is not chasing every pad.
+    const effort = 0.015 + 0.2 * (1 - driver.keen);
+    const room = 0.3 * driver.care + 0.3 * driver.loose;
+
+    let now = this.plan[0];
+    let next = this.plan[1];
+    let left = this.s;
+    let stake = false;
+    this.gates = 0;
+    this.routeLane = this.lane;
+    this.routeS0 = this.s;
+    this.routeX0 = this.x;
+    this.routeRate = rate;
+    this.routeLead = 2 / this.firmness(driver);
+    // The marble arrives a moment behind where it is steered, and steering early for the next thing starts to
+    // carry it off this one: so anything to be passed just so is reached that much sooner and held a little longer.
+    const settle = pace * this.routeLead;
+
+    // One step of the plan: from every strip it could be in at the last thing, to every strip at this one. It has
+    // to be in place from `before` the thing until `after` it.
+    const advance = (s: number, before: number, after: number, worth: (x: number) => number, middle = NaN) => {
+      const gate = this.gates;
+      const reach = rate * Math.max(0, s - before - left);
+      const span = Math.ceil(reach / strip);
+      const kerb = Math.max(strip, halfAt(s));
+      this.frameAt((s + left) / 2, this.ahead);
+      // The inside of a bend is the shorter way round.
+      const inside = (this.ahead.k * Math.max(0, s - left) * driver.keen) / 54;
+      for (let slot = 0; slot < SLOTS; slot++) {
+        const x = at(slot);
+        let best = -Infinity;
+        let via = slot;
+        if (!gate) {
+          const move = Math.abs(x - this.x);
+          if (move <= reach + strip / 2) best = -effort * move - Math.abs(x - this.goal) * 0.02;
+        } else {
+          for (let was = Math.max(0, slot - span); was <= Math.min(SLOTS - 1, slot + span); was++) {
+            const move = Math.abs(x - at(was));
+            if (move > reach + 1e-6 || now[was] === -Infinity) continue;
+            // All else equal, sooner: a move left late is a move that may not come off.
+            const total = now[was] - effort * move * (1 + gate * 0.03);
+            if (total > best) {
+              best = total;
+              via = was;
+            }
+          }
+        }
+        next[slot] = best === -Infinity || Math.abs(x) > kerb ? -Infinity : best + worth(x) + inside * x;
+        this.cameBy[gate * SLOTS + slot] = via;
+      }
+      [now, next] = [next, now];
+      this.routeIn[gate] = s - before;
+      this.routeOut[gate] = left = s + after;
+      this.routeX[gate] = middle;
+      this.gates++;
+    };
+
+    // A ramp carries the marble over whatever stands just behind it, and up to rings that hang in the air.
+    let rampX = 0;
+    let rampFrom = 0;
+    let rampTo = 0;
     for (const i of this.byLane[this.lane]) {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
-      if (ahead > 30) break;
-      if (ahead < -2 || this.gone(i)) continue;
-      if (o.kind === 'crate' || o.kind === 'goo' || o.kind === 'slider' || o.kind === 'pendulum' || o.kind === 'spinner' || o.kind === 'windmill') return true;
+      if (ahead > horizon || this.gates >= GATES - 1) break;
+      if (ahead < 0.5 || this.gone(i)) continue;
+      const lead = (ahead / pace) * driver.foresee;
+      const flown = o.s > rampFrom && o.s < rampTo;
+      // Hitting something costs more the faster it is going: all the speed above a steady roll is gone for good.
+      const cost = 1.2 + Math.max(0, this.v - CRUISE) / 13;
+      const near = ahead < pace * 1.2;
+      const want = (worth: number, wide: number, exact = false) => {
+        if (near) stake = true;
+        const value = (x: number) => {
+          const off = Math.abs(x - o.x);
+          return off > wide ? 0 : worth * driver.keen * (off < wide * 0.5 ? 1 : 0.7);
+        };
+        advance(o.s, exact ? 0.5 + settle / 2 : 1, exact ? 0.5 + settle / 2 : 0, value, o.x);
+      };
+      const avoid = (xs: number[], wide: number, much: number, long = 1.5) => {
+        if (near) stake = true;
+        const hit = (x: number) => xs.some((hx) => Math.abs(x - hx) < wide + room) && !(flown && Math.abs(x - rampX) < 1.6);
+        advance(o.s, long + 0.5 + settle, long + settle / 2, (x) => (hit(x) ? -much : 0));
+      };
+      if (o.kind === 'pad') {
+        // A pad is worth the speed it adds, and near top speed that is not much.
+        if (this.clock >= this.readyAt[i]) want(Math.max(0.3, (Math.min(MAX_SPEED, Math.max(this.v, CRUISE) + 13) - this.v) / 13), 1.6);
+      } else if (o.kind === 'turbo') {
+        if (this.clock >= this.readyAt[i]) want(3, 2.2);
+      } else if (o.kind === 'ring') {
+        if ((o.y ?? 2) < 3 || (flown && Math.abs(o.x - rampX) < 1)) want(0.45, 1.45, true);
+      } else if (o.kind === 'jump') {
+        // In the air from a moment after the ramp until a moment before landing.
+        const power = o.power ?? 11.5;
+        const high = Math.sqrt(Math.max(0, power * power - 4 * 13 * 2)) / 26;
+        rampX = o.x;
+        rampFrom = o.s + pace * (power / 26 - high);
+        rampTo = o.s + pace * (power / 26 + high);
+        want(0.25, 1.9, true);
+      } else if (o.kind === 'crate') avoid([o.x], 2.1, cost);
+      else if (o.kind === 'goo') avoid([o.x], 1.95, cost, (o.len ?? 8) / 2 + 0.5);
+      else if (o.kind === 'slider' || o.kind === 'pendulum') avoid([this.swingX(o, lead)], 2.0, cost + 0.3);
+      else if (o.kind === 'spinner') {
+        // A turning bar blocks the whole road when it lies across it and hardly any when it lies along it: what
+        // counts is which way it will be pointing on arrival, give or take.
+        const angle = this.spinAngle(o) + lead * (o.speed ?? 1);
+        let wide = 0;
+        for (const a of [angle - 0.3, angle, angle + 0.3]) wide = Math.max(wide, Math.min(((o.len ?? 3.2) + 0.3) / Math.abs(Math.cos(a)), 1.3 / Math.abs(Math.sin(a))));
+        avoid([o.x], wide + 0.2, cost);
+      } else if (o.kind === 'windmill') avoid(this.sailsAt(o, lead), 2.0, cost + 0.3);
     }
-    return false;
+    // Past the last thing it can see there is still road, and a bend has an inside.
+    if (this.s + horizon - left > 4) advance(this.s + horizon, 0, 0, () => 0);
+    this.aiming = stake;
+
+    // Trace the best way through back from its far end, to find where across the road to be at each thing.
+    let slot = 0;
+    for (let other = 1; other < SLOTS; other++) if (now[other] > now[slot]) slot = other;
+    if (now[slot] === -Infinity) {
+      this.gates = 0;
+      return;
+    }
+    for (let gate = this.gates - 1; gate >= 0; gate--) {
+      const x = at(slot);
+      // The strips are coarse: where it is going for a pad, go for the middle of it.
+      const middle = this.routeX[gate];
+      this.routeX[gate] = Math.abs(x - middle) < Math.max(strip, 0.6) ? clamp(middle, -edge, edge) : x;
+      slot = this.cameBy[gate * SLOTS + slot];
+    }
   }
 
   /** A careful player's line, for the hands-free test runs: go for everything, give blockers a wide berth. */
-  private smartLine(far = 1): number {
+  private smartLine(): number {
     const hazards: { s: number; x: number; wide: number }[] = [];
     const wants: number[] = [];
     for (const i of this.byLane[this.lane]) {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
-      if (ahead < 0.5 || ahead > 36 * far || this.gone(i)) continue;
+      if (ahead < 0.5 || ahead > 36 || this.gone(i)) continue;
       if (o.kind === 'crate' || o.kind === 'goo') hazards.push({ s: ahead, x: o.x, wide: 2.3 });
       else if (o.kind === 'slider' || o.kind === 'pendulum') hazards.push({ s: ahead, x: this.swingX(o), wide: 2.4 });
       else if (o.kind === 'spinner') hazards.push({ s: ahead, x: o.x, wide: (o.len ?? 3.2) + 0.6 });
@@ -615,7 +823,7 @@ export class Sim {
     const edge = this.limit - 0.6;
     // Never drift across a parting fork by accident: stay on the route the ball is on.
     wants.push(clamp(this.ahead.k * 160, -edge, edge), clamp(this.x, -edge, edge));
-    const safe = (x: number) => hazards.every((h) => h.s > 20 * far || Math.abs(h.x - x) > h.wide);
+    const safe = (x: number) => hazards.every((h) => h.s > 20 || Math.abs(h.x - x) > h.wide);
     const pick = wants.find(safe);
     if (pick !== undefined) return pick;
     const room = (x: number) => Math.min(...hazards.map((h) => Math.abs(h.x - x) - h.wide));
@@ -626,9 +834,9 @@ export class Sim {
    * An expert's line, driving for time alone: it sets the five-star time. It heads for the next speed pad, ring or
    * ramp it can actually reach, takes the inside of bends otherwise, and sidesteps blockers at the last moment.
    */
-  private aceLine(far = 1): number {
+  private aceLine(): number {
     const edge = this.limit - 0.4;
-    const reach = (ahead: number) => (26 * ahead) / Math.max(this.v, 20) / far + 0.8;
+    const reach = (ahead: number) => (26 * ahead) / Math.max(this.v, 20) + 0.8;
     const blockers: { s: number; x: number; wide: number }[] = [];
     let goal: number | null = null;
     for (const i of this.byLane[this.lane]) {
@@ -651,7 +859,7 @@ export class Sim {
       goal = Math.abs(this.ahead.k) > 0.004 ? clamp(this.ahead.k * 400, -edge, edge) : clamp(this.x, -edge, edge);
     }
     // Anything about to be hit on this line: step round it by the shorter way that stays on the road.
-    const soon = Math.max(8, this.v * 0.32) * far;
+    const soon = Math.max(8, this.v * 0.32);
     const inWay = blockers.filter((b) => b.s > -1 && b.s < soon);
     const clear = (x: number) => inWay.every((b) => Math.abs(b.x - x) > b.wide);
     if (!clear(goal)) {
@@ -686,7 +894,7 @@ export class Sim {
     if (riding && !this.riding) this.emit({ type: 'lift' });
     this.riding = riding;
     const driver = this.driver;
-    const line = driver?.line ?? this.autopilot;
+    const line = this.autopilot;
     const wanted = riding ? 0 : driver ? this.decide(driver, dt) : line === 'ace' ? this.aceLine() : line === 'smart' ? this.smartLine() : this.steer;
     const target = this.finished || this.knockT > 0 ? null : wanted;
     // On a wet or icy road the ball takes a moment to answer, and slides on when you let go.
@@ -694,9 +902,9 @@ export class Sim {
     if (target !== null && driver && !riding) {
       // A rival turns the marble the way a hand does: it leans towards where it wants to be and eases off as it
       // arrives, without swinging past, and can only move across as fast as it is rolling allows.
-      const firm = driver.turn * (grip === Infinity ? 1 : grip > 4 ? 0.75 : 0.55);
+      const firm = this.firmness(driver);
       const push = clamp(firm * firm * (target - this.x) - 2 * firm * this.xv, -firm * 11, firm * 11);
-      const most = Math.min(this.v * 0.34, 9);
+      const most = Math.min((this.v * 0.34 * driver.quick) / 9, driver.quick);
       this.xv = clamp(this.xv + push * dt, -most, most);
     } else if (target !== null) {
       // A swiping finger gets a snappier ball than keys or the mouse: quick enough to cross the road in about a

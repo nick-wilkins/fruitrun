@@ -164,3 +164,103 @@ For multiplayer later: smashed crates, fruit times and knocks will have to be se
 
 Review (`/code-review medium`, one round, 2026-11-19). Fixed: a knock can no longer push a marble off the road or past the normal top speed; a marble on turbo keeps its speed and only nudges what it hits; speed in the air is read correctly; held-back rivals respond in proportion; rivals brought home out of sight after the player finishes each run on their own copy of the course, with nothing shown and no fruit left hidden; no knock sound or shake once past the line; tests added for different roads, the countdown, the kerb and turbo. Left: rival pace is still tuned on a solo run (times are a guide, placings matter); `shareWith` assumes everyone shares with the same marble, which is how it is used.
 After the fixes: `npm test` 895 passed, `tsc` clean; level 7 medium and level 30 easy raced through the real loop to the results: most overlap 0.12, no fruit left hidden at the finish.
+
+## Difficulty tuning (2026-11-19)
+
+Nick raced on Hard, "missed almost every speed up and still just about won". Asked for: Hard genuinely hard, Medium a fair fight, Easy winnable at six to eight, by skill and not speed, still driving like people.
+
+### Diagnosis
+
+Measured with whole contact races run headlessly (three rivals and a stand-in player on one course, `jostle` on), levels 1, 3, 7, 15, 30, 45, 60. Stand-ins: `ace` and `smart` (the hands-free lines), `none` (never steers).
+
+- **The hard rivals did not reach their times.** Guide 3.9 to 4.7 stars; in a race they came home at about 2.5 to 4.2. Level 15: guide 62.5 s, drove 73.8 s on its own and 80.1 s in the race. Level 60: 62.4 against 74.1.
+- **So the careful hands-free line beat all three on Hard on 5 levels of 7**, by 3.3 s on average, and the expert line won all 7 by 7.1 s.
+- **Why they fell short.** They were following lines written for a marble that turns in an instant (28 across the road a second) with hands limited to 9, by stretching the line's look-ahead. With every mistake and all wandering switched off they still took 1.11 times the best hands-free time, caught 55 to 70 percent of the speed pads and hit 2 to 8 things a race. Reaction time, sharpness and slips made almost no difference: the plan was the limit, not the hands. Two layers also fought each other: the line said "cross now", the danger map still remembered the row of crates just passed and said "stay".
+- **The setting-up loop had nothing left to give.** All it could do for a rival behind its time was raise `speed` to 1 and strip its character; most hard rivals were already at 1.
+- **Contact** cost a further 2 to 6 s, and the rivals were set on a run alone.
+- **Side roads** were taken by fondness alone. Measured per level they are worth anything from 4 s lost (level 45) to 3 s gained (level 7).
+- Not confirmed: that a player who truly ignores the pads could win. A stand-in that only dodged came last on Hard by 16 s even then. More likely Nick drove a good line and caught more than it felt like; the rivals were simply at three-star pace.
+
+### Sources
+
+- Game AI Pro ch42 (rubber-banding): change the driver's skill before the car's power, "the drivers are still in the same cars and so no cheating is happening"; none of it near the player. ch38 (architecture): skill is the primary characteristic of a driver persona, a narrow range of it sets the difficulty, and it should vary slowly with short off spells. Game AI Pro 3 ch4: players judge difficulty poorly but notice a stupid-looking mistake at once. Game AI Pro ch40 and Reynolds for steering at a point up the road. https://www.gameaipro.com/
+- iRacing AI rosters: lower skill is "slower cornering speeds and a less optimum driving line", with separate dials for aggression and optimism. https://www.iracing.com/airoster/
+- Forza: difficulty is named as the skill of the opponents, Tourist to Unbeatable; the newer AI is built to make natural mistakes such as braking late and running wide. https://support.forza.net/hc/en-us/articles/360005363194-Difficulty-Assists-and-Drivatars , https://forza.net/news/forza-motorsport-drivatars-tire-physics (the forum threads on Drivatars cornering beyond the physics are the cautionary tale: https://forums.forza.net/t/ai-drivatar-and-difficulty-balancing-issues/57068 )
+- Gran Turismo Sophy coverage, and players' complaint that it is held back on power while ahead: https://aiwire.net/2022/02/11/sonys-sophy-ai-trained-on-thousands-of-races-bests-humans-champs , https://www.gtplanet.net/forum/threads/is-sophy-2-0-no-longer-competitive.423856/
+- Mario Kart, as what not to do on Hard (catch-up that players read as rigged): https://www.cheatcc.com/articles/why-mario-kart-s-rubber-band-ai-feels-rigged-not-just-hard/ , https://giantbomb.com/wiki/Concepts/Rubber_Band_AI . Forum and press pieces, not measurements.
+
+What was taken from them: difficulty is one marble driven better or worse, never a quicker marble; the setting-up loop turns a skill dial; the top difficulty is the rivals flat out, with no banding at all.
+
+### Targets
+
+Stand-ins added, built on the rivals' own driver model with ordinary hands: `steady` (a decent player, goes for most pads), `misser` (same hands, hardly ever goes out of the way for a pad: the run Nick described), `kid` (six to eight: slow hands, short sight, wanders, slips).
+
+- **Hard:** the expert line wins narrowly or loses; the careful line does not beat the leader on average; a decent player is usually fourth; missing the pads is last by a distance.
+- **Medium:** a decent player is in a close fight for the podium and wins about half; missing the pads loses it.
+- **Easy:** a young child is on the podium nearly every time and wins some; nobody is left more than 10 s behind.
+- The brief's "careful line behind two rivals on most levels" was restated. On three of the seven levels the careful line is the best line there is, so it stands in for an expert there. Where it is at least 5 percent slower than the expert line it does finish third or fourth.
+
+### What changed
+
+`src/game/sim.ts`
+- **Rivals read the road instead of borrowing the hands-free lines** (`readRoad`). Each look, a rival works out the best way through everything in the next one to three seconds that its own hands can manage: pads, turbos and rings worth having, crates, goo and moving things to miss, the inside of bends, the road narrowing. It no longer sets off for a pad it cannot reach. It knows a ramp carries it over the crates behind it, and that a turning bar lying along the road leaves room.
+- **It steers for a point a little way up the road** (`onward`) and carries on with what it has read between looks, so one move flows into the next. The strips of danger are now only for getting round other marbles.
+- **New things that separate a sharp driver from a casual one:** `ahead` (seconds of road read), `keen` (how far out of its way it goes for a pad), `foresee` (judging where a swinging thing will be on arrival), `loose` (whether it tightens up with something to aim for), `quick` (top speed of its hands), `wise` (knowing which side roads are short cuts). `line` and `far` are gone. The hands-free lines are untouched; star times are unchanged.
+
+`src/game/rivals.ts`
+- **Set in a race, not alone** (`fieldTimes`): the three together with a careful hands-free marble in the player's place, bumping and sharing crates.
+- **Set by skill.** `keen` closes in on what brings each rival home on its time. A rival behind its time gives up its favourite side of the road, then concentrates harder, and stops there: it keeps its forks and its character. `speed` stays 1 on Medium and Hard on every level sampled; only an easy rival still too quick while taking next to nothing is slowed, to 0.8 at the least.
+- **A sharp scout drives each course once per side road** so rivals can know which are short cuts. Hard rivals nearly always do (0.9), medium sometimes (0.4), easy go by whim.
+- Manners: hard reads 2.2 s ahead with hands that cross four units in about a third of a second (a player on keys manages much the same, a swipe is twice as quick); medium 1.6 s and about 0.8 s; easy 1.2 s and over a second.
+- Guide form: hard 4.7/4.3/3.9 to 4.9/4.6/4.3, which only an expert's run matches, so in practice they drive flat out. Easy 2.0/1.6/1.2 to 2.0/1.5/0.9: Plum on Easy is now slower than rolling straight, which is what puts a small child on the podium. Medium unchanged.
+- Easing off: easy 0.2 to 0.25, medium 0.1, hard 0. Still only ever slower, only when well clear.
+
+### Before and after
+
+Places over the seven levels in level order, and the average seconds ahead of the first rival home (minus is behind).
+
+| Difficulty | Stand-in | Before | After |
+|---|---|---|---|
+| Hard | expert line | 1111111, +7.1 | 1111111, +1.1 |
+| Hard | careful line | 1121211, +3.3 | 1141421, -0.8 |
+| Hard | never steers | 4444444, -15.7 | 4444444, -20.4 |
+| Hard | decent player | | 4244414, -4.7 |
+| Hard | misses the pads | | 4444444, -16.6 |
+| Medium | expert line | 1111111, +9.3 | 1111111, +6.8 |
+| Medium | careful line | 1121111, +6.4 | 1121111, +3.2 |
+| Medium | decent player | | 1111111, +1.5 |
+| Medium | misses the pads | | 4143443, -7.4 |
+| Easy | never steers | 4123144, -4.2 | 3113232, -2.1 |
+| Easy | young child | | 1131331, -0.4 |
+| Easy | misses the pads | | 1143131, -0.5 |
+
+The people stand-ins need the new driver model, so they have no "before".
+
+Checked again on 23 levels (every third), none of which the numbers were chosen on beyond the seven:
+- Hard: expert line wins 19 of 23 by 1.1 s on average and loses 4; careful line averages 0.5 s behind the leader; decent player fourth on 20; missing the pads last on all 23, 19 s back.
+- Medium: decent player on the podium 22 of 23, wins 14, average 0.4 s ahead.
+- Easy: young child on the podium 20 of 23, wins 6, average 1.7 s behind.
+
+Other numbers:
+- Hard leader's time against the best hands-free time: 1.03 (was about 1.12). Second 1.05, third 1.08. Medium 1.17, 1.22, 1.27. Easy 1.34, 1.40, 1.46.
+- Things hit per rival per race: hard 0.9 (was about 3), medium 3.6, easy 4.5.
+- How it looks, levels 7 and 30: easy rivals peak at 5 to 8 across the road a second and change direction 7 to 25 times a minute; medium 8.5 to 10 and 22 to 39; hard 16 and 32 to 60. The hands-free player line sits at 16 and about 80. Every rival was 3.5 to 9 before: hard is visibly busier now.
+- Working out a level's rivals costs 25 to 275 ms in Node (17 to 290 before).
+
+### Evidence
+
+- RED: the six new tests in `tests/race.test.ts` ("how hard the rivals are") run against the previous `sim.ts` and `rivals.ts` all failed, the first two with the diagnosis numbers (7.08 s against a limit of 3; 3.32 against 1). The four that use the people stand-ins fail there partly because the old driver does not understand them.
+- GREEN: `npm test` 921 passed in 12 files, 35.5 s (suite was about 30 s). `npx tsc --noEmit` clean.
+- Runtime verification: headless whole races only, as above. PASS for the placings. NOT DONE: nothing was watched by eye or on a device, on instruction (no browser, no sound).
+
+### Not achieved, and calls for Nick
+
+- **Not seen on screen.** Hard rivals now move across the road up to 16 a second, where 9 was the limit. They still ease into and out of every move and never snap, but whether that reads as a sharp person or as a machine is a call for the eye. To calm them: `MANNER.hard.quick` and `turn` in `rivals.ts`; quick 14 and turn 10 costs about 2 percent of their pace.
+- **The expert line still wins Hard 19 times in 23.** The leader is about 3 percent off it. Closing that needs hands as quick as the player's own, which was not wanted.
+- **Hard may now be too hard.** A decent player is last on most levels. The dial is `FORM.hard`: 4.7/4.3/3.9 brings the second and third back by a second or two.
+- **Rivals lose 2 to 4 percent in a crowd.** Near other marbles they drop their line and pick a strip. Not improved.
+- **Rings over a gap** are not gone for; only rings over a ramp.
+- **The stand-in people are models,** built from the same driver the rivals use. Real six year olds were not consulted.
+- The seven-level tests pin today's numbers. Retuning will move them; that is their job.
+
+Checked by the session owner after the tuning agent reported (2026-11-19): `npm test` 921 passed, `npx tsc --noEmit` clean, `npm run build` clean. Real game loop in desktop Chrome, sound off: level 7 Hard, careful line 57.4 s came 4th behind 53.6 to 54.3 s; expert line 53.2 s won by 0.1 s. Level 3 Easy, a marble that never steers won by 0.2 s. Level 15 Medium, careful line won by 3 s. Rival setup on starting a race took 15 to 100 ms. No console errors. Not watched by eye.

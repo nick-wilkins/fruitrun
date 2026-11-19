@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { completeLevel, newSave } from '../src/core/progress';
-import { finishingOrder, podiumFruit, RIVALS } from '../src/core/race';
+import { finishingOrder, podiumFruit, RIVALS, type Difficulty } from '../src/core/race';
 import { LEVELS } from '../src/data/levels';
 import { courseFor, starTimesFor } from '../src/game/courses';
-import { raceTime, rivalDrivers, rivalTargets } from '../src/game/rivals';
+import { fieldTimes, rivalDrivers, rivalTargets } from '../src/game/rivals';
+import { raceAgainst, type Outcome, type StandIn } from './field';
 
 const sample = [LEVELS[0], LEVELS[6], LEVELS[29]];
 
@@ -19,13 +20,12 @@ describe('star times', () => {
 
 describe('rivals', () => {
   // The time set for a rival is a guide: what it would do driving exactly to its level. Driving like a person, with
-  // wandering and mistakes, it comes in somewhere near, and the placings are what matter.
+  // wandering and mistakes, in among the others, it comes in somewhere near, and the placings are what matter.
   it.each(LEVELS)('all reach the line on $name at every difficulty, within a quarter of the time set as their guide', (level) => {
     const course = courseFor(level);
     for (const difficulty of ['easy', 'medium', 'hard'] as const) {
       const targets = rivalTargets(level, difficulty);
-      rivalDrivers(level, difficulty).forEach((driver, i) => {
-        const time = raceTime(course, level, driver, i);
+      fieldTimes(course, level, rivalDrivers(level, difficulty)).forEach((time, i) => {
         expect(time, `${difficulty} rival ${i}`).toBeLessThan(Infinity);
         expect(Math.abs(time - targets[i]) / targets[i], `${difficulty} rival ${i}: ${time.toFixed(1)}s against ${targets[i].toFixed(1)}s`).toBeLessThan(0.25);
       });
@@ -34,7 +34,7 @@ describe('rivals', () => {
 
   it('are slowest on easy and quickest on hard', () => {
     for (const level of sample) {
-      const best = (difficulty: 'easy' | 'medium' | 'hard') => Math.min(...rivalDrivers(level, difficulty).map((driver, i) => raceTime(courseFor(level), level, driver, i)));
+      const best = (difficulty: 'easy' | 'medium' | 'hard') => Math.min(...fieldTimes(courseFor(level), level, rivalDrivers(level, difficulty)));
       expect(best('easy')).toBeGreaterThan(best('medium'));
       expect(best('medium')).toBeGreaterThan(best('hard'));
     }
@@ -50,8 +50,58 @@ describe('rivals', () => {
 
   it('drive the same race every time', () => {
     const level = sample[2];
-    const [driver] = rivalDrivers(level, 'hard');
-    expect(raceTime(courseFor(level), level, driver, 0)).toBe(raceTime(courseFor(level), level, driver, 0));
+    const drivers = rivalDrivers(level, 'hard');
+    expect(fieldTimes(courseFor(level), level, drivers)).toEqual(fieldTimes(courseFor(level), level, drivers));
+  });
+});
+
+// Whole races against stand-ins for players of different ability, over a spread of levels. These pin how hard each
+// difficulty is; the numbers behind them are in docs/superpowers/2026-11-18-ios-phase-2-ai-races.md.
+describe('how hard the rivals are', () => {
+  const spread = [1, 3, 7, 15, 30, 45, 60].map((n) => LEVELS[n - 1]);
+  const races = (difficulty: Difficulty, standIn: StandIn) => spread.map((level) => raceAgainst(level, difficulty, standIn));
+  const mean = (values: number[]) => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const margins = (outcomes: Outcome[]) => outcomes.map((outcome) => outcome.margin);
+  const count = (outcomes: Outcome[], test: (outcome: Outcome) => boolean) => outcomes.filter(test).length;
+
+  it('on hard, the expert line only just wins, where it wins at all', () => {
+    const ace = margins(races('hard', 'ace'));
+    expect(mean(ace)).toBeLessThan(3);
+    expect(Math.max(...ace)).toBeLessThan(5);
+  });
+
+  it('on hard, the careful hands-free line does not come out ahead of the leader', () => {
+    expect(mean(margins(races('hard', 'smart')))).toBeLessThan(1);
+  });
+
+  it('on hard, a decent player is off the podium more often than on it, and one who misses the speed pads is last by a distance', () => {
+    expect(count(races('hard', 'steady'), (outcome) => outcome.place === 4)).toBeGreaterThanOrEqual(4);
+    const misser = races('hard', 'misser');
+    expect(misser.map((outcome) => outcome.place)).toEqual(spread.map(() => 4));
+    expect(mean(margins(misser))).toBeLessThan(-8);
+  });
+
+  it('on medium, a decent player is in a close fight for the podium, and missing the speed pads loses it', () => {
+    const steady = races('medium', 'steady');
+    expect(count(steady, (outcome) => outcome.place <= 3)).toBeGreaterThanOrEqual(6);
+    expect(mean(margins(steady).map(Math.abs))).toBeLessThan(4);
+    const misser = races('medium', 'misser');
+    expect(count(misser, (outcome) => outcome.place >= 3)).toBeGreaterThanOrEqual(4);
+    expect(mean(margins(misser))).toBeLessThan(-3);
+  });
+
+  it('on easy, a young child is on the podium nearly every time, and nobody is left far behind', () => {
+    const kid = races('easy', 'kid');
+    expect(count(kid, (outcome) => outcome.place <= 3)).toBeGreaterThanOrEqual(6);
+    expect(Math.min(...margins(kid))).toBeGreaterThan(-10);
+    expect(Math.min(...margins(races('easy', 'none')))).toBeGreaterThan(-10);
+  });
+
+  it('comes from how the rivals drive, not from a quicker or slower marble', () => {
+    for (const level of spread) for (const difficulty of ['medium', 'hard'] as const) expect(rivalDrivers(level, difficulty).map((driver) => driver.speed)).toEqual([1, 1, 1]);
+    const hits = (difficulty: Difficulty) => mean(races(difficulty, 'smart').flatMap((outcome) => outcome.hits));
+    expect(hits('hard')).toBeLessThan(hits('medium') / 2);
+    expect(hits('medium')).toBeLessThan(hits('easy'));
   });
 });
 
