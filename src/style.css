@@ -336,21 +336,51 @@ body::before {
 /* ---------- menu ---------- */
 
 .menu-stage {
-  --ratio: 987 / 526;
+  --ratio: 1720 / 914;
+}
+
+.menu-logo {
+  position: absolute;
+  left: 50%;
+  top: 2%;
+  width: 46%;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 0.6cqw 0.5cqw rgba(0, 0, 0, 0.3));
+  animation: pop-in 0.4s;
+  pointer-events: none;
+}
+
+.menu-btn {
+  position: absolute;
+  left: 50%;
+  width: 30%;
+  padding: 0;
+  background: none;
+  border: 0;
+  transform: translateX(-50%);
+  transition: transform 0.08s;
+  filter: drop-shadow(0 0.5cqw 0.4cqw rgba(0, 0, 0, 0.35));
+}
+
+.menu-btn img {
+  display: block;
+  width: 100%;
+}
+
+.menu-btn:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.menu-btn.off {
+  filter: grayscale(1) opacity(0.75);
 }
 
 .menu-carry {
-  left: 34.3%;
-  top: 57.2%;
-  width: 35.6%;
-  height: 17%;
+  top: 61%;
 }
 
 .menu-new {
-  left: 34.5%;
-  top: 76.8%;
-  width: 35.4%;
-  height: 17%;
+  top: 79%;
 }
 
 .mute {

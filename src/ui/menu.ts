@@ -6,11 +6,14 @@ import { setBackdrop } from './screen';
 
 export function menuScreen(app: App): HTMLElement {
   const stage = el('div.stage.menu-stage');
-  stage.append(el('img.bg', { src: asset('assets/ui/menu.webp'), alt: 'Smoothie Scramble', draggable: false }));
+  stage.append(
+    el('img.bg', { src: asset('assets/ui/menu-bg.webp'), alt: '', draggable: false }),
+    el('img.menu-logo', { src: asset('assets/ui/menu-logo.webp'), alt: 'Smoothie Scramble', draggable: false }),
+  );
 
-  const carryOn = el('button.hit.menu-carry', { ariaLabel: 'Carry on' });
+  const carryOn = el('button.menu-btn.menu-carry', { ariaLabel: 'Carry on' }, el('img', { src: asset('assets/ui/menu-carry.webp'), alt: '', draggable: false }));
   if (!app.hasSave) carryOn.classList.add('off');
-  setBackdrop(asset('assets/ui/menu.webp'));
+  setBackdrop(asset('assets/ui/menu-bg.webp'));
   onTap(carryOn, () => {
     if (!app.hasSave) {
       sfx.nope();
@@ -21,7 +24,7 @@ export function menuScreen(app: App): HTMLElement {
     app.show('map');
   });
 
-  const startNew = el('button.hit.menu-new', { ariaLabel: 'Start new' });
+  const startNew = el('button.menu-btn.menu-new', { ariaLabel: 'Start new' }, el('img', { src: asset('assets/ui/menu-new.webp'), alt: '', draggable: false }));
   onTap(startNew, () => {
     sfx.tap();
     if (!app.hasSave) {

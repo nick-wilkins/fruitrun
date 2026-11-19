@@ -162,7 +162,6 @@ def cut(source, box, out, strays=True):
     print(out, piece.size)
 
 
-cut("tools/source/ui-pack1.png", (0, 0, 1000, 545), "public/assets/ui/menu.webp")
 cut("tools/source/ui-pack1.png", (1005, 25, 1340, 205), "public/assets/ui/level-complete.png")
 cut("tools/source/ui-pack1.png", (1145, 548, 1222, 625), "public/assets/ui/star.png")
 cut("tools/source/ui-pack1.png", (1222, 548, 1297, 625), "public/assets/ui/star-empty.png")
