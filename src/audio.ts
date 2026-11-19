@@ -57,12 +57,15 @@ export function unlockAudio(): void {
   syncMusic();
 }
 
-/** Start the soundtrack: the tracks play in turn, for ever. It begins on the first tap if the browser is not ready yet. */
-export function startMusic(urls: string[]): void {
+/**
+ * Start the soundtrack: the tracks play in turn, for ever, beginning with one of the first `lead`. It begins on the
+ * first tap if the browser is not ready yet.
+ */
+export function startMusic(urls: string[], lead = urls.length): void {
   if (!music) {
     playlist = urls;
     // Start somewhere different each visit.
-    playing = Math.floor(Math.random() * urls.length);
+    playing = Math.floor(Math.random() * Math.min(lead, urls.length));
     const player = new Audio(urls[playing]);
     player.volume = MUSIC_VOLUME;
     player.preload = 'auto';
