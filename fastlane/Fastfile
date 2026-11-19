@@ -4,6 +4,7 @@ ROOT = File.expand_path('..', __dir__)
 PROJECT = File.join(ROOT, 'ios/App/App.xcodeproj')
 PBXPROJ = File.join(PROJECT, 'project.pbxproj')
 PACKAGE_JSON = File.join(ROOT, 'package.json')
+BUNDLE = 'com.smoothiescramble.app'
 
 def current_version
   JSON.parse(File.read(PACKAGE_JSON))['version']
@@ -21,16 +22,41 @@ def build_web
   sh("cd #{ROOT} && npm run build && env -u GEM_HOME -u GEM_PATH -u RUBYOPT -u RUBYLIB -u BUNDLE_GEMFILE npx cap sync ios")
 end
 
+# Signing with the key lets the build fetch its own certificate and profile, with no account signed in to Xcode.
+def signing_args
+  return '-allowProvisioningUpdates' unless ENV['ASC_KEY_ID']
+
+  [
+    '-allowProvisioningUpdates',
+    "-authenticationKeyPath #{File.expand_path(ENV.fetch('ASC_KEY_PATH'))}",
+    "-authenticationKeyID #{ENV.fetch('ASC_KEY_ID')}",
+    "-authenticationKeyIssuerID #{ENV.fetch('ASC_ISSUER_ID')}"
+  ].join(' ')
+end
+
+# The archive signs itself for development. The store copy is signed on export with the distribution
+# certificate in this Mac's keychain and a store profile fetched (or made, the first time) with the key.
+def store_export
+  return { method: 'app-store' } unless ENV['ASC_KEY_ID']
+
+  asc_key
+  get_provisioning_profile(app_identifier: BUNDLE, output_path: File.join(ROOT, 'build'), filename: 'store.mobileprovision')
+  {
+    method: 'app-store',
+    signingStyle: 'manual',
+    provisioningProfiles: { BUNDLE => lane_context[SharedValues::SIGH_NAME] }
+  }
+end
+
 def build_ios
   build_app(
     project: PROJECT,
     scheme: 'App',
     configuration: 'Release',
-    export_method: 'app-store',
+    export_options: store_export,
     output_directory: File.join(ROOT, 'build'),
     output_name: "SmoothieScramble-#{current_version}.ipa",
-    xcargs: '-allowProvisioningUpdates',
-    export_xcargs: '-allowProvisioningUpdates'
+    xcargs: signing_args
   )
 end
 
@@ -50,7 +76,7 @@ lane :bump do |options|
 end
 
 platform :ios do
-  desc 'Build and archive without uploading, to prove the app signs. No API key needed.'
+  desc 'Build and archive without uploading, to prove the app signs'
   lane :archive do
     build_web
     build_ios
@@ -58,7 +84,6 @@ platform :ios do
 
   desc 'Build, archive and upload to TestFlight for testers, with no store submission'
   lane :beta do
-    asc_key
     build_web
     build_ios
     upload_to_testflight(ipa: lane_context[SharedValues::IPA_OUTPUT_PATH], skip_waiting_for_build_processing: true)
