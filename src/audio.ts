@@ -221,9 +221,14 @@ export const sfx = {
     tone(160, 0.25, { type: 'square', volume: 0.26, to: 55 });
     noise(0.08, 0.3, 3500, 0.02);
   },
-  knock: () => {
-    noise(0.12, 0.3, 700, 0, 160);
-    tone(220, 0.12, { type: 'triangle', volume: 0.18, to: 120 });
+  /** Two marbles meeting: a glassy clack with a little bounce in it. `loud` is 1 for the player's own knocks. */
+  knock: (loud = 1) => {
+    tone(1750 + Math.random() * 250, 0.07, { type: 'sine', volume: 0.34 * loud, to: 1100 });
+    tone(2500 + Math.random() * 300, 0.05, { type: 'triangle', volume: 0.2 * loud, to: 1700, delay: 0.012 });
+    noise(0.035, 0.32 * loud, 3200, 0, undefined, 'highpass');
+    tone(240, 0.13, { type: 'sine', volume: 0.26 * loud, to: 130 });
+    // The bounce: a quieter clack a moment later.
+    tone(1500, 0.05, { type: 'sine', volume: 0.14 * loud, to: 1000, delay: 0.085 });
   },
   pin: () => {
     tone(1100 + Math.random() * 500, 0.08, { type: 'square', volume: 0.14, to: 600 });

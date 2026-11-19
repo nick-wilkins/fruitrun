@@ -228,6 +228,7 @@ export class Run {
   private ghost: { run: Ghost; pip: Pip } | null = null;
   /** The celebration is over and the results are owed, once any rival about to finish has done so. */
   private resultsDue = false;
+  private knockHeard = 0;
   /** Set once the player has finished and the rivals still out have been brought home out of sight. */
   private over = false;
 
@@ -580,7 +581,15 @@ export class Run {
     } else if (event.type === 'pin') this.fling(sim, this.world.pins, event.index, 0.75, 11);
     else if (event.type === 'pickup') this.sparks.burst(this.world.pickups.get(event.index)!.base, 8, ['#ffffff', '#ffe066'], 4);
     else if (event.type === 'bump') this.sparks.burst(sim.point(sim.s, sim.x, 0.8, this.v1), 10, ['#ffffff', '#ffd9a8'], 5);
-    else if (event.type === 'finish') this.sparks.burst(sim.point(sim.s, sim.x, 2, this.v1), 40, ['#ffffff', '#ffd23f', '#4aa3ff', '#ff7ac0'], 10);
+    else if (event.type === 'knock') {
+      this.sparks.burst(sim.point(sim.s, sim.x, 0.8, this.v1), 6, ['#ffffff', '#ffd9a8'], 4);
+      // Rivals knocking each other close by are heard, more quietly; a knock with the player has its own sound.
+      // One knock, one sound, though both marbles report it.
+      if (!this.sim.rattled && sim.lane === this.sim.lane && Math.abs(sim.s - this.sim.s) < 30 && this.sim.clock - this.knockHeard > 0.12) {
+        this.knockHeard = this.sim.clock;
+        sfx.knock(0.45);
+      }
+    } else if (event.type === 'finish') this.sparks.burst(sim.point(sim.s, sim.x, 2, this.v1), 40, ['#ffffff', '#ffd23f', '#4aa3ff', '#ff7ac0'], 10);
     else if (event.type === 'boost' || event.type === 'turbo') this.sparks.burst(sim.point(sim.s, sim.x, 0.5, this.v1), 8, ['#eaff3d', '#ffffff'], 4);
   }
 
