@@ -2578,6 +2578,7 @@ input.name {
   grid-template-columns: repeat(5, 1fr);
   gap: 1cqw;
   margin-bottom: 0.8em;
+  padding-top: 0.7em;
 }
 
 .cup {
@@ -2695,26 +2696,29 @@ input.name {
   color: #d08a4a;
 }
 
-.cup-going {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1em;
-  margin-bottom: 0.6em;
-  padding: 0.6em 1em;
-  font-size: 1.4cqw;
-  background: #dff5c8;
-  border: 0.2cqw solid #7cc04a;
-  border-radius: 1.2cqw;
+.cup {
+  position: relative;
 }
 
-.cup-going .row {
-  margin: 0;
-  flex: none;
+.cup.going {
+  background: linear-gradient(#f1ffe0, #cdf0a8);
+  border-color: #5fb62f;
+  box-shadow: 0 0.35cqw 0 rgba(50, 120, 20, 0.4), 0 0 0 0.35cqw rgba(140, 220, 90, 0.5);
+  animation: bob 1.3s ease-in-out infinite;
 }
 
-.cup-going .btn {
-  margin: 0;
+.cup-flag {
+  position: absolute;
+  left: 50%;
+  top: -0.9em;
+  transform: translateX(-50%);
+  padding: 0.05em 0.8em;
+  font-size: 0.78em;
+  white-space: nowrap;
+  color: #fff;
+  background: #3fae3a;
+  border: 0.15em solid #fff;
+  border-radius: 99em;
 }
 
 .cup-card {
@@ -2782,9 +2786,4 @@ input.name {
   color: #5a3310;
   background: #ffe27a;
   border: 0.12em solid #e0a000;
-}
-
-/* The buttons' depth hangs below them: lift them by half of it so they sit level with the words. */
-.cup-going .row {
-  transform: translateY(-0.12em);
 }

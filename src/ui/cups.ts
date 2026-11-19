@@ -69,34 +69,61 @@ export function cupsScreen(app: App): HTMLElement {
   };
 
   const entered = save.cup && cupById(save.cup.id);
-  if (save.cup && entered) {
-    const difficulty = DIFFICULTIES.find((d) => d.id === save.cup!.difficulty)!.name;
-    body.append(
+  const hardness = (id: string) => DIFFICULTIES.find((d) => d.id === id)!.name;
+  const button = (label: string, color: string, action: () => void) =>
+    el(`button.btn.${color}`, {
+      onclick: () => {
+        sfx.tap();
+        action();
+      },
+    }, label);
+  const giveUp = () => {
+    quitCup(save);
+    app.persist();
+  };
+
+  /** The cup under way: where it stands, and on with it or out of it. */
+  const resume = (cup: Cup) => {
+    const run = save.cup!;
+    const dialog = el(
+      'div.modal',
+      { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() },
       el(
-        'div.cup-going',
+        'div.card.small',
         {},
-        el('b', {}, `${entered.name} (${difficulty}): race ${save.cup.race + 1} of ${CUP_RACES} is next`),
+        el('div.kicker', {}, `${cup.name} · ${hardness(run.difficulty)}`),
+        el('h2', {}, `Race ${run.race + 1} of ${CUP_RACES} is next`),
+        run.race ? table(standings(save)) : el('p', {}, `First up: ${levelById(cup.levels[0]).name}.`),
+        el('div.row', {}, button('Give up', 'orange', () => (giveUp(), app.show('cups'))), button('Carry on ▶', 'green.big', () => app.playCup())),
+      ),
+    );
+    stage.append(dialog);
+  };
+
+  /** Another cup is under way: one at a time. */
+  const swap = (cup: Cup, going: Cup) => {
+    const dialog = el(
+      'div.modal',
+      { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() },
+      el(
+        'div.card.small',
+        {},
+        el('h2', {}, `You are in the ${going.name}`),
+        el('p', {}, `Starting the ${cup.name} gives that one up.`),
         el(
           'div.row',
           {},
-          el('button.btn.orange.small', {
-            onclick: () => {
-              sfx.tap();
-              quitCup(save);
-              app.persist();
-              app.show('cups');
-            },
-          }, 'Give up'),
-          el('button.btn.green.small', {
-            onclick: () => {
-              sfx.tap();
-              app.playCup();
-            },
-          }, 'Carry on ▶'),
+          button(`Back to the ${going.name}`, 'green', () => (dialog.remove(), resume(going))),
+          button(`Start the ${cup.name}`, 'orange', () => {
+            giveUp();
+            dialog.remove();
+            enter(cup);
+          }),
         ),
       ),
     );
-  }
+    stage.append(dialog);
+  };
 
   WORLDS.forEach((world, index) => {
     body.append(el('h3', {}, world.name));
@@ -111,8 +138,9 @@ export function cupsScreen(app: App): HTMLElement {
         ...DIFFICULTIES.map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: trophySvg }), name)),
       );
       const tile = el(
-        `button.cup${open ? '' : '.shut'}`,
+        `button.cup${open ? '' : '.shut'}${entered === cup ? '.going' : ''}`,
         {},
+        entered === cup ? el('div.cup-flag', {}, `Race ${save.cup!.race + 1} of ${CUP_RACES} next ▶`) : null,
         el('div.cup-art', { innerHTML: trophySvg }, el('img.cup-fruit', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }), open ? null : el('img.cup-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false })),
         el('b', {}, cup.name),
         open ? shelf : el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`),
@@ -123,13 +151,10 @@ export function cupsScreen(app: App): HTMLElement {
           app.toast('Finish all four of its levels to enter this cup!');
           return;
         }
-        if (save.cup) {
-          sfx.nope();
-          app.toast('Finish or give up the cup you are in first.');
-          return;
-        }
         sfx.tap();
-        enter(cup);
+        if (save.cup && entered === cup) resume(cup);
+        else if (save.cup && entered) swap(cup, entered);
+        else enter(cup);
       });
       grid.append(tile);
     }
