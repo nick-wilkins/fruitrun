@@ -12,7 +12,7 @@ import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import { readGhost } from './game/ghost';
-import { ghostStore, oldSave, onResume, saveStore, store } from './platform';
+import { askedStore, ghostStore, oldSave, onResume, saveStore, store } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -55,9 +55,10 @@ try {
 } catch {
   // The store cannot be read: start with nobody.
 }
-// What this Apple account owns is kept on the device, so this answers at once and with no internet.
-stock({ ...CLOSED, owned: await store.owned().catch(() => false) });
+stock(CLOSED);
 let showing: Screen = 'menu';
+/** An approval asked of a grown-up stays open for a day. After that the wait is no longer shown. */
+const ASK_LASTS = 24 * 60 * 60 * 1000;
 /** Sound on or off before anyone has started: nothing else of it is ever used. */
 const nobody = newSave();
 const worldOf = (save: Save) => (save.last ? levelById(save.last).world : 0);
@@ -130,6 +131,7 @@ const app: App = {
   },
   cupResult: null,
   startCup(cup: Cup, difficulty: Difficulty) {
+    if (!racesUnlocked()) return app.show('unlock');
     startCup(app.save, cup, difficulty);
     app.persist();
     app.playCup();
@@ -253,11 +255,13 @@ const app: App = {
   async buy() {
     const outcome = await store.buy().catch(() => 'failed' as const);
     stock(settle(shopNow(), outcome));
+    if (outcome === 'pending') askedStore.set(Date.now());
+    if (outcome === 'bought') askedStore.clear();
     return outcome;
   },
   async restore() {
     const owned = await store.restore().catch(() => null);
-    if (owned) stock(settle(shopNow(), 'bought'));
+    if (owned) owns(true);
     return owned;
   },
   toast(text: string) {
@@ -284,12 +288,29 @@ document.addEventListener('visibilitychange', () => {
 
 app.show('menu');
 void app.price();
-// A grown-up's yes, a purchase on another device or a refund can arrive at any time. A run under way is left alone.
-store.onChange((owned) => {
+/**
+ * Take the store's word on whether the unlock is owned. A run under way is left alone, and so is any screen
+ * that looks the same either way.
+ */
+function owns(owned: boolean): void {
   if (owned === shopNow().owned) return;
   stock({ ...shopNow(), owned, pending: owned ? false : shopNow().pending });
-  if (!run) app.show(showing);
-});
+  if (owned) askedStore.clear();
+  if (!run && ['map', 'cups', 'cuptable', 'unlock'].includes(showing)) app.show(showing);
+}
+// A grown-up's yes, a purchase on another device or a refund can arrive at any time.
+store.onChange(owns);
+// What the account owns is kept on the device, so this needs no internet. The game does not wait for it, and it
+// is asked again each time the app comes back, in case the first answer never came.
+const ask = () => void store.owned().then(owns, () => {});
+ask();
+onResume(ask);
+void askedStore
+  .get()
+  .then((at) => {
+    if (Date.now() - at < ASK_LASTS && !shopNow().owned) stock({ ...shopNow(), pending: true });
+  })
+  .catch(() => {});
 
 // Lay out courses in the background, starting with the ones the player can reach.
 warmCourses([...LEVELS].sort((a, b) => Number(isUnlocked(app.save, b)) - Number(isUnlocked(app.save, a))), () => !run);

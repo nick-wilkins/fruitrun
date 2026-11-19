@@ -30,6 +30,15 @@ export const ghostStore = {
   },
 };
 
+const ASKED_KEY = 'fruitrun.unlock.asked';
+
+/** When a grown-up was last asked to approve the unlock, so the wait is still shown after the app is reopened. */
+export const askedStore = {
+  get: async () => Number((await Preferences.get({ key: ASKED_KEY })).value) || 0,
+  set: (at: number) => void Preferences.set({ key: ASKED_KEY, value: String(at) }).catch(() => {}),
+  clear: () => void Preferences.remove({ key: ASKED_KEY }).catch(() => {}),
+};
+
 /** Call `handler` each time the app comes back to the front. */
 export function onResume(handler: () => void): void {
   void NativeApp.addListener('resume', handler);

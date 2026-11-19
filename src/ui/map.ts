@@ -289,7 +289,7 @@ export function mapScreen(app: App): HTMLElement {
   }
 
   const go = (label: string, color: string, screen: 'blender' | 'book' | 'cups') => {
-    const button = el(`button.btn.${color}.small`, {}, label);
+    const button = el(`button.btn.${color}.small${label.startsWith('🔒') ? '.locked' : ''}`, {}, label);
     onTap(button, () => {
       sfx.tap();
       app.show(screen);

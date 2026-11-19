@@ -23,12 +23,14 @@ export function unlockScreen(app: App): HTMLElement {
     const buy = el('button.btn.green.big', {}, 'Unlock');
     const restore = el('button.btn.blue', {}, 'Restore purchase');
     const back = el('button.btn.purple', { onclick: () => dialog.remove() }, 'Back');
+    // While the store is being asked, nothing can close the dialog: its answer is shown here.
     const busy = (on: boolean) => {
+      dialog.classList.toggle('busy', on);
       for (const each of [buy, restore, back]) each.disabled = on;
     };
     const price = (text: string | null) => {
       buy.textContent = text ? `Unlock for ${text}` : 'Unlock';
-      if (!text) note.textContent = 'The shop cannot be reached just now. Check the internet and try again.';
+      if (!text && !buy.disabled) note.textContent = 'The shop cannot be reached just now. Check the internet and try again.';
     };
     if (app.shop.price) price(app.shop.price);
     else void app.price().then((text) => dialog.isConnected && price(text));
@@ -55,7 +57,7 @@ export function unlockScreen(app: App): HTMLElement {
 
   /** A sum past the times tables a young child knows, answered on a number pad. */
   const gate = () => {
-    const dialog = el('div.modal', { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() });
+    const dialog = el('div.modal', { onclick: (e: MouseEvent) => e.target === e.currentTarget && !dialog.classList.contains('busy') && dialog.remove() });
     let sum = grownUpSum();
     let typed = '';
     const ask = el('p');

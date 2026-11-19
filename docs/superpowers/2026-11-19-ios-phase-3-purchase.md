@@ -57,3 +57,24 @@ Run 2026-11-19 on `ios`.
   - PASS bought: "Races are open!", map shows "Cups", the cups screen opens, a race starts with three rivals.
 - NOT RUN, needs a device: the real StoreKit sheet, price from the store, a sandbox purchase, restore after reinstall, Ask to Buy approval arriving later, a refund locking races again. These need a TestFlight build and a sandbox Apple account.
 - NOT DONE: a StoreKit configuration file for offline testing in Xcode. The sandbox through TestFlight is the test instead.
+
+## Review (`/code-review medium` on 56c8dca) and fixes
+
+Ten findings. Fixed:
+
+- The dialog could be closed by a tap outside it while the store was answering, losing the answer: it now stays until the answer is shown.
+- The game waited on the store before showing its first screen: it no longer waits. Ownership is asked at launch and again each time the app comes back.
+- An ownership change rebuilt whatever screen was up, emptying a half-filled jug: now only the map, cups and unlock screens are rebuilt.
+- A change arriving before the page was listening was lost: the plugin keeps it until it is heard.
+- The wait for a grown-up was forgotten on restart and never ended after a no: it is remembered for a day, then dropped.
+- A late price lookup could overwrite "One moment…" during a purchase.
+- A cup could be entered in the save before the lock turned it away.
+- The locked Cups button now greys like the locked Race button.
+
+Left: the lock is checked in `show`, `play` and `startCup` rather than one place (to be gathered when multiplayer adds its own way in). A production web build has no store, so races there are locked with no way to buy: this matters only if `ios` is ever merged for the web.
+
+Re-verified after the fixes, 2026-11-19:
+
+- PASS `tsc --noEmit`; `fastlane ios archive` exported a signed build; no upload.
+- Tests: 935 passed on three runs. One earlier run, straight after the Xcode build, showed 1 failure that did not repeat and was not identified.
+- PASS browser: owned is picked up after a reload; a pending approval is still shown after a reload; an ownership change while in the blender leaves the blender alone; locked Cups carries the `locked` style.

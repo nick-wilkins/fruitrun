@@ -23,7 +23,8 @@ public class StorePlugin: CAPPlugin, CAPBridgedPlugin {
             for await update in Transaction.updates {
                 if case .verified(let transaction) = update { await transaction.finish() }
                 guard let self else { return }
-                self.notifyListeners("change", data: ["owned": await Self.isOwned()])
+                // Kept until the page is listening: one can arrive at launch, before it has asked.
+                self.notifyListeners("change", data: ["owned": await Self.isOwned()], retainUntilConsumed: true)
             }
         }
     }
