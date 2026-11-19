@@ -3,7 +3,9 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  ConeGeometry,
   Float32BufferAttribute,
+  Group,
   LineBasicMaterial,
   LineSegments,
   Matrix4,
@@ -30,7 +32,7 @@ import { ghostAt, Recorder, type Ghost } from './ghost';
 import type { Course } from './course';
 import { seeded } from './random';
 import { GRID, gridSlot } from './rivals';
-import { BALL_RADIUS, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type Driver, type SimEvent } from './sim';
+import { BALL_RADIUS, COUNTDOWN, CRUISE, MAX_SPEED, MIN_SPEED, PUSH, Sim, TICK, type Driver, type SimEvent } from './sim';
 import { blobTexture } from './textures';
 import { makeFrame } from './track';
 import { buildWorld, PIVOT, standing, type World } from './world';
@@ -63,6 +65,8 @@ interface Racer {
   sim: Sim;
   pip: Pip;
   shadow: Mesh;
+  /** The fire streaming off the back of the mean one. */
+  flame?: Group;
 }
 
 export interface RunHooks {
@@ -91,6 +95,31 @@ interface Flying {
   spin: Vector3;
   angle: number;
   life: number;
+}
+
+/**
+ * A crest of fire: tongues fanned across the top of the marble that lean back as it goes, so they show from behind
+ * as well as from the side. Solid colour rather than glow, so it shows against a bright sky.
+ */
+function buildFlame(): Group {
+  const flame = new Group();
+  const tongues: [string, number, number, number][] = [
+    ['#e3262b', 0.5, 1.7, -0.75],
+    ['#ff8a1f', 0.55, 2.3, -0.38],
+    ['#e3262b', 0.62, 2.9, 0],
+    ['#ff8a1f', 0.55, 2.3, 0.38],
+    ['#e3262b', 0.5, 1.7, 0.75],
+    ['#ffe14d', 0.36, 1.9, 0],
+  ];
+  tongues.forEach(([color, radius, length, splay], i) => {
+    const tongue = new Mesh(new ConeGeometry(radius, length, 10, 1, true), new MeshBasicMaterial({ color, transparent: true, opacity: 0.92, depthWrite: false, fog: false }));
+    tongue.renderOrder = 2 + i;
+    const pivot = new Group();
+    pivot.rotation.z = splay;
+    pivot.add(tongue);
+    flame.add(pivot);
+  });
+  return flame;
 }
 
 /** A small pool of glowing dots for sparkles, splinters and confetti. */
@@ -303,7 +332,9 @@ export class Run {
       pip.root.matrixAutoUpdate = false;
       const shadow = this.makeShadow();
       this.world.scene.add(pip.root, shadow);
-      this.racers.push({ rival, sim, pip, shadow });
+      const flame = rival.mean ? buildFlame() : undefined;
+      if (flame) pip.root.add(flame);
+      this.racers.push({ rival, sim, pip, shadow, flame });
     });
     // Each rival can see every other marble, the player's included, and makes room for it.
     this.marbles = [this.sim, ...this.racers.map((racer) => racer.sim)];
@@ -725,6 +756,19 @@ export class Run {
     this.camLook.copy(this.rig.look);
     this.camUp.copy(this.rig.up);
 
+    if (this.racers.length && sim.countdown > 0) {
+      // Before a race the view starts in front, facing the grid, and swings round to its place behind for "go".
+      const k = clamp(1 - sim.countdown / COUNTDOWN, 0, 1);
+      const smooth = (t: number) => t * t * (3 - 2 * t);
+      const swing = smooth(clamp((k - 0.15) / 0.7, 0, 1));
+      const angle = swing * Math.PI;
+      const out = 11 - swing * 2;
+      this.v1.copy(f.p).addScaledVector(f.t, Math.cos(angle) * out).addScaledVector(f.r, Math.sin(angle) * out).addScaledVector(f.u, 2.2 + swing * 1.8);
+      this.v3.copy(f.p).addScaledVector(f.u, 2.8 - swing * 1.6);
+      const home = smooth(clamp((k - 0.75) / 0.25, 0, 1));
+      this.camPos.copy(this.v1).lerp(this.rig.pos, home);
+      this.camLook.copy(this.v3).lerp(this.rig.look, home);
+    }
     if (sim.finished) {
       // Swing round to the front for the celebration.
       const k = clamp(sim.finishT / 1.4, 0, 1);
@@ -756,12 +800,25 @@ export class Run {
       this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisZ, (sim.xv * dt) / BALL_RADIUS));
     }
     for (const racer of this.racers) {
+      if (racer.flame) {
+        // It smoulders on the grid and streams out with speed, flickering all the while.
+        const burn = racer.sim.countdown > 0 ? 0.45 : 0.55 + clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.75;
+        racer.flame.visible = !racer.sim.finished;
+        const lean = racer.sim.countdown > 0 ? 0.35 : 0.6 + clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.5;
+        racer.flame.children.forEach((pivot, i) => {
+          const tongue = pivot.children[0] as Mesh<ConeGeometry>;
+          const flicker = burn * (1 + Math.sin(sim.clock * (31 + i * 13) + i * 2) * 0.14 + (Math.random() - 0.5) * 0.12);
+          pivot.rotation.x = -lean + Math.sin(sim.clock * (17 + i * 7)) * 0.08;
+          tongue.scale.set(1, flicker, 1);
+          tongue.position.y = 0.6 + (tongue.geometry.parameters.height * flicker) / 2;
+        });
+      }
       if (racer.sim.countdown > 0) continue;
       racer.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (racer.sim.v * racer.sim.gait * dt) / BALL_RADIUS));
       racer.pip.leaves.rotation.x = -clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.9;
       // The mean one burns as it goes.
       if (racer.rival.mean && !racer.sim.finished && racer.pip.root.visible && dt > 0) {
-        this.sparks.burst(racer.sim.point(racer.sim.s - 1 - Math.random() * 0.8, racer.sim.x + (Math.random() - 0.5) * 0.9, 0.4 + Math.random() * 0.9, this.v1), 5, ['#ff5a2a', '#ffd23f', '#ff2a2a', '#ffffff'], 3);
+        this.sparks.burst(racer.sim.point(racer.sim.s - 1 - Math.random() * 0.8, racer.sim.x + (Math.random() - 0.5) * 0.9, 0.4 + Math.random() * 0.9, this.v1), 2, ['#ff5a2a', '#ffd23f', '#ff2a2a', '#ffffff'], 3);
       }
       // Knocked by something, it rocks about for a moment; otherwise it leans the way it is steering.
       racer.pip.body.rotation.z = racer.sim.rattled ? Math.sin(racer.sim.clock * 38) * 0.45 : clamp(racer.sim.xv * 0.06, -0.5, 0.5);

@@ -13,7 +13,7 @@ export const MAX_SPEED = 56;
 export const TURBO_SPEED = 86;
 const TURBO_TIME = 2.2;
 const GRAVITY = 11;
-const COUNTDOWN = 3;
+export const COUNTDOWN = 3;
 const START_S = 12;
 /** How far past the kerb a steering target may reach, so pressing into the wall registers as a scrape. */
 export const PUSH = 1.2;
