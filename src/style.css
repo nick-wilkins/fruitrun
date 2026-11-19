@@ -3160,3 +3160,27 @@ input.name {
 .btn:disabled {
   opacity: 0.5;
 }
+
+/* ---------- playing together nearby ---------- */
+
+.party-card .race-order {
+  margin: 0.4em auto;
+}
+
+.party-pick {
+  align-items: center;
+  margin-top: 0.3em;
+}
+
+.party-level {
+  min-width: 12em;
+  font-size: 1.1em;
+}
+
+.party-card .race-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  min-width: 12em;
+  white-space: nowrap;
+}

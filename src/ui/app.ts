@@ -1,11 +1,12 @@
 import type { Cup, CupResult } from '../core/cups';
+import type { Party } from '../core/nearby';
 import type { Player, Roster } from '../core/players';
 import type { Save } from '../core/progress';
 import type { Difficulty } from '../core/race';
 import type { Outcome, Shop } from '../core/shop';
 import type { Level } from '../data/levels';
 
-export type Screen = 'menu' | 'map' | 'blender' | 'superblender' | 'book' | 'cups' | 'cuptable' | 'unlock';
+export type Screen = 'menu' | 'map' | 'blender' | 'superblender' | 'book' | 'cups' | 'cuptable' | 'unlock' | 'party';
 
 export interface App {
   /** The save of whoever is playing. Before anyone has started, a blank one that is never kept. */
@@ -25,8 +26,8 @@ export interface App {
   world: number;
   persist(): void;
   show(screen: Screen): void;
-  /** Start a level, as a race against the computer marbles if `race` says how hard. */
-  play(level: Level, race?: Difficulty, cup?: string): void;
+  /** Start a level: as a race against the computer marbles if `race` says how hard, or with the friends in the party. */
+  play(level: Level, race?: Difficulty, cup?: string, together?: boolean): void;
   /** Enter a cup at this difficulty and start its first race. */
   startCup(cup: Cup, difficulty: Difficulty): void;
   /** Start the next race of the cup under way. */
@@ -34,6 +35,8 @@ export interface App {
   /** How the cup just finished came out, for the table shown after its last race. */
   cupResult: CupResult | null;
   toast(text: string): void;
+  /** The game with friends nearby: being got together, under way, or idle. */
+  readonly party: Party;
   /** What is known of the unlock for races and cups. */
   readonly shop: Shop;
   /** The unlock's price, asking the store if it is not yet known; null if the store cannot be reached. */

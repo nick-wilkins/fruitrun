@@ -27,6 +27,8 @@ export interface Hud {
   finished(): void;
   /** `order` is everyone in finishing order, for a race. */
   results(result: RunResult, order?: Finisher[]): void;
+  /** The finishing order has moved on since the results went up: a friend still out has come home. */
+  standings(order: Finisher[]): void;
 }
 
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
@@ -37,6 +39,18 @@ const padlock = (open: boolean) =>
   `<svg viewBox="0 0 24 24"><path d="${open ? 'M8 11V7a4 4 0 0 1 7.6-1.7' : 'M8 11V7a4 4 0 0 1 8 0v4'}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor"/></svg>`;
 
 /** `passed` is true when this level already has the stars it needs to open what comes next: then there is no goal to show. */
+/** Everyone in a race, in order. A friend not yet home has no time to show. */
+function orderTable(order: Finisher[]): HTMLElement {
+  return el(
+    'div.race-order',
+    {},
+    ...order.map((row, i) => {
+      const home = Number.isFinite(row.time);
+      return el(`div.race-row${row.you ? '.you' : ''}`, {}, el('b', {}, home ? ORDINAL[i + 1] : '…'), el('i', { style: `background:${row.color}` }), el('span', {}, row.name), el('em', {}, home ? formatTime(row.time) : 'still racing'));
+    }),
+  );
+}
+
 export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string, passed = false): Hud {
   const fruit = ingredient(level.fruit);
   const root = el('div.hud');
@@ -163,19 +177,14 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
     finished() {
       pauseButton.classList.add('hidden');
     },
+    standings(order) {
+      root.querySelector('.race-order')?.replaceWith(orderTable(order));
+    },
     results(result, order) {
       root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
       // A race: who came where, and what the place was worth.
       const podium = result.podium ?? 0;
-      const table = order
-        ? el(
-            'div.race-order',
-            {},
-            ...order.map((row, i) =>
-              el(`div.race-row${row.you ? '.you' : ''}`, {}, el('b', {}, ORDINAL[i + 1]), el('i', { style: `background:${row.color}` }), el('span', {}, row.name), el('em', {}, formatTime(row.time))),
-            ),
-          )
-        : null;
+      const table = order ? orderTable(order) : null;
       // One line for the fruit: in a race it says what the place added, or what a podium would.
       const won = `You won ${countOf(result.fruits, fruit.name)}`;
       const wonLine = !order || !result.place ? `${won}!` : podium ? `${won}: ${podium} for coming ${ORDINAL[result.place]}!` : rivals.length === 1 ? `${won}. Beat ${rivals[0].name} for more!` : `${won}. Reach the podium for more!`;

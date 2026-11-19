@@ -10,5 +10,6 @@ class MainViewController: CAPBridgeViewController {
 
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(StorePlugin())
+        bridge?.registerPluginInstance(NearbyPlugin())
     }
 }

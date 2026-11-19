@@ -1,0 +1,204 @@
+import { describe, expect, it } from 'vitest';
+import { COURSES } from '../src/core/progress';
+import { decode, encode, Marble, Party, PROTOCOL, type Nearby, type NearbyEvent } from '../src/core/nearby';
+
+/** Devices within reach of each other, with no radio: whatever one sends arrives at once. */
+function air() {
+  const devices = new Map<string, { name: string; hosting: boolean; hear: (event: NearbyEvent) => void; links: Map<string, string> }>();
+  let count = 0;
+  const device = (): Nearby => {
+    const id = `d${++count}`;
+    const me = { name: '', hosting: false, hear: (_: NearbyEvent) => {}, links: new Map<string, string>() };
+    devices.set(id, me);
+    const hosts = () => [...devices].filter(([, each]) => each.hosting).map(([hostId, each]) => ({ id: hostId, name: each.name }));
+    return {
+      listen: (handler) => (me.hear = handler),
+      host: async (name) => {
+        me.name = name;
+        me.hosting = true;
+      },
+      browse: async () => me.hear({ type: 'hosts', hosts: hosts() }),
+      join: async (hostId) => {
+        const host = devices.get(hostId)!;
+        // The host knows the joiner by its own id; the joiner knows the host as 'host'.
+        me.links.set('host', hostId);
+        host.links.set(id, id);
+        host.hear({ type: 'peer', id, joined: true });
+        me.hear({ type: 'peer', id: 'host', joined: true });
+      },
+      send: (text, to) => {
+        for (const [as, other] of me.links) {
+          if (to && to !== as) continue;
+          const there = devices.get(other)!;
+          const from = [...there.links].find(([, target]) => target === id)?.[0] ?? id;
+          there.hear({ type: 'message', from: as === 'host' ? id : from === id ? 'host' : from, text });
+        }
+      },
+      leave: () => {
+        me.hosting = false;
+        for (const [as, other] of me.links) devices.get(other)!.hear({ type: 'peer', id: as === 'host' ? id : 'host', joined: false });
+        me.links.clear();
+      },
+    };
+  };
+  return device;
+}
+
+describe('messages between devices', () => {
+  it('survive the trip', () => {
+    const spot = { t: 'pos' as const, lane: 1, s: 123.4, x: -2.25, h: 0.5, v: 31.2, p: 0.25 };
+    expect(decode(encode(spot))).toEqual(spot);
+    expect(decode(encode({ t: 'start', level: 'level-3' }))).toEqual({ t: 'start', level: 'level-3' });
+  });
+
+  it('are dropped when they are not what they claim', () => {
+    expect(decode('not json')).toBeNull();
+    expect(decode('{"t":"pos","lane":"x"}')).toBeNull();
+    expect(decode('{"t":"start"}')).toBeNull();
+    expect(decode('{"t":"launch-missiles"}')).toBeNull();
+  });
+});
+
+describe("a friend's marble", () => {
+  const report = (s: number, v = 30, extra = {}) => ({ lane: 0, s, x: 0, h: 0, v, p: s / 1000, ...extra });
+
+  it('is nowhere until it has been heard from', () => {
+    expect(new Marble().spot(0)).toBeNull();
+  });
+
+  it('keeps rolling at its last speed between reports', () => {
+    const marble = new Marble();
+    marble.hear(report(100), 10);
+    expect(marble.spot(10)!.s).toBeCloseTo(100);
+    expect(marble.spot(10.05)!.s).toBeCloseTo(101.5);
+  });
+
+  it('does not run on for ever when the reports stop', () => {
+    const marble = new Marble();
+    marble.hear(report(100), 10);
+    expect(marble.spot(15)!.s).toBeCloseTo(marble.spot(11)!.s);
+    expect(marble.spot(15)!.s).toBeLessThan(110);
+  });
+
+  it('glides to a late report with no jump', () => {
+    const marble = new Marble();
+    marble.hear(report(100), 10);
+    const before = marble.spot(10.2)!.s;
+    marble.hear(report(103), 10.2);
+    expect(marble.spot(10.2)!.s).toBeCloseTo(before);
+    expect(marble.spot(10.5)!.s).toBeCloseTo(103 + 30 * 0.25);
+  });
+
+  it('goes straight to another road', () => {
+    const marble = new Marble();
+    marble.hear(report(100), 10);
+    marble.hear(report(20, 30, { lane: 2 }), 10.1);
+    expect(marble.spot(10.1)).toMatchObject({ lane: 2, s: 20 });
+  });
+});
+
+describe('a party', () => {
+  const gather = () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    sam.host();
+    for (const guest of [ada, kit]) {
+      guest.browse();
+      guest.join(guest.hosts[0].id);
+    }
+    return { sam, ada, kit };
+  };
+
+  it('finds a game and joins it', () => {
+    const { sam, ada, kit } = gather();
+    expect(sam.phase).toBe('hosting');
+    expect(ada.phase).toBe('joined');
+    for (const party of [sam, ada, kit]) expect(party.players.map((p) => p.name)).toEqual(['Sam', 'Ada', 'Kit']);
+    expect(ada.friends().map((p) => p.name)).toEqual(['Sam', 'Kit']);
+    expect(kit.slot()).toBe(2);
+  });
+
+  it('starts everyone on the level the host picks', () => {
+    const { sam, ada, kit } = gather();
+    const started: string[] = [];
+    for (const party of [sam, ada, kit]) party.onStart = (level) => started.push(level);
+    sam.start('level-4');
+    expect(started).toEqual(['level-4', 'level-4', 'level-4']);
+  });
+
+  it('only lets the host start, and only with somebody to race', () => {
+    const { sam, ada } = gather();
+    const started: string[] = [];
+    sam.onStart = ada.onStart = (level) => started.push(level);
+    ada.start('level-4');
+    expect(started).toEqual([]);
+    const alone = new Party(air()(), 'Solo', () => 0);
+    alone.onStart = (level) => started.push(level);
+    alone.host();
+    alone.start('level-1');
+    expect(started).toEqual([]);
+  });
+
+  it('shows each player where the others are, the host passing it on', () => {
+    const { sam, ada, kit } = gather();
+    sam.start('level-1');
+    ada.report({ lane: 0, s: 50, x: 1, h: 0, v: 20, p: 0.1 });
+    const adaAtSam = sam.marbles.get(sam.players[1].id)!;
+    const adaAtKit = kit.marbles.get(kit.players[1].id)!;
+    expect(adaAtSam.spot(0)).toMatchObject({ s: 50, x: 1 });
+    expect(adaAtKit.spot(0)).toMatchObject({ s: 50, x: 1 });
+    expect(adaAtKit.progress).toBe(0.1);
+    // Nobody is sent their own marble back.
+    expect(ada.marbles.get(ada.me)).toBeUndefined();
+  });
+
+  it('tells everyone when a player crosses the line', () => {
+    const { sam, ada, kit } = gather();
+    sam.start('level-1');
+    kit.finished(41.5);
+    expect(sam.marbles.get(sam.players[2].id)!.time).toBe(41.5);
+    expect(ada.marbles.get(ada.players[2].id)!.time).toBe(41.5);
+  });
+
+  it('carries on without a friend who drops out', () => {
+    const { sam, ada, kit } = gather();
+    ada.leave();
+    expect(sam.players.map((p) => p.name)).toEqual(['Sam', 'Kit']);
+    expect(kit.players.map((p) => p.name)).toEqual(['Sam', 'Kit']);
+    expect(ada.phase).toBe('idle');
+  });
+
+  it('closes for everyone when the host leaves', () => {
+    const { sam, ada, kit } = gather();
+    sam.leave();
+    expect(ada.phase).toBe('closed');
+    expect(kit.why).toBe('ended');
+  });
+
+  it('turns away a device on another version of the game', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const old = new Party(device(), 'Old', () => 0, { v: PROTOCOL, courses: COURSES - 1 });
+    sam.host();
+    old.browse();
+    old.join(old.hosts[0].id);
+    expect(old.phase).toBe('closed');
+    expect(old.why).toBe('version');
+    expect(sam.players.map((p) => p.name)).toEqual(['Sam']);
+  });
+
+  it('turns away a fifth player', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    sam.host();
+    const guests = ['A', 'B', 'C', 'D'].map((name) => new Party(device(), name, () => 0));
+    for (const guest of guests) {
+      guest.browse();
+      guest.join(guest.hosts[0].id);
+    }
+    expect(sam.players).toHaveLength(4);
+    expect(guests[3].why).toBe('full');
+  });
+});

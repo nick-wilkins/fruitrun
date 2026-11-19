@@ -23,7 +23,8 @@ import {
 } from 'three';
 import { sfx } from '../audio';
 import { starsForTime, type Feats } from '../core/progress';
-import { finishingOrder, type Finisher, type Rival } from '../core/race';
+import type { Marble } from '../core/nearby';
+import { finishingOrder, YOUR_COLOR, type Finisher, type Rival } from '../core/race';
 import type { Level } from '../data/levels';
 import { Rig } from './camera';
 import { buildPip, type Pip } from './character';
@@ -56,6 +57,18 @@ export interface HudState {
 export interface Field {
   rivals: Rival[];
   drivers: Driver[];
+}
+
+/** Somebody racing on another device: how to draw them, and the marble their reports move. */
+export interface Friend {
+  rival: Rival;
+  marble: Marble;
+}
+
+/** A race with friends nearby: where this player lines up, and the others. */
+export interface Together {
+  slot: number;
+  friends: Friend[];
 }
 
 /** How a race ended: everyone in finishing order, and where the player came. */
@@ -266,6 +279,8 @@ export class Run {
   private readonly flying: Flying[] = [];
   private readonly weather: Weather | null;
   private readonly racers: Racer[] = [];
+  /** Friends on other devices. They are drawn where they say they are and touch nothing here. */
+  private readonly friends: (Friend & { pip: Pip; shadow: Mesh })[] = [];
   /** Every marble on the course, the player's first. */
   private readonly marbles: Sim[];
   private readonly recorder = new Recorder();
@@ -315,6 +330,7 @@ export class Run {
     readonly level: Level,
     private readonly hooks: RunHooks,
     field: Field | null = null,
+    together: Together | null = null,
   ) {
     this.canvas = renderer.domElement;
     this.sim = new Sim(course, level, (event) => this.react(event));
@@ -351,6 +367,18 @@ export class Run {
       const flame = rival.mean ? buildFlame() : undefined;
       if (flame) pip.root.add(flame);
       this.racers.push({ rival, sim, pip, shadow, flame });
+    });
+    if (together) this.sim.x = GRID[together.slot] ?? 0;
+    together?.friends.forEach((friend) => {
+      const { rival } = friend;
+      const dark = course.mood === 'night' || course.mood === 'midnight';
+      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: [rival.deep, '#ffffff', rival.color], glow: dark ? 0.55 : 0 });
+      pip.root.matrixAutoUpdate = false;
+      pip.root.visible = false;
+      const shadow = this.makeShadow();
+      shadow.visible = false;
+      this.world.scene.add(pip.root, shadow);
+      this.friends.push({ ...friend, pip, shadow });
     });
     // Each rival can see every other marble, the player's included, and makes room for it.
     this.marbles = [this.sim, ...this.racers.map((racer) => racer.sim)];
@@ -528,8 +556,8 @@ export class Run {
       bonuses: sim.bonuses.length,
       countdown: sim.countdown > 0 ? sim.countdown : null,
       boosting: sim.boostT > 0,
-      place: this.racers.length ? this.place() : null,
-      rivals: this.racers.map((racer) => racer.sim.progress()),
+      place: this.racing() ? this.place() : null,
+      rivals: [...this.racers.map((racer) => racer.sim.progress()), ...this.friends.map((friend) => (friend.marble.time === null ? friend.marble.progress : 1))],
     };
   }
 
@@ -573,15 +601,56 @@ export class Run {
     pip.root.matrixWorldNeedsUpdate = true;
   }
 
+  /** Whether anyone else is on the course, computer or friend. */
+  private racing(): boolean {
+    return this.racers.length + this.friends.length > 0;
+  }
+
+  /** Put each friend's marble where their device last said it was, rolled on to now. */
+  private seatFriends(): void {
+    const now = performance.now() / 1000;
+    for (const { marble, pip, shadow } of this.friends) {
+      const spot = marble.gone ? null : marble.spot(now);
+      const lane = spot ? this.course.lanes[spot.lane] : undefined;
+      pip.root.visible = shadow.visible = Boolean(spot && lane);
+      if (!spot || !lane) continue;
+      const f = lane.track.at(spot.s, this.f);
+      this.v1.copy(f.r).negate();
+      this.v2.copy(f.p).addScaledVector(f.r, spot.x).addScaledVector(f.u, BALL_RADIUS + spot.h);
+      pip.root.matrix.makeBasis(this.v1, f.u, f.t).setPosition(this.v2);
+      pip.root.matrixWorldNeedsUpdate = true;
+      const shrink = 1 / (1 + spot.h * 0.45);
+      this.v3.copy(f.p).addScaledVector(f.r, spot.x).addScaledVector(f.u, 0.06);
+      shadow.matrix.makeBasis(f.r, f.t, f.u).scale(this.v4.set(shrink, shrink, 1)).setPosition(this.v3);
+      shadow.matrixWorldNeedsUpdate = true;
+    }
+  }
+
+  /**
+   * A race with friends as it stands: those home in the order of their own clocks, then those still out, the
+   * furthest along first. Anyone who left before finishing is not in it.
+   */
+  standings(): Finisher[] {
+    const sim = this.sim;
+    const rows = [
+      { name: 'You', color: YOUR_COLOR, time: sim.finished ? sim.time : Infinity, you: true, progress: sim.progress() },
+      ...this.friends.filter(({ marble }) => marble.time !== null || !marble.gone).map(({ rival, marble }) => ({ name: rival.name, color: rival.color, time: marble.time ?? Infinity, you: false, progress: marble.progress })),
+    ];
+    rows.sort((a, b) => (a.time === b.time ? (Number.isFinite(a.time) ? Number(b.you) - Number(a.you) : b.progress - a.progress) : a.time - b.time));
+    return rows.map(({ name, color, time, you }) => ({ name, color, time, you }));
+  }
+
   /** Where the player is running: one more than the number of rivals in front. */
   private place(): number {
     const sim = this.sim;
+    if (this.friends.length) return 1 + this.standings().findIndex((row) => row.you);
     const ahead = (rival: Sim) => (sim.finished ? rival.finished && rival.time < sim.time : rival.finished || rival.progress() > sim.progress());
     return 1 + this.racers.filter((racer) => ahead(racer.sim)).length;
   }
 
   /** The line is crossed: bring home anyone still out on the course, so the result is complete. */
   private raceResult(): Finisher[] | null {
+    if (this.friends.length) return this.standings();
     if (!this.racers.length) return null;
     this.over = true;
     for (const racer of this.racers) {
@@ -735,7 +804,7 @@ export class Run {
       }
       case 'finish': {
         // Anyone already home is ahead; the rest race on to the line by themselves, with nobody left to wait for.
-        this.hooks.finish(sim.time, sim.bonuses, sim.feats(), this.racers.length ? this.place() : null);
+        this.hooks.finish(sim.time, sim.bonuses, sim.feats(), this.racing() ? this.place() : null);
         for (const racer of this.racers) racer.sim.chase = null;
         sfx.finish();
         const f = sim.frameAt(sim.s, this.f);
@@ -778,6 +847,7 @@ export class Run {
     // A rival still racing after the player is home keeps its own smooth motion.
     for (const racer of this.racers) this.seat(racer.sim, racer.pip, racer.shadow, racer.sim.finished || racer.sim.countdown > 0 ? 0 : this.owed);
     this.seatGhost(lead);
+    this.seatFriends();
     // The player last: the camera works from what is left behind.
     this.seat(sim, this.pip, this.shadow, lead);
     const s = sim.s + sim.v * lead;
@@ -790,7 +860,7 @@ export class Run {
     this.camLook.copy(this.rig.look);
     this.camUp.copy(this.rig.up);
 
-    if (this.racers.length && sim.countdown > 0) {
+    if (this.racing() && sim.countdown > 0) {
       // Before a race the view starts in front, facing the grid, and swings round to its place behind for "go".
       const k = clamp(1 - sim.countdown / COUNTDOWN, 0, 1);
       const smooth = (t: number) => t * t * (3 - 2 * t);

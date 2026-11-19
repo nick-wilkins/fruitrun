@@ -4,7 +4,8 @@ import { asset } from './ui/dom';
 import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
-import { racesUnlocked, rivalsFor, type Difficulty, type Finisher } from './core/race';
+import { Party } from './core/nearby';
+import { racesUnlocked, RIVALS, rivalsFor, type Difficulty, type Finisher } from './core/race';
 import { CLOSED, settle, shopNow, stock } from './core/shop';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
@@ -12,7 +13,7 @@ import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import { readGhost } from './game/ghost';
-import { askedStore, ghostStore, oldSave, onResume, saveStore, store } from './platform';
+import { askedStore, ghostStore, nearby, oldSave, onResume, saveStore, store } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -22,6 +23,7 @@ import { el } from './ui/dom';
 import { createHud } from './ui/hud';
 import { mapScreen } from './ui/map';
 import { menuScreen } from './ui/menu';
+import { partyScreen } from './ui/party';
 import { unlockScreen } from './ui/unlock';
 import './style.css';
 
@@ -69,7 +71,10 @@ function endRun(): void {
   canvas.classList.add('hidden');
 }
 
+const party = new Party(nearby, 'Player', () => performance.now() / 1000);
+
 const app: App = {
+  party,
   get save() {
     return playing(roster)?.save ?? nobody;
   },
@@ -113,7 +118,7 @@ const app: App = {
   },
   show(screen: Screen) {
     // Cups are races: without the unlock, the way in leads to where it is offered.
-    if ((screen === 'cups' || screen === 'cuptable') && !racesUnlocked()) screen = 'unlock';
+    if ((screen === 'cups' || screen === 'cuptable' || screen === 'party') && !racesUnlocked()) screen = 'unlock';
     showing = screen;
     endRun();
     musicFor(null);
@@ -126,6 +131,7 @@ const app: App = {
       cups: cupsScreen,
       cuptable: cupTableScreen,
       unlock: unlockScreen,
+      party: partyScreen,
     }[screen];
     ui.replaceChildren(build(app));
   },
@@ -142,8 +148,8 @@ const app: App = {
     if (!entered || !cup) return app.show('cups');
     app.play(levelById(cup.levels[entered.race]), entered.difficulty, `${cup.name}, race ${entered.race + 1} of ${CUP_RACES}`);
   },
-  play(level: Level, race?: Difficulty, cup?: string) {
-    if (race && !racesUnlocked()) return app.show('unlock');
+  play(level: Level, race?: Difficulty, cup?: string, together = false) {
+    if ((race || together) && !racesUnlocked()) return app.show('unlock');
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
       // loss was not the device's own doing. If it is still gone a good while after the first tap, start the
@@ -162,13 +168,19 @@ const app: App = {
     sessionStorage.removeItem(RELOADED);
     endRun();
     app.world = level.world;
+    // Friends take Pip's friends' colours, in the order they joined.
+    const friends = together ? party.friends().flatMap((member, i) => {
+      const marble = party.marbles.get(member.id);
+      return marble ? [{ rival: { ...RIVALS[i % RIVALS.length], name: member.name }, marble }] : [];
+    }) : [];
     const hud = createHud(
       level,
       {
         pause: (paused) => run?.setPaused(paused),
-        // Starting again keeps the kind of run it was: a race stays a race, as hard as before.
-        restart: () => app.play(level, race, cup),
-        quit: () => app.show(cup ? 'cups' : 'map'),
+        // Starting again keeps the kind of run it was: a race stays a race, as hard as before. A race with
+        // friends cannot be started again by one of them: it is back to the waiting room.
+        restart: () => (together ? app.show('party') : app.play(level, race, cup)),
+        quit: () => app.show(together ? 'party' : cup ? 'cups' : 'map'),
         blend: () => {
           if (draft) {
             app.save = draft;
@@ -194,7 +206,7 @@ const app: App = {
           return app.save.muted;
         },
       },
-      race ? rivalsFor(race) : [],
+      together ? friends.map((friend) => friend.rival) : race ? rivalsFor(race) : [],
       cup,
       (app.save.levels[level.id]?.stars ?? 0) >= level.need || !LEVELS.some((l) => l.after.includes(level.n)),
     );
@@ -218,7 +230,9 @@ const app: App = {
           // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
           // retrying throws the whole run away, fruit, stars, podium place and all.
           draft = structuredClone(app.save);
-          result = completeLevel(draft, level, time, bonuses, feats, place ?? undefined, race);
+          // With friends the run counts as one of your own: the place is for the glory.
+          result = completeLevel(draft, level, time, bonuses, feats, together ? undefined : (place ?? undefined), race);
+          if (together) party.finished(time);
           trace = result.newBest ? (run?.trace() ?? null) : null;
           hud.finished();
         },
@@ -228,8 +242,24 @@ const app: App = {
         },
       },
       race ? { rivals: rivalsFor(race), drivers: rivalDrivers(level, race) } : null,
+      together ? { slot: party.slot(), friends } : null,
     );
     run.start();
+    if (together) {
+      // Tell the others where this marble is, and keep the finishing order on the results card up to date.
+      const mine = run;
+      let shown = '';
+      const telling = window.setInterval(() => {
+        if (run !== mine) return window.clearInterval(telling);
+        const { sim } = mine;
+        if (!sim.finished) party.report({ lane: sim.lane, s: sim.s, x: sim.x, h: sim.h, v: sim.countdown > 0 ? 0 : sim.v * sim.gait, p: sim.progress() });
+        if (!order) return;
+        const now = mine.standings();
+        const key = JSON.stringify(now);
+        if (shown && key !== shown) hud.standings(now);
+        shown = key;
+      }, 1000 / 15);
+    }
     // On a run of your own, your best run here rolls alongside. It is fetched while the countdown plays.
     if (!race && app.player && app.save.ghost !== false) {
       const mine = run;
@@ -286,6 +316,16 @@ document.addEventListener('visibilitychange', () => {
   else if (!document.querySelector('.hud .modal:not(.hidden):not(.clear)')) run?.setPaused(false);
 });
 
+party.onChange = () => {
+  if (run) {
+    if (party.phase === 'closed') app.toast('The game with friends has ended.');
+  } else if (showing === 'party') app.show('party');
+};
+party.onStart = (id) => {
+  const level = LEVELS.find((each) => each.id === id);
+  if (level) app.play(level, undefined, undefined, true);
+};
+
 app.show('menu');
 void app.price();
 /**
@@ -296,7 +336,7 @@ function owns(owned: boolean): void {
   if (owned === shopNow().owned) return;
   stock({ ...shopNow(), owned, pending: owned ? false : shopNow().pending });
   if (owned) askedStore.clear();
-  if (!run && ['map', 'cups', 'cuptable', 'unlock'].includes(showing)) app.show(showing);
+  if (!run && ['map', 'cups', 'cuptable', 'unlock', 'party'].includes(showing)) app.show(showing);
 }
 // A grown-up's yes, a purchase on another device or a refund can arrive at any time.
 store.onChange(owns);

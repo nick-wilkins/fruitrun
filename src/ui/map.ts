@@ -288,7 +288,7 @@ export function mapScreen(app: App): HTMLElement {
     stage.append(way);
   }
 
-  const go = (label: string, color: string, screen: 'blender' | 'book' | 'cups') => {
+  const go = (label: string, color: string, screen: 'blender' | 'book' | 'cups' | 'party') => {
     const button = el(`button.btn.${color}.small${label.startsWith('🔒') ? '.locked' : ''}`, {}, label);
     onTap(button, () => {
       sfx.tap();
@@ -306,6 +306,7 @@ export function mapScreen(app: App): HTMLElement {
     el('div.chip', {}, el('img', { src: asset('assets/smoothie-cup.png'), alt: 'Smoothie points' }), String(save.points)),
     go('Blend', 'green', 'blender'),
     go(racesUnlocked() ? 'Cups' : '🔒 Cups', 'purple', 'cups'),
+    go(racesUnlocked() ? 'Together' : '🔒 Together', 'blue', 'party'),
     go('Book', 'orange', 'book'),
   );
   stage.append(blender, el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
