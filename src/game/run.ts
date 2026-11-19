@@ -26,6 +26,7 @@ import type { Level } from '../data/levels';
 import { Rig } from './camera';
 import { buildPip, type Pip } from './character';
 import { jostle } from './contact';
+import { ghostAt, Recorder, type Ghost } from './ghost';
 import type { Course } from './course';
 import { seeded } from './random';
 import { GRID } from './rivals';
@@ -222,6 +223,9 @@ export class Run {
   private readonly racers: Racer[] = [];
   /** Every marble on the course, the player's first. */
   private readonly marbles: Sim[];
+  private readonly recorder = new Recorder();
+  /** The player's best run here, shown as a see-through marble to chase. It touches nothing. */
+  private ghost: { run: Ghost; pip: Pip } | null = null;
   /** Set once the player has finished and the rivals still out have been brought home out of sight. */
   private over = false;
 
@@ -430,6 +434,7 @@ export class Run {
     this.owed += dt;
     while (this.owed >= TICK) {
       this.sim.step(TICK);
+      this.recorder.sample(this.sim);
       for (const racer of this.racers) racer.sim.step(TICK);
       if (this.racers.length) jostle(this.marbles);
       this.owed -= TICK;
@@ -456,6 +461,44 @@ export class Run {
       place: this.racers.length ? this.place() : null,
       rivals: this.racers.map((racer) => racer.sim.progress()),
     };
+  }
+
+  /** This run so far, as a ghost to keep: ask once the line has been crossed. */
+  trace(): string {
+    return this.recorder.finish(this.sim.time);
+  }
+
+  /** Show a best run alongside this one. */
+  haunt(run: Ghost): void {
+    if (this.ghost || this.disposed) return;
+    const pip = buildPip({ skin: '#ffffff', belly: '#ffffff', leaf: '#dff4ff', bands: ['#ffffff', '#bfe9ff', '#ffffff'], glow: 0.4 });
+    pip.root.traverse((part) => {
+      const material = (part as Mesh).material as MeshBasicMaterial | undefined;
+      if (!material) return;
+      material.transparent = true;
+      material.opacity = 0.38;
+      material.depthWrite = false;
+    });
+    pip.root.matrixAutoUpdate = false;
+    pip.root.visible = false;
+    this.world.scene.add(pip.root);
+    this.ghost = { run, pip };
+  }
+
+  /** Put the ghost where the best run was at this moment of it. */
+  private seatGhost(lead: number): void {
+    if (!this.ghost) return;
+    const { run, pip } = this.ghost;
+    const sim = this.sim;
+    const spot = sim.countdown > 0 ? null : ghostAt(run, sim.time + lead);
+    // Out of the way once the player is home, so the celebration is theirs.
+    pip.root.visible = spot !== null && !sim.finished;
+    if (!spot) return;
+    const f = this.course.lanes[spot.lane].track.at(spot.s, this.f);
+    this.v1.copy(f.r).negate();
+    this.v2.copy(f.p).addScaledVector(f.r, spot.x).addScaledVector(f.u, BALL_RADIUS + spot.h);
+    pip.root.matrix.makeBasis(this.v1, f.u, f.t).setPosition(this.v2);
+    pip.root.matrixWorldNeedsUpdate = true;
   }
 
   /** Where the player is running: one more than the number of rivals in front. */
@@ -637,6 +680,7 @@ export class Run {
     // be by now, part-way into the next step, so its motion is even rather than a step ahead or behind.
     const lead = sim.countdown > 0 || sim.finished ? 0 : this.owed;
     for (const racer of this.racers) this.seat(racer.sim, racer.pip, racer.shadow, racer.sim.finished ? 0 : lead);
+    this.seatGhost(lead);
     // The player last: the camera works from what is left behind.
     this.seat(sim, this.pip, this.shadow, lead);
     const s = sim.s + sim.v * lead;

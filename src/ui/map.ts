@@ -109,6 +109,22 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       card.append(list);
     });
   }
+  // Chasing your own best run is on unless switched off here.
+  const ghost = times.length ? el('button.best-time.ghost', { ariaLabel: 'Ghost of your best run' }) : null;
+  if (ghost) {
+    const show = () => {
+      const on = app.save.ghost !== false;
+      ghost.textContent = on ? '👻 Ghost on' : '👻 Ghost off';
+      ghost.classList.toggle('off', !on);
+    };
+    show();
+    onTap(ghost, () => {
+      sfx.tap();
+      app.save.ghost = app.save.ghost === false;
+      app.persist();
+      show();
+    });
+  }
   const card = el(
     'div.modal',
     { onclick: (e: MouseEvent) => e.target === e.currentTarget && close() },
@@ -119,7 +135,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('img.big-fruit', { src: asset(fruit.img), alt: fruit.name, draggable: false }),
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
-      record ? el('div.best', {}, stars(record.stars), best) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
+      record ? el('div.best', {}, stars(record.stars), best, ghost) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
       record && racesUnlocked() ? raceMedals(record.races, DIFFICULTIES) : null,
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,

@@ -74,6 +74,8 @@ export interface Save {
   /** Ids of awards earned. */
   awards: string[];
   muted: boolean;
+  /** False once the player has switched off the ghost of their best run. */
+  ghost?: boolean;
   /** How hard the last race was set: offered first next time. */
   race?: Difficulty;
 }

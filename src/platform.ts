@@ -16,6 +16,18 @@ export const saveStore: SaveStore = {
 /** The single save from before the game kept one per player. Read once, to become the first player; never written. */
 export const oldSave = async () => (await Preferences.get({ key: SAVE_KEY })).value;
 
+const ghostKey = (player: string, level: string) => `fruitrun.ghost.${player}.${level}`;
+
+/** Each player's best run on each level, kept apart from the save so that stays small. */
+export const ghostStore = {
+  get: async (player: string, level: string) => (await Preferences.get({ key: ghostKey(player, level) })).value,
+  set: (player: string, level: string, value: string) => void Preferences.set({ key: ghostKey(player, level), value }).catch(() => {}),
+  /** Forget every ghost a player has: their number may be given to someone new. */
+  clear: (player: string, levels: string[]) => {
+    for (const level of levels) void Preferences.remove({ key: ghostKey(player, level) }).catch(() => {});
+  },
+};
+
 /** Call `handler` each time the app comes back to the front. */
 export function onResume(handler: () => void): void {
   void NativeApp.addListener('resume', handler);

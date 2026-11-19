@@ -58,3 +58,12 @@ Recorded here per stage with PASS or FAIL: the real screens in desktop Chrome wi
 - Runtime, desktop Chrome, sound off: PASS. The existing save loaded as "Player 1" with its 2 levels and 74 fruit, and the old key was left in place. Start New asked for a name, "  Sam  " became Sam with a blank map; the store then held Player 1 (2 levels) and Sam (0). Carry On showed "Who's playing?" with both and their stars. Removing Sam asked first, then left Player 1 playing with everything intact. The level card's best time opened the Best times list.
 - Not checked: the on-screen keyboard for the name box on a real iPhone or iPad, and the results card's "Your 2nd best" tag (needs a finished run).
 - Left for Nick's eye: removing a player is behind a simple confirm, not a grown-up gate.
+
+### Stage 2: ghost (2026-11-19)
+
+- Built: `src/game/ghost.ts` (recorder, text form, replay), drawn in `src/game/run.ts` as a see-through white marble, kept per player and level by `ghostStore` in `src/platform.ts`, loaded during the countdown of a run on your own, switched on or off from the level card. It is saved when a new best is kept ("Keep and blend"), like the rest of the result. A player's ghosts are cleared when they are removed.
+- RED: `tests/ghost.test.ts` failed (no `ghost` module). GREEN: 4 tests. Tolerances I first guessed were tighter than a tenth-of-a-second sampling can give and were set to what it does: within 1 along the road (half a marble) and 0.8 across.
+- Size: 3.4 KB for a 42 second run; under 12 KB for the longest tested.
+- Runtime, desktop Chrome, sound off, a throwaway player: PASS. First run 41.87 s kept and blended: one ghost entry written. Second run: the ghost loaded with time 41.867 and was on the road from the start to the finish; seen in a screenshot beside the player. Removing the player removed the ghost entry and left Player 1 untouched.
+- A race does not show the ghost, but a best time set in a race still becomes the ghost.
+- Not checked: on a device; the feel of chasing it is Nick's call.

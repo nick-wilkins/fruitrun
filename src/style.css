@@ -2531,3 +2531,9 @@ input.name {
 .new-best.ranked {
   background: #7a3fc9;
 }
+
+.best-time.ghost.off {
+  opacity: 0.55;
+  background: rgba(255, 255, 255, 0.5);
+  border-style: dashed;
+}

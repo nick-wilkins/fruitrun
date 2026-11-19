@@ -9,7 +9,8 @@ import { courseFor, warmCourses } from './game/courses';
 import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
-import { oldSave, onResume, saveStore } from './platform';
+import { readGhost } from './game/ghost';
+import { ghostStore, oldSave, onResume, saveStore } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -87,7 +88,9 @@ const app: App = {
     app.persist();
   },
   join(name: string) {
-    if (!addPlayer(roster, name, app.save.muted)) return false;
+    const player = addPlayer(roster, name, app.save.muted);
+    if (!player) return false;
+    ghostStore.clear(player.id, LEVELS.map((l) => l.id));
     app.world = 0;
     app.persist();
     app.show('map');
@@ -95,6 +98,7 @@ const app: App = {
   },
   leave(id: string) {
     removePlayer(roster, id);
+    ghostStore.clear(id, LEVELS.map((l) => l.id));
     app.world = worldOf(app.save);
     app.persist();
   },
@@ -140,6 +144,8 @@ const app: App = {
           if (draft) {
             app.save = draft;
             app.persist();
+            // A new best time is the run to chase from now on.
+            if (trace && app.player) ghostStore.set(app.player.id, level.id, trace);
           }
           app.show('blender');
         },
@@ -158,6 +164,7 @@ const app: App = {
     let result: RunResult | null = null;
     let draft: Save | null = null;
     let order: Finisher[] | undefined;
+    let trace: string | null = null;
     // Night levels get their own dreamy tune.
     musicFor(level.mood === 'night' || level.mood === 'midnight' ? asset('assets/audio/track4.m4a') : null);
     run = new Run(
@@ -173,6 +180,7 @@ const app: App = {
           draft = structuredClone(app.save);
           result = completeLevel(draft, level, time, bonuses, feats, raced?.place, race);
           order = raced?.order;
+          trace = result.newBest ? (run?.trace() ?? null) : null;
           hud.finished();
         },
         results: () => result && hud.results(result, order),
@@ -180,6 +188,17 @@ const app: App = {
       race ? { rivals: RIVALS, drivers: rivalDrivers(level, race) } : null,
     );
     run.start();
+    // On a run of your own, your best run here rolls alongside. It is fetched while the countdown plays.
+    if (!race && app.player && app.save.ghost !== false) {
+      const mine = run;
+      void ghostStore
+        .get(app.player.id, level.id)
+        .then((raw) => {
+          const ghost = readGhost(raw);
+          if (ghost && run === mine) mine.haunt(ghost);
+        })
+        .catch(() => {});
+    }
   },
   toast(text: string) {
     toastEl.textContent = text;
