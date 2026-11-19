@@ -1,6 +1,8 @@
 import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
+import { claimAwards } from './core/awards';
+import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
 import { RIVALS, type Difficulty, type Finisher } from './core/race';
@@ -15,6 +17,7 @@ import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
 import { bookScreen } from './ui/book';
+import { cupsScreen, cupTableScreen } from './ui/cups';
 import { el } from './ui/dom';
 import { createHud } from './ui/hud';
 import { mapScreen } from './ui/map';
@@ -111,10 +114,24 @@ const app: App = {
       blender: (a: App) => blenderScreen(a, MAX_JUG),
       superblender: (a: App) => blenderScreen(a, SUPER_JUG),
       book: bookScreen,
+      cups: cupsScreen,
+      cuptable: cupTableScreen,
     }[screen];
     ui.replaceChildren(build(app));
   },
-  play(level: Level, race?: Difficulty) {
+  cupResult: null,
+  startCup(cup: Cup, difficulty: Difficulty) {
+    startCup(app.save, cup, difficulty);
+    app.persist();
+    app.playCup();
+  },
+  playCup() {
+    const entered = app.save.cup;
+    const cup = entered && cupById(entered.id);
+    if (!entered || !cup) return app.show('cups');
+    app.play(levelById(cup.levels[entered.race]), entered.difficulty, `${cup.name}, race ${entered.race + 1} of ${CUP_RACES}`);
+  },
+  play(level: Level, race?: Difficulty, cup?: string) {
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
       // loss was not the device's own doing. If it is still gone a good while after the first tap, start the
@@ -138,8 +155,8 @@ const app: App = {
       {
         pause: (paused) => run?.setPaused(paused),
         // Starting again keeps the kind of run it was: a race stays a race, as hard as before.
-        restart: () => app.play(level, race),
-        quit: () => app.show('map'),
+        restart: () => app.play(level, race, cup),
+        quit: () => app.show(cup ? 'cups' : 'map'),
         blend: () => {
           if (draft) {
             app.save = draft;
@@ -148,6 +165,16 @@ const app: App = {
             if (trace && app.player) ghostStore.set(app.player.id, level.id, trace);
           }
           app.show('blender');
+        },
+        next: () => {
+          if (!draft || !order) return;
+          app.save = draft;
+          app.cupResult = scoreCupRace(app.save, order);
+          // A finished cup can earn awards of its own.
+          claimAwards(app.save);
+          app.persist();
+          if (trace && app.player) ghostStore.set(app.player.id, level.id, trace);
+          app.show('cuptable');
         },
         muted: () => app.save.muted,
         toggleSound: () => {
@@ -158,6 +185,7 @@ const app: App = {
         },
       },
       race ? RIVALS : [],
+      cup,
     );
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');

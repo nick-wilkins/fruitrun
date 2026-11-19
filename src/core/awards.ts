@@ -130,6 +130,32 @@ const GROUPS: [string, Entry[]][] = [
     ],
   ],
   [
+    'Racing',
+    [
+      ...tiers('race-wins', fruit('cherry'), (s) => stat(s, 'raceWins'), [
+        [1, 'First Past the Post', 'Win a race'],
+        [10, 'Hard to Beat', 'Win 10 races'],
+        [50, 'Racing Legend', 'Win 50 races'],
+      ]),
+      { id: 'hard-win', name: 'Tough Cookie', how: 'Win a race on Hard', icon: item('walnut'), done: (s) => stat(s, 'hardWins') >= 1 },
+      ...tiers('sweep', STAR, (s) => stat(s, 'sweeps'), [
+        [1, 'Clean Sweep', 'Win a level on Easy, Medium and Hard'],
+        [10, 'Sweeping Up', 'Win 10 levels at every difficulty'],
+        [ALL, 'Unbeatable', 'Win every level at every difficulty'],
+      ]),
+      ...tiers('cups', fruit('pineapple'), (s) => stat(s, 'cups'), [
+        [1, 'Cup Runner', 'Finish a cup'],
+        [10, 'Cup Regular', 'Finish 10 cups'],
+      ]),
+      ...tiers('cup-gold', fruit('lemon'), (s) => stat(s, 'cupGolds'), [
+        [1, 'Going for Gold', 'Win a gold trophy'],
+        [10, 'Trophy Cabinet', 'Win 10 gold trophies'],
+      ]),
+      { id: 'cup-hard-gold', name: 'Champion', how: 'Win a gold trophy on Hard', icon: fruit('dragonfruit'), done: (s) => stat(s, 'cupHardGolds') >= 1 },
+      { id: 'cup-perfect', name: 'Perfect Forty', how: 'Win every race in a cup', icon: STAR, done: (s) => stat(s, 'cupPerfect') >= 1 },
+    ],
+  ],
+  [
     'Blending',
     [
       ...tiers('smoothies', CUP, (s) => s.smoothies, [

@@ -1,9 +1,10 @@
+import type { Cup, CupResult } from '../core/cups';
 import type { Player, Roster } from '../core/players';
 import type { Save } from '../core/progress';
 import type { Difficulty } from '../core/race';
 import type { Level } from '../data/levels';
 
-export type Screen = 'menu' | 'map' | 'blender' | 'superblender' | 'book';
+export type Screen = 'menu' | 'map' | 'blender' | 'superblender' | 'book' | 'cups' | 'cuptable';
 
 export interface App {
   /** The save of whoever is playing. Before anyone has started, a blank one that is never kept. */
@@ -24,6 +25,12 @@ export interface App {
   persist(): void;
   show(screen: Screen): void;
   /** Start a level, as a race against the computer marbles if `race` says how hard. */
-  play(level: Level, race?: Difficulty): void;
+  play(level: Level, race?: Difficulty, cup?: string): void;
+  /** Enter a cup at this difficulty and start its first race. */
+  startCup(cup: Cup, difficulty: Difficulty): void;
+  /** Start the next race of the cup under way. */
+  playCup(): void;
+  /** How the cup just finished came out, for the table shown after its last race. */
+  cupResult: CupResult | null;
   toast(text: string): void;
 }

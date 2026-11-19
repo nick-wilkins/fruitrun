@@ -247,7 +247,7 @@ export function mapScreen(app: App): HTMLElement {
     stage.append(way);
   }
 
-  const go = (label: string, color: string, screen: 'blender' | 'book') => {
+  const go = (label: string, color: string, screen: 'blender' | 'book' | 'cups') => {
     const button = el(`button.btn.${color}.small`, {}, label);
     onTap(button, () => {
       sfx.tap();
@@ -264,6 +264,7 @@ export function mapScreen(app: App): HTMLElement {
     el('div.chip', {}, el('img', { src: asset('assets/fruits/apple.png'), alt: 'Ingredients' }), String(items)),
     el('div.chip', {}, el('img', { src: asset('assets/smoothie-cup.png'), alt: 'Smoothie points' }), String(save.points)),
     go('Blend', 'green', 'blender'),
+    racesUnlocked() ? go('Cups', 'purple', 'cups') : null,
     go('Book', 'orange', 'book'),
   );
   stage.append(blender, el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);

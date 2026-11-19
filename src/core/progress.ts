@@ -1,6 +1,7 @@
 import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { claimAwards, type Award } from './awards';
+import type { CupRun } from './cups';
 import { DIFFICULTIES, podiumFruit, type Difficulty } from './race';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
@@ -74,6 +75,10 @@ export interface Save {
   /** Ids of awards earned. */
   awards: string[];
   muted: boolean;
+  /** The cup being raced, if one has been started and not finished or given up. */
+  cup?: CupRun;
+  /** The best trophy won in each cup at each difficulty: 1 gold, 2 silver, 3 bronze. */
+  trophies?: Record<string, Partial<Record<Difficulty, number>>>;
   /** False once the player has switched off the ghost of their best run. */
   ghost?: boolean;
   /** How hard the last race was set: offered first next time. */
@@ -246,6 +251,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   if (perfect && clean && stars === 5) add('flawless');
   if (place !== undefined) add('races');
   if (place === 1) add('raceWins');
+  if (place === 1 && difficulty === 'hard') add('hardWins');
   if (level.mood !== 'sunny') add(level.mood);
   if (stars === 5 && (level.mood === 'rain' || level.mood === 'snow')) add('slipperyFive');
   if (previous && comparable && newBest) add('newBests');

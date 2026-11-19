@@ -2537,3 +2537,120 @@ input.name {
   background: rgba(255, 255, 255, 0.5);
   border-style: dashed;
 }
+
+/* ---------- cups ---------- */
+
+.cup-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1cqw;
+  margin-bottom: 0.6em;
+}
+
+.cup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2em;
+  padding: 0.6em 0.4em;
+  font: inherit;
+  font-size: 1.3cqw;
+  color: var(--ink);
+  background: #fff8e6;
+  border: 0.2cqw solid #e0b866;
+  border-radius: 1.2cqw;
+  box-shadow: 0 0.3cqw 0 rgba(120, 70, 10, 0.25);
+}
+
+.cup:active {
+  transform: scale(0.97);
+}
+
+.cup img {
+  width: 4.4cqw;
+  height: 4.4cqw;
+  object-fit: contain;
+}
+
+.cup small {
+  font-size: 0.75em;
+  opacity: 0.8;
+}
+
+.cup.shut {
+  background: rgba(255, 255, 255, 0.45);
+  border-style: dashed;
+}
+
+.cup.shut img {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.cup-won {
+  display: flex;
+  gap: 0.5em;
+}
+
+.cup-won span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15em;
+  padding: 0 0.45em;
+  font-size: 0.85em;
+  background: #ffe27a;
+  border-radius: 99em;
+}
+
+.cup-won span.none {
+  color: #9a8a70;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.cup-won i {
+  font-style: normal;
+}
+
+.cup-going {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  margin-bottom: 0.6em;
+  padding: 0.5em 1em;
+  font-size: 1.4cqw;
+  background: #dff5c8;
+  border: 0.2cqw solid #7cc04a;
+  border-radius: 1.2cqw;
+}
+
+.cup-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  min-width: 26em;
+  transform: translate(-50%, -50%);
+  animation: none;
+}
+
+.cup-card .pip-cheer {
+  position: static;
+  width: 6em;
+  margin: 0 auto;
+}
+
+.cup-prize {
+  font-size: 5em;
+  line-height: 1.1;
+  animation: pop-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.cup-table {
+  margin: 0.5em auto 0.8em;
+}
+
+.race-order.cup-table {
+  grid-template-columns: 1fr;
+  width: 75%;
+  font-size: 1.1em;
+}

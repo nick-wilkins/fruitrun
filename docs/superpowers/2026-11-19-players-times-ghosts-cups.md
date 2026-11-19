@@ -67,3 +67,15 @@ Recorded here per stage with PASS or FAIL: the real screens in desktop Chrome wi
 - Runtime, desktop Chrome, sound off, a throwaway player: PASS. First run 41.87 s kept and blended: one ghost entry written. Second run: the ghost loaded with time 41.867 and was on the road from the start to the finish; seen in a screenshot beside the player. Removing the player removed the ghost entry and left Player 1 untouched.
 - A race does not show the ghost, but a best time set in a race still becomes the ghost.
 - Not checked: on a device; the feel of chasing it is Nick's call.
+
+### Stage 3: cups (2026-11-19)
+
+Built ahead of the difficulty tuning after all: the rules do not depend on it, only how the points feel.
+
+- `src/core/cups.ts`: 19 cups of four levels (5 in Sunny Meadow, 6 in Tropical Falls, 8 in Blossom Village; a world's last cup takes its last four levels, sharing one or two with the cup before). Named after the first level's fruit. Points 10, 7, 5, 3; level on points, the player is ahead. The cup under way and the trophies live in the player's save.
+- `src/ui/cups.ts`: a Cups screen (from the map's new Cups button) with every cup, its three trophy slots and a "carry on or give up" strip for a cup under way; a points table after each race; a trophy card at the end.
+- In a cup the results card has one button, "Cup points", which keeps the run and scores the race. Leaving a race before the line, or closing the app before pressing it, leaves the cup at that race.
+- Awards, new "Racing" group: race wins (1, 10, 50), a win on Hard, sweeps (1, 10, all), cups finished (1, 10), gold trophies (1, 10), gold on Hard, Perfect Forty.
+- RED: `tests/cups.test.ts` failed (no `cups` module); the awards test failed with `expected [] to include 'race-wins-1'`. GREEN: 6 tests.
+- Runtime, desktop Chrome, sound off, a throwaway player with six levels finished: PASS. Cups screen listed 19 cups, one open. Apple Cup on Easy run through the real game loop: four races in order (Apple Orchard, Banana Bend, Strawberry Fields, Orange Grove), the hint named the cup and race each time, the table after each race added up (10, 20, 30, 40 for four wins; rivals 22, 20, 18), the trophy card showed gold, the save held `cup-0-1: easy 1`, and the awards Cup Runner, Going for Gold and Perfect Forty were earned. The player was then removed, leaving Player 1 untouched.
+- Not checked in the browser: carrying a cup on after leaving it (covered by the unit test), losing a cup, a phone-sized screen.

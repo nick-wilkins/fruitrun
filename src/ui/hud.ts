@@ -12,6 +12,8 @@ export interface HudHandlers {
   restart(): void;
   quit(): void;
   blend(): void;
+  /** In a cup: keep the result and go on to the points table. */
+  next?(): void;
   muted(): boolean;
   /** Flip sound on or off and return whether it is now muted. */
   toggleSound(): boolean;
@@ -30,7 +32,7 @@ export interface Hud {
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
 
 /** `rivals` are the marbles being raced, if this run is a race. */
-export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = []): Hud {
+export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string): Hud {
   const fruit = ingredient(level.fruit);
   const root = el('div.hud');
 
@@ -53,7 +55,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
   const count = el('div.countdown');
   const touch = window.matchMedia('(pointer: coarse)').matches;
   const warning = { sunny: '', night: 'Night run! ', midnight: 'Midnight run: follow the lights! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
-  const hint = el('div.hint', {}, warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
+  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
   const soundButton = el('button.btn.blue', {}, handlers.muted() ? '🔇 Sound off' : '🔊 Sound on');
@@ -204,13 +206,16 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
           feats,
           counts.size ? el('div.kicker.small', {}, 'Extras you picked up') : null,
           counts.size ? extras : null,
-          el(
-            'div.row',
-            {},
-            el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Retry'),
-            el('button.btn.green.big', { onclick: () => handlers.blend() }, 'Keep and blend ▶'),
-          ),
-          el('p.retry-note', {}, 'Retry starts the level again. This run\'s fruit and stars are only kept if you blend.'),
+          // In a cup the race counts as it stands: on to the points.
+          cup
+            ? el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.next?.() }, 'Cup points ▶'))
+            : el(
+                'div.row',
+                {},
+                el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Retry'),
+                el('button.btn.green.big', { onclick: () => handlers.blend() }, 'Keep and blend ▶'),
+              ),
+          cup ? null : el('p.retry-note', {}, 'Retry starts the level again. This run\'s fruit and stars are only kept if you blend.'),
         ),
       );
       root.append(card);
