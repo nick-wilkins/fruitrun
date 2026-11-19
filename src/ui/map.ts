@@ -1,5 +1,6 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
+import { CUPS, cupOpen } from '../core/cups';
 import { COURSES, isUnlocked, superBlenderOpen, swept } from '../core/progress';
 import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
@@ -125,6 +126,19 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       show();
     });
   }
+  // Which cup this level is raced in, and the way into it once all four of its levels are finished.
+  const cup = racesUnlocked() ? CUPS.find((each) => each.levels.includes(level.id)) : undefined;
+  let cupLine: HTMLElement | null = null;
+  if (cup && cupOpen(app.save, cup)) {
+    cupLine = el('button.cup-line.open', {}, `🏆 ${cup.name}: race all four ▶`);
+    onTap(cupLine, () => {
+      sfx.tap();
+      app.show('cups');
+    });
+  } else if (cup) {
+    const [first, last] = [cup.levels[0], cup.levels[cup.levels.length - 1]].map((id) => levelByNumber(Number(id.split('-')[1])).label);
+    cupLine = el('div.cup-line', {}, `🏆 Part of the ${cup.name}: finish levels ${first} to ${last} to enter`);
+  }
   const card = el(
     'div.modal',
     { onclick: (e: MouseEvent) => e.target === e.currentTarget && close() },
@@ -141,6 +155,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
       targets,
       starts,
+      cupLine,
     ),
   );
   return card;

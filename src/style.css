@@ -2481,6 +2481,7 @@ input.name {
 }
 
 .best-time {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 0.3em;
@@ -2671,4 +2672,22 @@ input.name {
   width: 1.4em;
   height: 1.4em;
   object-fit: contain;
+}
+
+.cup-line {
+  display: inline-block;
+  margin-top: 0.7em;
+  padding: 0.15em 1em;
+  font: inherit;
+  font-size: 0.8em;
+  color: #6a4a1c;
+  background: rgba(255, 255, 255, 0.5);
+  border: 0.12em dashed #e0b866;
+  border-radius: 99em;
+}
+
+.cup-line.open {
+  color: #5a3310;
+  background: #ffe27a;
+  border: 0.12em solid #e0a000;
 }
