@@ -9,6 +9,10 @@ import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
 
 const TROPHY = ['', '🥇', '🥈', '🥉'];
+const METAL = ['none', 'gold', 'silver', 'bronze'];
+
+/** A two-handled trophy cup, in whatever colour it is given. */
+const trophySvg = `<svg viewBox="0 0 64 64"><path d="M14 10h36v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/><path d="M14 14H6c0 10 4 16 12 17M50 14h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="40" width="8" height="10" fill="currentColor"/><rect x="18" y="49" width="28" height="8" rx="3" fill="currentColor"/><path d="M20 13h8v14c-5-2-8-7-8-14z" fill="#fff" opacity=".35"/></svg>`;
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
 
 function table(rows: Standing[]): HTMLElement {
@@ -100,12 +104,18 @@ export function cupsScreen(app: App): HTMLElement {
     for (const cup of CUPS.filter((c) => c.world === index)) {
       const open = cupOpen(save, cup);
       const won = save.trophies?.[cup.id];
+      // A big trophy with the cup's fruit on it; under it, a little trophy for each difficulty, coloured once won.
+      const shelf = el(
+        'div.cup-won',
+        {},
+        ...DIFFICULTIES.map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: trophySvg }), name)),
+      );
       const tile = el(
         `button.cup${open ? '' : '.shut'}`,
         {},
-        el('img', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }),
+        el('div.cup-art', { innerHTML: trophySvg }, el('img.cup-fruit', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }), open ? null : el('img.cup-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false })),
         el('b', {}, cup.name),
-        open ? el('div.cup-won', {}, ...DIFFICULTIES.map(({ id, name }) => el(`span${won?.[id] ? '' : '.none'}`, { title: name }, name[0], el('i', {}, won?.[id] ? TROPHY[won[id]!] : '·')))) : el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label} first`),
+        open ? shelf : el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`),
       );
       onTap(tile, () => {
         if (!open) {

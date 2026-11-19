@@ -2575,73 +2575,124 @@ input.name {
 
 .cup-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 1cqw;
-  margin-bottom: 0.6em;
+  margin-bottom: 0.8em;
 }
 
 .cup {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.2em;
-  padding: 0.6em 0.4em;
+  gap: 0.25em;
+  padding: 0.7em 0.3em 0.6em;
   font: inherit;
-  font-size: 1.3cqw;
+  font-size: 1.25cqw;
   color: var(--ink);
-  background: #fff8e6;
-  border: 0.2cqw solid #e0b866;
-  border-radius: 1.2cqw;
-  box-shadow: 0 0.3cqw 0 rgba(120, 70, 10, 0.25);
+  background: linear-gradient(#fffdf2, #ffeebc);
+  border: 0.22cqw solid #e0a93a;
+  border-radius: 1.4cqw;
+  box-shadow: 0 0.35cqw 0 rgba(150, 90, 10, 0.35);
+  transition: transform 0.08s;
 }
 
 .cup:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 
-.cup img {
-  width: 4.4cqw;
-  height: 4.4cqw;
+.cup-art {
+  position: relative;
+  width: 6.4cqw;
+  height: 6.4cqw;
+  color: #ffc21f;
+  filter: drop-shadow(0 0.25cqw 0 rgba(140, 80, 0, 0.45));
+}
+
+.cup-art svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cup-fruit {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  width: 46%;
+  height: 46%;
   object-fit: contain;
+  transform: translate(-50%, -50%);
+}
+
+.cup-lock {
+  position: absolute;
+  right: -6%;
+  bottom: 2%;
+  width: 42%;
 }
 
 .cup small {
-  font-size: 0.75em;
-  opacity: 0.8;
+  font-size: 0.78em;
+  opacity: 0.85;
 }
 
 .cup.shut {
-  background: rgba(255, 255, 255, 0.45);
-  border-style: dashed;
+  background: linear-gradient(#f6f1e4, #e9e1cc);
+  border-color: #c9bfa6;
+  box-shadow: 0 0.35cqw 0 rgba(90, 80, 60, 0.25);
 }
 
-.cup.shut img {
+.cup.shut .cup-art {
+  color: #c2c4cc;
+  filter: drop-shadow(0 0.25cqw 0 rgba(70, 70, 80, 0.4));
+}
+
+.cup.shut .cup-fruit {
   filter: grayscale(1);
-  opacity: 0.5;
+  opacity: 0.6;
 }
 
 .cup-won {
   display: flex;
-  gap: 0.5em;
+  gap: 0.7em;
 }
 
 .cup-won span {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.15em;
-  padding: 0 0.45em;
-  font-size: 0.85em;
-  background: #ffe27a;
-  border-radius: 99em;
-}
-
-.cup-won span.none {
-  color: #9a8a70;
-  background: rgba(0, 0, 0, 0.06);
+  font-size: 0.68em;
+  line-height: 1.2;
+  color: #a8997a;
 }
 
 .cup-won i {
-  font-style: normal;
+  display: block;
+  width: 2.1em;
+  height: 2.1em;
+  color: #e3dac4;
+}
+
+.cup-won svg {
+  width: 100%;
+  height: 100%;
+}
+
+.cup-won .gold,
+.cup-won .silver,
+.cup-won .bronze {
+  color: var(--ink);
+}
+
+.cup-won .gold i {
+  color: #ffc21f;
+}
+
+.cup-won .silver i {
+  color: #b9c0cc;
+}
+
+.cup-won .bronze i {
+  color: #d08a4a;
 }
 
 .cup-going {
@@ -2650,11 +2701,20 @@ input.name {
   justify-content: space-between;
   gap: 1em;
   margin-bottom: 0.6em;
-  padding: 0.5em 1em;
+  padding: 0.6em 1em;
   font-size: 1.4cqw;
   background: #dff5c8;
   border: 0.2cqw solid #7cc04a;
   border-radius: 1.2cqw;
+}
+
+.cup-going .row {
+  margin: 0;
+  flex: none;
+}
+
+.cup-going .btn {
+  margin: 0;
 }
 
 .cup-card {
@@ -2722,4 +2782,9 @@ input.name {
   color: #5a3310;
   background: #ffe27a;
   border: 0.12em solid #e0a000;
+}
+
+/* The buttons' depth hangs below them: lift them by half of it so they sit level with the words. */
+.cup-going .row {
+  transform: translateY(-0.12em);
 }
