@@ -2924,3 +2924,129 @@ input.name {
 .card.small .row {
   flex-wrap: wrap;
 }
+
+/* ---------- cup trophies by difficulty, and the champion's card ---------- */
+
+.cup-won {
+  align-items: flex-end;
+}
+
+.cup-won .mark {
+  fill: #fff;
+  opacity: 0.75;
+}
+
+.cup-won .fire {
+  fill: currentColor;
+  opacity: 0.55;
+}
+
+.cup-won .easy i {
+  width: 1.8em;
+  height: 1.8em;
+}
+
+.cup-won .hard i {
+  width: 2.3em;
+  height: 2.3em;
+}
+
+.cup-won .legendary i {
+  width: 2.6em;
+  height: 2.6em;
+}
+
+.cup-won .legendary:not(.none) .fire {
+  fill: #ff5a1f;
+  opacity: 1;
+}
+
+.cup-won .legendary:not(.none) .mark {
+  fill: #e3262b;
+  opacity: 1;
+}
+
+.cup-won .legendary:not(.none) i {
+  animation: bob 1.6s ease-in-out infinite;
+}
+
+.cup.champion {
+  border-color: transparent;
+  background:
+    linear-gradient(#fffbe6, #ffe9a0) padding-box,
+    linear-gradient(120deg, #ff7ac0, #ffd23f, #7dffb0, #4aa3ff, #c58bff, #ff7ac0) border-box;
+  background-size: auto, 300% 100%;
+  box-shadow: 0 0.35cqw 0 rgba(150, 90, 10, 0.35), 0 0 1.6cqw rgba(255, 200, 40, 0.75);
+  animation: champion-sheen 4s linear infinite;
+}
+
+@keyframes champion-sheen {
+  to {
+    background-position: 0 0, 300% 0;
+  }
+}
+
+.cup-champion {
+  position: absolute;
+  left: 50%;
+  top: -0.9em;
+  transform: translateX(-50%);
+  padding: 0.05em 0.8em;
+  font-size: 0.78em;
+  font-weight: 800;
+  white-space: nowrap;
+  color: #6b3a00;
+  background: linear-gradient(#fff3a8, #ffc21f);
+  border: 0.15em solid #fff;
+  border-radius: 99em;
+}
+
+.cup-crown {
+  position: absolute;
+  left: 50%;
+  top: -24%;
+  font-size: 2.1cqw;
+  transform: translateX(-50%) rotate(-8deg);
+}
+
+.cup-twinkle {
+  position: absolute;
+  font-size: 1.3cqw;
+  color: #fff;
+  text-shadow: 0 0 0.4cqw #ffb000;
+  animation: twinkle 1.8s ease-in-out infinite;
+}
+
+.cup-twinkle.t0 {
+  left: -14%;
+  top: 8%;
+}
+
+.cup-twinkle.t1 {
+  right: -16%;
+  top: 34%;
+  animation-delay: 0.6s;
+}
+
+.cup-twinkle.t2 {
+  left: -4%;
+  bottom: 4%;
+  animation-delay: 1.2s;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    transform: scale(0.3) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1) rotate(40deg);
+    opacity: 1;
+  }
+}
+
+/* Room between the champion's ribbon and the crown. */
+.cup.champion .cup-art {
+  margin-top: 0.9em;
+}

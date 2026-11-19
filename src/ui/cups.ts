@@ -1,6 +1,6 @@
 import { sfx } from '../audio';
 import { CUP_POINTS, CUP_RACES, CUPS, cupById, cupLegendaryOpen, cupOpen, quitCup, standings, type Cup, type Standing } from '../core/cups';
-import { DIFFICULTIES } from '../core/race';
+import { DIFFICULTIES, type Difficulty } from '../core/race';
 import { ingredient } from '../data/ingredients';
 import { levelById, WORLDS } from '../data/levels';
 import type { App } from './app';
@@ -13,6 +13,16 @@ const METAL = ['none', 'gold', 'silver', 'bronze'];
 
 /** A two-handled trophy cup, in whatever colour it is given. */
 const trophySvg = `<svg viewBox="0 0 64 64"><path d="M14 10h36v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/><path d="M14 14H6c0 10 4 16 12 17M50 14h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="40" width="8" height="10" fill="currentColor"/><rect x="18" y="49" width="28" height="8" rx="3" fill="currentColor"/><path d="M20 13h8v14c-5-2-8-7-8-14z" fill="#fff" opacity=".35"/></svg>`;
+const BASE = '<rect x="28" y="40" width="8" height="10" fill="currentColor"/><rect x="18" y="49" width="28" height="8" rx="3" fill="currentColor"/>';
+const HANDLES = '<path d="M14 14H6c0 10 4 16 12 17M50 14h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>';
+const STAR = '<path class="mark" d="M32 13l3.4 7 7.6 1-5.5 5.3 1.3 7.6L32 30.3l-6.8 3.6 1.3-7.6L21 21l7.6-1z"/>';
+/** A little trophy for each difficulty, grander as they get harder: a plain goblet, a cup, a starred cup on a plinth, a crowned and burning one. */
+const SHELF: Record<Difficulty, string> = {
+  easy: `<svg viewBox="0 0 64 64"><path d="M19 14h26v9c0 10-5 17-13 17s-13-7-13-17z" fill="currentColor"/>${BASE}</svg>`,
+  medium: `<svg viewBox="0 0 64 64"><path d="M14 10h36v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/>${HANDLES}${BASE}</svg>`,
+  hard: `<svg viewBox="0 0 64 64"><path d="M14 8h36v12c0 12-7 20-18 20S14 32 14 20z" fill="currentColor"/><path d="M14 12H6c0 10 4 16 12 17M50 12h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="38" width="8" height="8" fill="currentColor"/><rect x="20" y="45" width="24" height="6" rx="2" fill="currentColor"/><rect x="14" y="51" width="36" height="8" rx="3" fill="currentColor"/><path class="mark" d="M32 11l3.4 7 7.6 1-5.5 5.3 1.3 7.6L32 28.3l-6.8 3.6 1.3-7.6L21 19l7.6-1z"/></svg>`,
+  legendary: `<svg viewBox="0 0 64 64"><path class="fire" d="M9 34c-6-8-3-16 2-22 0 6 3 8 5 10 0-7 3-12 8-16-1 8 3 12 3 18zM55 34c6-8 3-16-2-22 0 6-3 8-5 10 0-7-3-12-8-16 1 8-3 12-3 18z"/><path d="M14 22l0-12 7 6 5.500-8 5.500 8 5.500-8 5.500 8 7-6v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/>${BASE.replace('x="18" y="49" width="28"', 'x="14" y="49" width="36"')}${STAR.replace('M32 13', 'M32 15')}</svg>`,
+};
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
 
 function table(rows: Standing[]): HTMLElement {
@@ -146,13 +156,16 @@ export function cupsScreen(app: App): HTMLElement {
       const shelf = el(
         'div.cup-won',
         {},
-        ...DIFFICULTIES.filter(({ id }) => id !== 'legendary' || cupLegendaryOpen(save, cup)).map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: trophySvg }), name)),
+        ...DIFFICULTIES.filter(({ id }) => id !== 'legendary' || cupLegendaryOpen(save, cup)).map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}.${id}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: SHELF[id] }), name)),
       );
+      // A trophy at every difficulty, Legendary included: the card itself turns into a prize.
+      const champion = DIFFICULTIES.every(({ id }) => won?.[id]);
       const tile = el(
-        `button.cup${open ? '' : '.shut'}${entered === cup ? '.going' : ''}`,
+        `button.cup${open ? '' : '.shut'}${entered === cup ? '.going' : ''}${champion ? '.champion' : ''}`,
         {},
+        champion ? el('div.cup-champion', {}, '★ Champion ★') : null,
         entered === cup ? el('div.cup-flag', {}, `Race ${save.cup!.race + 1} of ${CUP_RACES} next ▶`) : null,
-        el('div.cup-art', { innerHTML: trophySvg }, el('img.cup-fruit', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }), open ? null : el('img.cup-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false })),
+        el('div.cup-art', { innerHTML: trophySvg }, el('img.cup-fruit', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }), open ? null : el('img.cup-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false }), champion ? el('span.cup-crown', {}, '👑') : null, ...(champion ? [0, 1, 2].map((n) => el(`span.cup-twinkle.t${n}`, {}, '✦')) : [])),
         el('b', {}, cup.name),
         open ? shelf : el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`),
       );
