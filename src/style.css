@@ -3070,3 +3070,32 @@ input.name {
 .record.head span:nth-of-type(1) {
   text-align: center;
 }
+
+/* The records list is one grid, each row borrowing its columns, so headings and rows line up. */
+.records {
+  display: grid;
+  grid-template-columns: 2.4cqw 1fr auto auto auto;
+  column-gap: 1cqw;
+}
+
+.records .record {
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+.records .record .medals {
+  justify-content: flex-start;
+}
+
+.records .record.head span {
+  text-align: center;
+}
+
+.book-stats {
+  display: flex;
+  justify-content: center;
+}
+
+.book-stats .stat {
+  flex: 0 1 15.5%;
+}

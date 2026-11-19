@@ -218,11 +218,14 @@ function records(app: App): HTMLElement {
     const levels = played.filter((l) => l.world === index);
     if (!levels.length) return;
     page.append(el('h3', {}, world.name));
+    // One grid for the whole list, so the headings sit over their columns.
+    const list = el('div.records');
+    page.append(list);
     // Say what each column is: the pills are places in races, nothing to do with blending.
-    page.append(el('div.record.head', {}, el('i'), el('i'), el('span', {}, 'Stars'), el('span', {}, 'Best time'), racing ? el('span', {}, '🏁 Best place in races') : null));
+    list.append(el('div.record.head', {}, el('i'), el('i'), el('span', {}, 'Stars'), el('span', {}, 'Best time'), racing ? el('span', {}, '🏁 Best place in races') : null));
     for (const level of levels) {
       const record = save.levels[level.id];
-      page.append(
+      list.append(
         el(
           'div.record',
           {},
