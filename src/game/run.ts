@@ -610,7 +610,8 @@ export class Run {
   private seatFriends(): void {
     const now = performance.now() / 1000;
     for (const { marble, pip, shadow } of this.friends) {
-      const spot = marble.gone ? null : marble.spot(now);
+      // Once over the line it is taken off the road, out of the way of those still coming.
+      const spot = marble.gone || marble.time !== null ? null : marble.spot(now);
       const lane = spot ? this.course.lanes[spot.lane] : undefined;
       pip.root.visible = shadow.visible = Boolean(spot && lane);
       if (!spot || !lane) continue;

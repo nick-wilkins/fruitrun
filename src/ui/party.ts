@@ -11,6 +11,7 @@ const WHY = {
   denied: 'Smoothie Scramble is not allowed to look for devices nearby. A grown-up can turn it on in Settings, under Privacy & Security, then Local Network.',
   version: 'That device has a different version of the game. Update both and try again.',
   full: `That game is full: ${PARTY_SIZE} players is the most.`,
+  racing: 'That game is in the middle of a race. Try again in a moment.',
   ended: 'The game has ended.',
   error: 'Something went wrong finding friends. Check Wi-Fi is switched on and try again.',
 };
@@ -46,11 +47,11 @@ export function partyScreen(app: App): HTMLElement {
       name.textContent = `${open[at].n}. ${open[at].name}`;
     };
     turn(0);
-    const ready = party.players.length > 1;
+    const ready = party.canStart();
     card(
       el('h2', {}, 'Your game'),
       players(),
-      el('p', {}, ready ? 'Pick a level and press Start!' : 'Waiting for friends to join…'),
+      el('p', {}, ready ? 'Pick a level and press Start!' : party.players.length > 1 ? 'Waiting for everyone to finish…' : 'Waiting for friends to join…'),
       el('div.row.party-pick', {}, button('◀', 'blue', () => turn(-1)), name, button('▶', 'blue', () => turn(1))),
       el('div.row', {}, leave('Close game'), ready ? button('Start ▶', 'green.big', () => party.start(open[at].id)) : null),
     );

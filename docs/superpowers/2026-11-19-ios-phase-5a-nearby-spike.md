@@ -57,3 +57,20 @@ Run 2026-11-19 on `ios`.
   - PASS Retry goes back to the waiting room, still joined.
   - PASS the host closing the game leaves the other on "The game has ended."
 - NOT RUN, needs two devices: everything about the real connection. Finding each other over peer to peer Wi-Fi with no shared network, the Local Network prompt and its refusal, how smooth a friend's marble looks at real latency, a device going to the background mid-race, Wi-Fi switched off, three and four players.
+
+## Review (`/code-review medium` on aaf6344) and fixes
+
+Ten findings, all fixed:
+
+- A Start could pull a friend out of the blender or off an unkept results card: now only someone in the waiting room is taken into a race; anyone else sits it out.
+- The host could restart while others were still racing: Start waits until everyone is home or out.
+- Quitting or retrying mid-race left a frozen marble on friends' roads: it now tells them, and the marble is taken off.
+- News from the race before could land on the next one: every race is numbered and other numbers are ignored.
+- A brief "no way through yet" from the network was treated as the end: now only a real failure or a refusal is.
+- Your own ghost rolled alongside in a race with friends: it no longer does.
+- A paused marble shuddered on friends' screens: a marble that has not moved reports standing still.
+- A finished friend sat parked short of the line: it is taken off the road once home.
+- A newcomer could be let in mid-race: they are told to try again in a moment. The host now sends only to players it has let in.
+- A device that could not start the race was left listed as racing: it reports itself out.
+
+Re-verified 2026-11-19: `tsc` clean; 956 tests pass (5 new, shown failing first). Two tabs: race starts on both with no ghost; the host cannot start again while the other is racing; the host quitting takes their marble off the other's road; once the other is out, Start comes back.

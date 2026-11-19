@@ -22,22 +22,23 @@ export interface Member {
   name: string;
 }
 
-export type Refusal = 'version' | 'full';
+export type Refusal = 'version' | 'full' | 'racing';
 
 export type Message =
   | { t: 'hello'; v: number; courses: number; name: string }
   | { t: 'roster'; players: Member[]; you: string }
   | { t: 'refuse'; why: Refusal }
-  | { t: 'start'; level: string }
-  | ({ t: 'pos'; from?: string } & Report)
-  | { t: 'done'; time: number; from?: string };
+  | { t: 'start'; n: number; level: string }
+  | ({ t: 'pos'; n: number; from?: string } & Report)
+  | { t: 'done'; n: number; time: number; from?: string }
+  | { t: 'out'; n: number; from?: string };
 
 const round = (value: number, to: number) => Math.round(value * to) / to;
 
 export function encode(message: Message): string {
   if (message.t !== 'pos') return JSON.stringify(message);
-  const { lane, s, x, h, v, p, from } = message;
-  return JSON.stringify({ t: 'pos', lane, s: round(s, 100), x: round(x, 100), h: round(h, 100), v: round(v, 10), p: round(p, 1000), ...(from ? { from } : {}) });
+  const { n, lane, s, x, h, v, p, from } = message;
+  return JSON.stringify({ t: 'pos', n, lane, s: round(s, 100), x: round(x, 100), h: round(h, 100), v: round(v, 10), p: round(p, 1000), ...(from ? { from } : {}) });
 }
 
 const num = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
@@ -62,13 +63,15 @@ export function decode(raw: string): Message | null {
       return players.length === m.players.length ? { t: 'roster', players, you: m.you } : null;
     }
     case 'refuse':
-      return m.why === 'version' || m.why === 'full' ? { t: 'refuse', why: m.why } : null;
+      return m.why === 'version' || m.why === 'full' || m.why === 'racing' ? { t: 'refuse', why: m.why } : null;
     case 'start':
-      return text(m.level) ? { t: 'start', level: m.level } : null;
+      return num(m.n) && text(m.level) ? { t: 'start', n: m.n, level: m.level } : null;
     case 'pos':
-      return num(m.lane) && num(m.s) && num(m.x) && num(m.h) && num(m.v) && num(m.p) ? { t: 'pos', lane: m.lane, s: m.s, x: m.x, h: m.h, v: m.v, p: m.p, ...from } : null;
+      return num(m.n) && num(m.lane) && num(m.s) && num(m.x) && num(m.h) && num(m.v) && num(m.p) ? { t: 'pos', n: m.n, lane: m.lane, s: m.s, x: m.x, h: m.h, v: m.v, p: m.p, ...from } : null;
     case 'done':
-      return num(m.time) && m.time > 0 ? { t: 'done', time: m.time, ...from } : null;
+      return num(m.n) && num(m.time) && m.time > 0 ? { t: 'done', n: m.n, time: m.time, ...from } : null;
+    case 'out':
+      return num(m.n) ? { t: 'out', n: m.n, ...from } : null;
     default:
       return null;
   }
@@ -146,9 +149,14 @@ export class Party {
   me = '';
   /** Every other player's marble, by player. */
   readonly marbles = new Map<string, Marble>();
+  /** Which race this is, counted by the host. News from any other race is ignored. */
+  private race = 0;
+  /** The host's list of who is still out on the course. */
+  private readonly busy = new Set<string>();
   /** Something on show has changed. */
   onChange = (): void => {};
-  onStart = (_level: string): void => {};
+  /** A race is starting. Answer false if this player cannot take part just now: they sit this one out. */
+  onStart = (_level: string): boolean => true;
 
   constructor(
     private readonly net: Nearby,
@@ -182,9 +190,20 @@ export class Party {
 
   /** The host sets everyone off on a level. */
   start(level: string): void {
-    if (this.phase !== 'hosting' || this.players.length < 2) return;
-    this.net.send(encode({ t: 'start', level }));
-    this.begin(level);
+    if (!this.canStart()) return;
+    this.race++;
+    this.busy.clear();
+    for (const player of this.players) this.busy.add(player.id);
+    this.begin(level, () => this.tell(encode({ t: 'start', n: this.race, level })));
+  }
+
+  /** Whether the host may set a race off: somebody to race, and nobody still out from the last one. */
+  canStart(): boolean {
+    return this.phase === 'hosting' && this.players.length > 1 && this.busy.size === 0;
+  }
+
+  raceNow(): number {
+    return this.race;
   }
 
   leave(): void {
@@ -204,14 +223,36 @@ export class Party {
 
   /** Tell the others where this player's marble is. */
   report(spot: Report): void {
-    if (!this.live()) return;
-    this.net.send(encode({ t: 'pos', ...spot, ...(this.phase === 'hosting' ? { from: HOST } : {}) }));
+    if (this.live()) this.tell(encode({ t: 'pos', n: this.race, ...spot, ...this.asMe() }));
   }
 
   /** Tell the others this player has crossed the line. */
-  finished(time: number): void {
+  finished(time: number, race = this.race): void {
     if (!this.live()) return;
-    this.net.send(encode({ t: 'done', time, ...(this.phase === 'hosting' ? { from: HOST } : {}) }));
+    this.tell(encode({ t: 'done', n: race, time, ...this.asMe() }));
+    if (race === this.race) this.home(HOST);
+  }
+
+  /** Tell the others this player has given the race up, or could not start it. */
+  out(): void {
+    if (!this.live()) return;
+    this.tell(encode({ t: 'out', n: this.race, ...this.asMe() }));
+    this.home(HOST);
+  }
+
+  private asMe(): { from?: string } {
+    return this.phase === 'hosting' ? { from: HOST } : {};
+  }
+
+  /** To the host from a guest; from the host, to everyone who has been let in, except perhaps one. */
+  private tell(line: string, except?: string): void {
+    if (this.phase !== 'hosting') return this.net.send(line);
+    for (const player of this.players) if (player.id !== HOST && player.id !== except) this.net.send(line, player.id);
+  }
+
+  /** The host notes that a player is no longer out on the course. */
+  private home(id: string): void {
+    if (this.phase === 'hosting' && this.busy.delete(id)) this.onChange();
   }
 
   private live(): boolean {
@@ -224,6 +265,8 @@ export class Party {
     this.hosts = [];
     this.players = [];
     this.me = '';
+    this.race = 0;
+    this.busy.clear();
     for (const marble of this.marbles.values()) marble.gone = true;
     this.marbles.clear();
   }
@@ -236,10 +279,12 @@ export class Party {
     this.onChange();
   }
 
-  private begin(level: string): void {
-    // A fresh marble each race: nobody starts with last race's finishing time.
+  private begin(level: string, announce = (): void => {}): void {
+    // A fresh marble each race: nobody starts with last race's finishing time. They are made before anyone is
+    // told, so an answer that comes straight back lands on the new one.
     for (const friend of this.friends()) this.marbles.set(friend.id, new Marble());
-    this.onStart(level);
+    announce();
+    if (!this.onStart(level)) this.out();
   }
 
   private seat(players: Member[]): void {
@@ -248,6 +293,7 @@ export class Party {
       if (players.some((player) => player.id === id)) continue;
       marble.gone = true;
       this.marbles.delete(id);
+      this.busy.delete(id);
     }
     for (const friend of this.friends()) if (!this.marbles.has(friend.id)) this.marbles.set(friend.id, new Marble());
   }
@@ -285,16 +331,16 @@ export class Party {
     const known = this.players.some((player) => player.id === from);
     if (message.t === 'hello') {
       if (known) return;
-      const refuse = message.v !== this.version.v || message.courses !== this.version.courses ? 'version' : this.players.length >= PARTY_SIZE ? 'full' : null;
+      const refuse = message.v !== this.version.v || message.courses !== this.version.courses ? 'version' : this.players.length >= PARTY_SIZE ? 'full' : this.busy.size ? 'racing' : null;
       if (refuse) return this.net.send(encode({ t: 'refuse', why: refuse }), from);
       this.seat([...this.players, { id: from, name: message.name.slice(0, 12) }]);
       return this.announce();
     }
-    if (!known || (message.t !== 'pos' && message.t !== 'done')) return;
+    if (!known || (message.t !== 'pos' && message.t !== 'done' && message.t !== 'out') || message.n !== this.race) return;
     this.note({ ...message, from });
     // Pass it on to everyone else, saying whose it is.
-    const relayed = encode({ ...message, from });
-    for (const player of this.players) if (player.id !== HOST && player.id !== from) this.net.send(relayed, player.id);
+    this.tell(encode({ ...message, from }), from);
+    if (message.t !== 'pos') this.home(from);
   }
 
   private asGuest(message: Message): void {
@@ -306,14 +352,18 @@ export class Party {
       return this.onChange();
     }
     if (this.phase !== 'joined') return;
-    if (message.t === 'start') return this.begin(message.level);
-    if (message.t === 'pos' || message.t === 'done') this.note(message);
+    if (message.t === 'start') {
+      this.race = message.n;
+      return this.begin(message.level);
+    }
+    if ((message.t === 'pos' || message.t === 'done' || message.t === 'out') && message.n === this.race) this.note(message);
   }
 
-  private note(message: Extract<Message, { t: 'pos' | 'done' }>): void {
+  private note(message: Extract<Message, { t: 'pos' | 'done' | 'out' }>): void {
     const marble = message.from ? this.marbles.get(message.from) : undefined;
     if (!marble) return;
     if (message.t === 'pos') marble.hear(message, this.now());
-    else marble.time = message.time;
+    else if (message.t === 'done') marble.time = message.time;
+    else marble.gone = true;
   }
 }

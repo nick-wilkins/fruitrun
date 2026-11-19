@@ -65,7 +65,13 @@ const ASK_LASTS = 24 * 60 * 60 * 1000;
 const nobody = newSave();
 const worldOf = (save: Save) => (save.last ? levelById(save.last).world : 0);
 
+/** The run on now is a race with friends. */
+let racingTogether = false;
+
 function endRun(): void {
+  // Leaving a race with friends before the line takes this marble off their roads.
+  if (run && racingTogether && !run.sim.finished) party.out();
+  racingTogether = false;
   run?.dispose();
   run = null;
   canvas.classList.add('hidden');
@@ -245,14 +251,18 @@ const app: App = {
       together ? { slot: party.slot(), friends } : null,
     );
     run.start();
+    racingTogether = together;
     if (together) {
       // Tell the others where this marble is, and keep the finishing order on the results card up to date.
       const mine = run;
       let shown = '';
+      let was = NaN;
       const telling = window.setInterval(() => {
         if (run !== mine) return window.clearInterval(telling);
         const { sim } = mine;
-        if (!sim.finished) party.report({ lane: sim.lane, s: sim.s, x: sim.x, h: sim.h, v: sim.countdown > 0 ? 0 : sim.v * sim.gait, p: sim.progress() });
+        // A marble that has not moved since the last report is standing still, whatever speed it was doing: paused, say.
+        if (!sim.finished) party.report({ lane: sim.lane, s: sim.s, x: sim.x, h: sim.h, v: sim.s === was ? 0 : sim.pace, p: sim.progress() });
+        was = sim.s;
         if (!order) return;
         const now = mine.standings();
         const key = JSON.stringify(now);
@@ -261,7 +271,7 @@ const app: App = {
       }, 1000 / 15);
     }
     // On a run of your own, your best run here rolls alongside. It is fetched while the countdown plays.
-    if (!race && app.player && app.save.ghost !== false) {
+    if (!race && !together && app.player && app.save.ghost !== false) {
       const mine = run;
       void ghostStore
         .get(app.player.id, level.id)
@@ -321,9 +331,13 @@ party.onChange = () => {
     if (party.phase === 'closed') app.toast('The game with friends has ended.');
   } else if (showing === 'party') app.show('party');
 };
+// Only someone in the waiting room is taken into a race: anyone blending, or looking at a result they have not
+// kept yet, sits it out. So does a device that cannot draw the track just now.
 party.onStart = (id) => {
   const level = LEVELS.find((each) => each.id === id);
-  if (level) app.play(level, undefined, undefined, true);
+  if (!level || run || showing !== 'party') return false;
+  app.play(level, undefined, undefined, true);
+  return run !== null;
 };
 
 app.show('menu');

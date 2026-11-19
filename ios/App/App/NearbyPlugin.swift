@@ -56,10 +56,7 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
                     self?.adopt(connection, as: UUID().uuidString)
                 }
                 listener.stateUpdateHandler = { [weak self] state in
-                    switch state {
-                    case .failed(let error), .waiting(let error): self?.fail(error)
-                    default: break
-                    }
+                    self?.watch(state: state)
                 }
                 listener.start(queue: self.queue)
                 self.listener = listener
@@ -88,7 +85,8 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             browser.stateUpdateHandler = { [weak self] state in
                 switch state {
-                case .failed(let error), .waiting(let error): self?.fail(error)
+                case .failed(let error): self?.fail(error)
+                case .waiting(let error): if Self.denied(error) { self?.fail(error) }
                 default: break
                 }
             }
@@ -148,7 +146,8 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
             case .ready:
                 self.notifyListeners("peer", data: ["id": id, "joined": true])
                 self.receive(from: peer, id: id)
-            case .failed, .cancelled, .waiting:
+            // Waiting means no way through yet: the system keeps trying, and often gets there.
+            case .failed, .cancelled:
                 self.drop(id)
             default:
                 break
@@ -183,9 +182,21 @@ public class NearbyPlugin: CAPPlugin, CAPBridgedPlugin {
 
     /// Being refused the local network is its own case: only a grown-up in Settings can put it right.
     private func fail(_ error: NWError) {
-        var why = "error"
-        if case .dns(let code) = error, code == kDNSServiceErr_PolicyDenied { why = "denied" }
         stop()
-        notifyListeners("failed", data: ["why": why])
+        notifyListeners("failed", data: ["why": Self.denied(error) ? "denied" : "error"])
+    }
+
+    private static func denied(_ error: NWError) -> Bool {
+        if case .dns(let code) = error { return code == kDNSServiceErr_PolicyDenied }
+        return false
+    }
+
+    /// Waiting is the system still trying, unless it is waiting because it has been refused.
+    private func watch(state: NWListener.State) {
+        switch state {
+        case .failed(let error): fail(error)
+        case .waiting(let error): if Self.denied(error) { fail(error) }
+        default: break
+        }
     }
 }

@@ -46,9 +46,9 @@ function air() {
 
 describe('messages between devices', () => {
   it('survive the trip', () => {
-    const spot = { t: 'pos' as const, lane: 1, s: 123.4, x: -2.25, h: 0.5, v: 31.2, p: 0.25 };
+    const spot = { t: 'pos' as const, n: 3, lane: 1, s: 123.4, x: -2.25, h: 0.5, v: 31.2, p: 0.25 };
     expect(decode(encode(spot))).toEqual(spot);
-    expect(decode(encode({ t: 'start', level: 'level-3' }))).toEqual({ t: 'start', level: 'level-3' });
+    expect(decode(encode({ t: 'start', n: 2, level: 'level-3' }))).toEqual({ t: 'start', n: 2, level: 'level-3' });
   });
 
   it('are dropped when they are not what they claim', () => {
@@ -123,7 +123,7 @@ describe('a party', () => {
   it('starts everyone on the level the host picks', () => {
     const { sam, ada, kit } = gather();
     const started: string[] = [];
-    for (const party of [sam, ada, kit]) party.onStart = (level) => started.push(level);
+    for (const party of [sam, ada, kit]) party.onStart = (level) => (started.push(level), true);
     sam.start('level-4');
     expect(started).toEqual(['level-4', 'level-4', 'level-4']);
   });
@@ -131,11 +131,11 @@ describe('a party', () => {
   it('only lets the host start, and only with somebody to race', () => {
     const { sam, ada } = gather();
     const started: string[] = [];
-    sam.onStart = ada.onStart = (level) => started.push(level);
+    sam.onStart = ada.onStart = (level) => (started.push(level), true);
     ada.start('level-4');
     expect(started).toEqual([]);
     const alone = new Party(air()(), 'Solo', () => 0);
-    alone.onStart = (level) => started.push(level);
+    alone.onStart = (level) => (started.push(level), true);
     alone.host();
     alone.start('level-1');
     expect(started).toEqual([]);
@@ -200,5 +200,67 @@ describe('a party', () => {
     }
     expect(sam.players).toHaveLength(4);
     expect(guests[3].why).toBe('full');
+  });
+
+  it('cannot be started again until everyone racing is home or out', () => {
+    const { sam, ada, kit } = gather();
+    const started: string[] = [];
+    sam.onStart = (level) => (started.push(level), true);
+    sam.start('level-1');
+    sam.start('level-2');
+    expect(started).toEqual(['level-1']);
+    expect(sam.canStart()).toBe(false);
+    sam.finished(40);
+    ada.finished(41);
+    kit.out();
+    expect(sam.canStart()).toBe(true);
+    sam.start('level-2');
+    expect(started).toEqual(['level-1', 'level-2']);
+  });
+
+  it('takes a player who gives up off the road for everyone', () => {
+    const { sam, ada, kit } = gather();
+    sam.start('level-1');
+    ada.out();
+    expect(sam.marbles.get(sam.players[1].id)!.gone).toBe(true);
+    expect(kit.marbles.get(kit.players[1].id)!.gone).toBe(true);
+  });
+
+  it('leaves out a player who is busy elsewhere when the race starts', () => {
+    const { sam, ada, kit } = gather();
+    // Kit hears of the start last, as the last to join: over the air, everyone has been told before any answer comes back.
+    kit.onStart = () => false;
+    sam.start('level-1');
+    expect(sam.marbles.get(sam.players[2].id)!.gone).toBe(true);
+    expect(ada.marbles.get(ada.players[2].id)!.gone).toBe(true);
+    sam.finished(40);
+    ada.finished(41);
+    expect(sam.canStart()).toBe(true);
+  });
+
+  it('takes no notice of news from the race before', () => {
+    const { sam, ada, kit } = gather();
+    sam.start('level-1');
+    const stale = ada.raceNow();
+    for (const party of [sam, ada, kit]) party.finished(40);
+    sam.start('level-2');
+    ada.finished(39, stale);
+    expect(sam.marbles.get(sam.players[1].id)!.time).toBeNull();
+    expect(kit.marbles.get(kit.players[1].id)!.time).toBeNull();
+  });
+
+  it('turns a newcomer away while a race is on', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    sam.host();
+    ada.browse();
+    ada.join(ada.hosts[0].id);
+    sam.start('level-1');
+    kit.browse();
+    kit.join(kit.hosts[0].id);
+    expect(kit.why).toBe('racing');
+    expect(sam.players).toHaveLength(2);
   });
 });
