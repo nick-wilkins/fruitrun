@@ -32,17 +32,27 @@ export interface Hud {
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
 
 /** `rivals` are the marbles being raced, if this run is a race. */
-export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string): Hud {
+/** A padlock, its shackle swung open or clicked shut. */
+const padlock = (open: boolean) =>
+  `<svg viewBox="0 0 24 24"><path d="${open ? 'M8 11V7a4 4 0 0 1 7.6-1.7' : 'M8 11V7a4 4 0 0 1 8 0v4'}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><rect x="5" y="11" width="14" height="10" rx="2.5" fill="currentColor"/></svg>`;
+
+/** `passed` is true when this level already has the stars it needs to open what comes next: then there is no goal to show. */
+export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string, passed = false): Hud {
   const fruit = ingredient(level.fruit);
   const root = el('div.hud');
 
   const timer = el('div.timer', {}, '0:00.0');
   const prizes = el('div.prizes');
-  const prizeIcons = Array.from({ length: 5 }, () => el('img', { src: asset(fruit.img), alt: '', draggable: false }));
-  prizes.append(...prizeIcons);
-  // The star the player has to keep to move on is ringed.
-  prizeIcons[level.need - 1].classList.add('needed');
-  const goalNote = el('div.goal-note', {}, `Keep ${level.need} to move on`);
+  // Five stars that go out one by one as the clock runs. The ones needed to open the next level sit together
+  // behind a padlock, which stays open for as long as they are all still lit.
+  const prizeIcons = Array.from({ length: 5 }, () => el('img', { src: asset('assets/ui/star.png'), alt: '', draggable: false }));
+  const lock = el('div.gate-lock', { innerHTML: padlock(true) });
+  const gate = el('div.gate', {}, ...prizeIcons.slice(0, level.need), lock);
+  const goalNote = el('div.goal-note', {}, `Keep ${level.need} ${level.need === 1 ? 'star' : 'stars'} to open the next level`);
+  if (passed) {
+    prizes.append(...prizeIcons);
+    goalNote.classList.add('hidden');
+  } else prizes.append(gate, ...prizeIcons.slice(level.need));
   const progressFill = el('div.fill');
   const dots = rivals.map((rival) => el('div.rival-dot', { style: `background:${rival.color}`, title: rival.name }));
   const progress = el('div.progress', {}, progressFill, ...dots, el('div.flag', {}, '🏁'));
@@ -111,7 +121,17 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       }
       if (state.stars !== lastStars) {
         lastStars = state.stars;
-        prizeIcons.forEach((icon, i) => icon.classList.toggle('lost', i >= state.stars));
+        prizeIcons.forEach((icon, i) => {
+          icon.classList.toggle('lost', i >= state.stars);
+          icon.src = asset(i < state.stars ? 'assets/ui/star.png' : 'assets/ui/star-empty.png');
+        });
+        if (!passed) {
+          const safe = state.stars >= level.need;
+          gate.classList.toggle('shut', !safe);
+          lock.innerHTML = padlock(safe);
+          goalNote.textContent = safe ? `Keep ${level.need} ${level.need === 1 ? 'star' : 'stars'} to open the next level` : 'Too slow to open the next level this time';
+          goalNote.classList.toggle('shut', !safe);
+        }
       }
       const shown = state.countdown === null ? '' : String(Math.ceil(state.countdown));
       if (shown !== lastCount) {

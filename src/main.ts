@@ -184,6 +184,7 @@ const app: App = {
       },
       race ? RIVALS : [],
       cup,
+      (app.save.levels[level.id]?.stars ?? 0) >= level.need || !LEVELS.some((l) => l.after.includes(level.n)),
     );
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');

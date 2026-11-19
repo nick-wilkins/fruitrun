@@ -790,9 +790,45 @@ body::before {
 }
 
 .prizes img.lost {
-  opacity: 0.35;
-  filter: grayscale(1);
-  transform: scale(0.72);
+  opacity: 0.7;
+  transform: scale(0.8);
+}
+
+.prizes {
+  align-items: center;
+}
+
+.gate {
+  display: flex;
+  align-items: center;
+  gap: 0.15em;
+  margin: -0.05em 0.25em -0.05em -0.45em;
+  padding: 0.1em 0.35em 0.1em 0.45em;
+  color: #fff;
+  background: #3fae3a;
+  border: 0.12em solid #d7ffb8;
+  border-radius: 99em;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.gate.shut {
+  background: #d8482f;
+  border-color: #ffd0c4;
+}
+
+.gate-lock {
+  display: flex;
+  width: 1.25em;
+  height: 1.25em;
+}
+
+.gate-lock svg {
+  width: 100%;
+  height: 100%;
+}
+
+.goal-note.shut {
+  background: rgba(190, 50, 30, 0.85);
 }
 
 .progress {
@@ -1951,16 +1987,12 @@ button.mix-item {
   color: #8a4b00;
 }
 
-.prizes img.needed {
-  outline: 0.14em solid #ffe066;
-  outline-offset: 0.05em;
-  border-radius: 50%;
-}
-
 .goal-note {
+  padding: 0.05em 0.9em;
   font-size: 0.72em;
   color: #fff;
-  text-shadow: 0 0.1em 0 rgba(0, 0, 0, 0.5);
+  background: rgba(50, 30, 10, 0.55);
+  border-radius: 99em;
 }
 
 .goal {

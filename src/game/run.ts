@@ -428,7 +428,7 @@ export class Run {
   private readonly frame = (now: number) => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.frame);
-    const dt = Math.min(0.05, (now - this.last) / 1000);
+    const dt = clamp((now - this.last) / 1000, 0, 0.05);
     this.last = now;
     if (this.paused) return;
     // Fixed steps, however long the frame took: the same line earns the same time on any device.
