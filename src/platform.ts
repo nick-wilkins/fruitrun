@@ -83,6 +83,10 @@ const DEV_OUTCOME = 'fruitrun.dev.outcome';
  * put 'pending', 'cancelled' or 'failed' under fruitrun.dev.outcome to try the other endings.
  */
 function devStore(): Store {
+  // Opening the page with ?races unlocks at once, and ?noraces locks again.
+  const asked = new URLSearchParams(location.search);
+  if (asked.has('races')) localStorage.setItem(DEV_OWNED, '1');
+  if (asked.has('noraces')) localStorage.removeItem(DEV_OWNED);
   const owned = () => localStorage.getItem(DEV_OWNED) === '1';
   return {
     price: async () => '£2.99',
