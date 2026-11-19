@@ -1,14 +1,15 @@
 import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
-import { clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, storeSave, type RunResult, type Save } from './core/progress';
+import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
+import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
 import { RIVALS, type Difficulty, type Finisher } from './core/race';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
 import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
-import { onResume, saveStore } from './platform';
+import { oldSave, onResume, saveStore } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -43,12 +44,15 @@ const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
 keepSavesIn(saveStore);
-let stored: Save | null = null;
+let roster: Roster = readRoster(null, null);
 try {
-  stored = readSave(await saveStore.get());
+  roster = readRoster(await saveStore.get(), await oldSave());
 } catch {
-  // The store cannot be read: start as a new player.
+  // The store cannot be read: start with nobody.
 }
+/** Sound on or off before anyone has started: nothing else of it is ever used. */
+const nobody = newSave();
+const worldOf = (save: Save) => (save.last ? levelById(save.last).world : 0);
 
 function endRun(): void {
   run?.dispose();
@@ -57,12 +61,42 @@ function endRun(): void {
 }
 
 const app: App = {
-  save: stored ?? newSave(),
-  hasSave: stored !== null,
-  world: stored?.last ? levelById(stored.last).world : 0,
+  get save() {
+    return playing(roster)?.save ?? nobody;
+  },
+  set save(to: Save) {
+    const player = playing(roster);
+    if (player) player.save = to;
+  },
+  get hasSave() {
+    return roster.players.length > 0;
+  },
+  roster,
+  get player() {
+    return playing(roster);
+  },
+  world: worldOf(playing(roster)?.save ?? nobody),
   persist() {
-    app.hasSave = true;
-    storeSave(app.save);
+    storeRoster(roster);
+  },
+  choose(id: string) {
+    if (!roster.players.some((p) => p.id === id)) return;
+    roster.current = id;
+    app.world = worldOf(app.save);
+    setMuted(app.save.muted);
+    app.persist();
+  },
+  join(name: string) {
+    if (!addPlayer(roster, name, app.save.muted)) return false;
+    app.world = 0;
+    app.persist();
+    app.show('map');
+    return true;
+  },
+  leave(id: string) {
+    removePlayer(roster, id);
+    app.world = worldOf(app.save);
+    app.persist();
   },
   show(screen: Screen) {
     endRun();
@@ -146,13 +180,6 @@ const app: App = {
       race ? { rivals: RIVALS, drivers: rivalDrivers(level, race) } : null,
     );
     run.start();
-  },
-  startAgain() {
-    clearSave();
-    app.save = { ...newSave(), muted: app.save.muted };
-    app.world = 0;
-    app.persist();
-    app.show('map');
   },
   toast(text: string) {
     toastEl.textContent = text;

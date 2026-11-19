@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, starsForTime, storeSave, superBlenderOpen, swept, type Save, type SaveStore } from '../src/core/progress';
+import { blend, completeLevel, isUnlocked, newSave, readSave, starsForTime, superBlenderOpen, swept, type Save } from '../src/core/progress';
 import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
@@ -204,37 +204,6 @@ describe('the smoothie book', () => {
 });
 
 describe('keeping the save', () => {
-  const memoryStore = () => {
-    let kept: string | null = null;
-    const store: SaveStore = {
-      get: async () => kept,
-      set: async (value) => void (kept = value),
-      remove: async () => void (kept = null),
-    };
-    return store;
-  };
-
-  it('reads back what was stored', async () => {
-    const store = memoryStore();
-    keepSavesIn(store);
-    storeSave({ ...newSave(), points: 70 });
-    expect(readSave(await store.get())?.points).toBe(70);
-  });
-
-  it('forgets the save when the game is started again', async () => {
-    const store = memoryStore();
-    keepSavesIn(store);
-    storeSave({ ...newSave(), points: 70 });
-    clearSave();
-    expect(await store.get()).toBeNull();
-  });
-
-  it('carries on playing when the store fails', () => {
-    keepSavesIn({ get: async () => null, set: () => Promise.reject(new Error('full')), remove: () => { throw new Error('gone'); } });
-    expect(() => storeSave(newSave())).not.toThrow();
-    expect(() => clearSave()).not.toThrow();
-  });
-
   it('starts fresh when nothing is stored or it cannot be read', () => {
     expect(readSave(null)).toBeNull();
     expect(readSave('{"version":1,"poi')).toBeNull();

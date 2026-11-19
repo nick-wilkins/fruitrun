@@ -195,7 +195,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
           {},
           el('img.banner', { src: asset('assets/ui/level-complete.png'), alt: 'Level complete!' }),
           el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
-          el('div.time', {}, formatTime(result.time), result.newBest && !result.firstClear ? el('span.new-best', {}, 'New best!') : null),
+          el('div.time', {}, formatTime(result.time), result.newBest && !result.firstClear ? el('span.new-best', {}, 'New best!') : result.rank > 1 ? el('span.new-best.ranked', {}, `Your ${['', '', '2nd', '3rd', '4th', '5th'][result.rank]} best`) : null),
           starRow,
           table,
           el('div.kicker', {}, wonLine),

@@ -39,9 +39,14 @@ export interface LevelRecord {
   time: number;
   /** Which set of course layouts the time was set on. Missing on saves from before layouts were versioned. */
   courses?: number;
+  /** The five best times on the current layout, quickest first, with the day each was set. */
+  times?: { time: number; on: string }[];
   /** The best place finished in a race here, at each difficulty raced. */
   races?: Partial<Record<Difficulty, number>>;
 }
+
+/** How many best times a level remembers. */
+export const BEST_TIMES = 5;
 
 /** Has every difficulty of race been won on this level? */
 export function swept(record: LevelRecord | undefined): boolean {
@@ -142,13 +147,9 @@ export function readSave(raw: string | null): Save | null {
   }
 }
 
-export function storeSave(save: Save): void {
-  const json = JSON.stringify(save);
+/** Keep `json` in the store, replacing what was there. */
+export function storeRaw(json: string): void {
   withStore((to) => to.set(json));
-}
-
-export function clearSave(): void {
-  withStore((to) => to.remove());
 }
 
 /**
@@ -174,6 +175,8 @@ export interface RunResult {
   fruits: number;
   bonuses: string[];
   newBest: boolean;
+  /** Where this time comes among the level's best five, 1 being the best, or 0 if it does not make the list. */
+  rank: number;
   firstClear: boolean;
   /** Every pickup on the route taken was collected. */
   perfect: boolean;
@@ -202,10 +205,15 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   // A time set on an older layout of this course cannot be compared: the first run on the new one replaces it.
   const comparable = previous?.courses === COURSES;
   const newBest = !previous || !comparable || seconds < previous.time;
+  // The list starts from the best time a save already had, from before the list was kept.
+  const before = comparable ? (previous.times ?? [{ time: previous.time, on: '' }]) : [];
+  const rank = before.filter((t) => t.time <= seconds).length + 1;
+  const times = [...before.slice(0, rank - 1), { time: seconds, on: new Date().toISOString().slice(0, 10) }, ...before.slice(rank - 1)].slice(0, BEST_TIMES);
   save.levels[level.id] = {
     stars: Math.max(stars, previous?.stars ?? 0),
     time: newBest ? seconds : previous.time,
     courses: COURSES,
+    times,
     ...(previous?.races ? { races: previous.races } : {}),
   };
   if (place !== undefined && difficulty) {
@@ -246,6 +254,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
     fruits: stars + podium,
     bonuses,
     newBest,
+    rank: rank <= BEST_TIMES ? rank : 0,
     firstClear: !previous,
     perfect,
     clean,

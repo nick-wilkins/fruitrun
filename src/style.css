@@ -376,11 +376,11 @@ body::before {
 }
 
 .menu-carry {
-  top: 61%;
+  top: 58%;
 }
 
 .menu-new {
-  top: 79%;
+  top: 74.5%;
 }
 
 .mute {
@@ -2417,4 +2417,117 @@ button.mix-item {
 .record .medals {
   margin: 0;
   font-size: 0.85em;
+}
+
+/* ---------- players ---------- */
+
+.menu-who {
+  position: absolute;
+  left: 50%;
+  top: 94%;
+  transform: translate(-50%, -50%);
+  padding: 0.15em 1em;
+  font-size: 0.9em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.players {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  margin-top: 0.4em;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+.player .btn {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+.player .btn small {
+  opacity: 0.9;
+}
+
+.round.small {
+  position: static;
+  width: 2em;
+  height: 2em;
+  font-size: 0.9em;
+  flex: none;
+}
+
+input.name {
+  width: 80%;
+  margin: 0.2em 0 0.7em;
+  padding: 0.35em 0.8em;
+  font: inherit;
+  font-size: 1.2em;
+  text-align: center;
+  color: var(--ink);
+  background: #fff;
+  border: 0.14em solid #c98f52;
+  border-radius: 99em;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.best-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1em 0.7em;
+  font: inherit;
+  color: inherit;
+  background: #fff3d1;
+  border: 0.12em solid #e0b866;
+  border-radius: 99em;
+}
+
+.best-time i {
+  font-style: normal;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.times .time-row {
+  display: grid;
+  grid-template-columns: 1.6em 1fr auto;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.25em 0.8em;
+  font-size: 1.1em;
+  text-align: left;
+  border-bottom: 0.1em dashed rgba(138, 75, 0, 0.3);
+}
+
+.times .time-row.top {
+  background: #ffe27a;
+  border-radius: 0.6em;
+}
+
+.times .time-row b {
+  color: #e2551f;
+}
+
+.times .time-row em {
+  font-style: normal;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.times .btn {
+  margin-top: 0.7em;
+}
+
+.new-best.ranked {
+  background: #7a3fc9;
 }

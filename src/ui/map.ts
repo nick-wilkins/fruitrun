@@ -87,7 +87,29 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
     };
     starts.append(race);
   }
-  return el(
+  // The best time opens the list of the five best, with the day each was set.
+  const times = record?.courses === COURSES ? (record.times ?? [{ time: record.time, on: '' }]) : [];
+  const best = times.length ? el('button.best-time', { ariaLabel: 'Best times' }, `Best ${formatTime(times[0].time)}`, el('i', {}, '▾')) : null;
+  if (best) {
+    onTap(best, () => {
+      sfx.tap();
+      const day = (on: string) => (on ? new Date(`${on}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '');
+      const list = el(
+        'div.modal',
+        { onclick: () => list.remove() },
+        el(
+          'div.card.small.times',
+          {},
+          el('h2', {}, 'Best times'),
+          el('div.kicker', {}, `${level.name}${app.player ? ` · ${app.player.name}` : ''}`),
+          ...times.map((t, i) => el(`div.time-row${i === 0 ? '.top' : ''}`, {}, el('b', {}, `${i + 1}`), el('span', {}, formatTime(t.time)), el('em', {}, day(t.on)))),
+          el('button.btn.purple', {}, 'Close'),
+        ),
+      );
+      card.append(list);
+    });
+  }
+  const card = el(
     'div.modal',
     { onclick: (e: MouseEvent) => e.target === e.currentTarget && close() },
     el(
@@ -97,7 +119,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('img.big-fruit', { src: asset(fruit.img), alt: fruit.name, draggable: false }),
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
-      record ? el('div.best', {}, stars(record.stars), record.courses === COURSES ? el('span', {}, `Best ${formatTime(record.time)}`) : null) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
+      record ? el('div.best', {}, stars(record.stars), best) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
       record && racesUnlocked() ? raceMedals(record.races, DIFFICULTIES) : null,
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
@@ -105,6 +127,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       starts,
     ),
   );
+  return card;
 }
 
 export function mapScreen(app: App): HTMLElement {

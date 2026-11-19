@@ -1,4 +1,5 @@
 import { setMuted, sfx } from '../audio';
+import { MAX_PLAYERS, type Player } from '../core/players';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
 import { pipSvg } from './pip';
@@ -11,41 +12,100 @@ export function menuScreen(app: App): HTMLElement {
     el('img.menu-logo', { src: asset('assets/ui/menu-logo.webp'), alt: 'Smoothie Scramble', draggable: false }),
   );
 
+  const starsOf = (player: Player) => Object.values(player.save.levels).reduce((sum, record) => sum + record.stars, 0);
+  const who = el('div.chip.menu-who');
+  const refresh = () => {
+    carryOn.classList.toggle('off', !app.hasSave);
+    who.classList.toggle('hidden', !app.player);
+    who.textContent = app.player ? `Playing as ${app.player.name}` : '';
+  };
+
+  /** Who's playing? One button a player, each with a small one to remove them. */
+  const pick = () => {
+    const list = el('div.players');
+    const dialog = el('div.modal', { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() }, el('div.card.small', {}, el('h2', {}, "Who's playing?"), list));
+    const fill = () => {
+      list.replaceChildren();
+      for (const player of app.roster.players) {
+        const go = el('button.btn.green', {}, el('span', {}, player.name), el('small', {}, `★ ${starsOf(player)}`));
+        onTap(go, () => {
+          sfx.tap();
+          app.choose(player.id);
+          app.show('map');
+        });
+        const remove = el('button.round.small', { ariaLabel: `Remove ${player.name}` }, '✕');
+        onTap(remove, () => {
+          sfx.tap();
+          const sure = el(
+            'div.modal',
+            {},
+            el(
+              'div.card.small',
+              {},
+              el('h2', {}, `Remove ${player.name}?`),
+              el('p', {}, 'Their stars, fruit, best times and smoothie points will be gone for good.'),
+              el(
+                'div.row',
+                {},
+                el('button.btn.purple', { onclick: () => sure.remove() }, 'Keep'),
+                el('button.btn.orange', {
+                  onclick: () => {
+                    app.leave(player.id);
+                    sure.remove();
+                    refresh();
+                    if (app.hasSave) fill();
+                    else dialog.remove();
+                  },
+                }, 'Remove'),
+              ),
+            ),
+          );
+          stage.append(sure);
+        });
+        list.append(el('div.player', {}, go, remove));
+      }
+    };
+    fill();
+    stage.append(dialog);
+  };
+
   const carryOn = el('button.menu-btn.menu-carry', { ariaLabel: 'Carry on' }, el('img', { src: asset('assets/ui/menu-carry.webp'), alt: '', draggable: false }));
-  if (!app.hasSave) carryOn.classList.add('off');
   setBackdrop(asset('assets/ui/menu-bg.webp'));
   onTap(carryOn, () => {
     if (!app.hasSave) {
       sfx.nope();
-      app.toast('Nothing to carry on yet. Tap Start New!');
+      app.toast('Nobody to carry on yet. Tap Start New!');
       return;
     }
     sfx.tap();
-    app.show('map');
+    if (app.roster.players.length > 1) pick();
+    else app.show('map');
+  });
+  onTap(who, () => {
+    sfx.tap();
+    pick();
   });
 
   const startNew = el('button.menu-btn.menu-new', { ariaLabel: 'Start new' }, el('img', { src: asset('assets/ui/menu-new.webp'), alt: '', draggable: false }));
   onTap(startNew, () => {
-    sfx.tap();
-    if (!app.hasSave) {
-      app.startAgain();
+    if (app.roster.players.length >= MAX_PLAYERS) {
+      sfx.nope();
+      app.toast(`${MAX_PLAYERS} players already. Remove one to make room.`);
+      pick();
       return;
     }
+    sfx.tap();
+    const number = app.roster.players.length + 1;
+    const name = el('input.name', { type: 'text', maxLength: 12, placeholder: `Player ${number}`, autocapitalize: 'words', autocomplete: 'off', spellcheck: false, ariaLabel: 'Your name' });
+    const start = () => {
+      sfx.tap();
+      app.join(name.value);
+    };
+    name.addEventListener('keydown', (e) => e.key === 'Enter' && start());
     const dialog = el(
       'div.modal',
-      {},
-      el(
-        'div.card.small',
-        {},
-        el('h2', {}, 'Start again?'),
-        el('p', {}, 'Your stars, fruit and smoothie points will be wiped.'),
-        el(
-          'div.row',
-          {},
-          el('button.btn.purple', { onclick: () => dialog.remove() }, 'Keep playing'),
-          el('button.btn.orange', { onclick: () => app.startAgain() }, 'Start again'),
-        ),
-      ),
+      { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() },
+      el('div.card.small', {}, el('h2', {}, 'New player'), el('p', {}, "What's your name?"), name, el('div.row', {}, el('button.btn.purple', { onclick: () => dialog.remove() }, 'Back'), el('button.btn.green', { onclick: start }, "Let's roll!"))),
     );
     stage.append(dialog);
   });
@@ -61,6 +121,7 @@ export function menuScreen(app: App): HTMLElement {
 
   const pip = el('div.menu-pip', { innerHTML: pipSvg('cheer') });
   const bubble = el('div.bubble', {}, "Hi, I'm Pip! Let's roll!");
-  stage.append(carryOn, startNew, mute, pip, bubble);
+  stage.append(carryOn, startNew, who, mute, pip, bubble);
+  refresh();
   return stage;
 }
