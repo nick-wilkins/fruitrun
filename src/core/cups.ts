@@ -1,5 +1,6 @@
 import { ingredient } from '../data/ingredients';
 import { LEVELS, type Level } from '../data/levels';
+import { claimAwards, type Award } from './awards';
 import type { Save } from './progress';
 import { RIVALS, YOUR_COLOR, type Difficulty, type Finisher } from './race';
 
@@ -39,6 +40,8 @@ export interface CupResult {
   perfect: boolean;
   /** The trophy is better than any won in this cup at this difficulty before. */
   best: boolean;
+  /** Awards the cup earned. */
+  awards: Award[];
   table: Standing[];
 }
 
@@ -49,12 +52,17 @@ export interface Standing {
   you: boolean;
 }
 
+/** Fruit already lending its name to a cup: two worlds can start with the same one, and no two cups share a name. */
+const named = new Set<string>();
+
 function cupsOf(world: number, levels: Level[]): Cup[] {
   const cups: Cup[] = [];
   for (let from = 0; from < levels.length; from += CUP_RACES) {
     // A world's levels rarely divide by four: its last cup takes the last four, sharing a level or two.
     const four = levels.slice(Math.min(from, levels.length - CUP_RACES), Math.min(from, levels.length - CUP_RACES) + CUP_RACES);
-    cups.push({ id: `cup-${world}-${cups.length + 1}`, name: `${ingredient(four[0].fruit).name} Cup`, world, levels: four.map((l) => l.id), fruit: four[0].fruit });
+    const fruit = (four.find((l) => !named.has(l.fruit)) ?? four[0]).fruit;
+    named.add(fruit);
+    cups.push({ id: `cup-${world}-${cups.length + 1}`, name: `${ingredient(fruit).name} Cup`, world, levels: four.map((l) => l.id), fruit });
   }
   return cups;
 }
@@ -93,8 +101,10 @@ export function scoreCupRace(save: Save, order: Finisher[]): CupResult | null {
   const cup = run && cupById(run.id);
   if (!run || !cup) return null;
   order.forEach((row, place) => {
-    const who = row.you ? 0 : RIVALS.findIndex((rival) => rival.name === row.name) + 1;
-    if (who >= 0) run.points[who] = (run.points[who] ?? 0) + (CUP_POINTS[place] ?? 0);
+    const rival = RIVALS.findIndex((each) => each.name === row.name);
+    if (!row.you && rival < 0) return;
+    const who = row.you ? 0 : rival + 1;
+    run.points[who] = (run.points[who] ?? 0) + (CUP_POINTS[place] ?? 0);
   });
   run.race++;
   if (run.race < CUP_RACES) return null;
@@ -111,7 +121,7 @@ export function scoreCupRace(save: Save, order: Finisher[]): CupResult | null {
   if (position === 1 && before !== 1) add('cupGolds');
   if (position === 1 && run.difficulty === 'hard' && before !== 1) add('cupHardGolds');
   if (perfect) add('cupPerfect');
-  const result = { cup, difficulty: run.difficulty, position, points, perfect, best, table };
+  const result = { cup, difficulty: run.difficulty, position, points, perfect, best, table, awards: claimAwards(save) };
   delete save.cup;
   return result;
 }

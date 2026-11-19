@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { CUPS, CUP_POINTS, cupOpen, quitCup, scoreCupRace, standings, startCup } from '../src/core/cups';
-import { claimAwards } from '../src/core/awards';
 import { completeLevel, newSave } from '../src/core/progress';
 import { RIVALS, type Finisher } from '../src/core/race';
 import { LEVELS, WORLDS } from '../src/data/levels';
@@ -98,7 +97,16 @@ describe('racing awards', () => {
     const swept = completeLevel(save, level, 50, [], undefined, 1, 'hard').awards.map((a) => a.id);
     expect(swept).toEqual(expect.arrayContaining(['hard-win', 'sweep-1']));
     startCup(save, cup, 'hard');
-    for (let i = 0; i < 4; i++) scoreCupRace(save, order(1));
-    expect(claimAwards(save).map((a) => a.id)).toEqual(expect.arrayContaining(['cups-1', 'cup-gold-1', 'cup-hard-gold', 'cup-perfect']));
+    let done = null;
+    for (let i = 0; i < 4; i++) done = scoreCupRace(save, order(1));
+    expect(done!.awards.map((a) => a.id)).toEqual(expect.arrayContaining(['cups-1', 'cup-gold-1', 'cup-hard-gold', 'cup-perfect']));
+  });
+
+  it('no two cups share a name, and a finisher nobody knows scores for nobody', () => {
+    expect(new Set(CUPS.map((each) => each.name)).size).toBe(CUPS.length);
+    const save = played();
+    startCup(save, cup, 'easy');
+    scoreCupRace(save, [{ name: 'Stranger', color: '#000', time: 1, you: false }, ...order(1)]);
+    expect(save.cup?.points[0]).toBe(7);
   });
 });

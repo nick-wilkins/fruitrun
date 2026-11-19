@@ -161,6 +161,7 @@ export function cupTableScreen(app: App): HTMLElement {
         prize ? el('div.cup-prize', {}, prize) : el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
         done.perfect ? el('div.kicker', {}, '★ Perfect Forty: every race won!') : null,
         done.best && done.position <= 3 ? el('div.kicker.small', {}, 'A new trophy for your shelf') : null,
+        ...done.awards.slice(0, 3).map((award) => el('div.cup-award', {}, el('img', { src: asset(award.icon), alt: '' }), `Award: ${award.name}`)),
         table(done.table),
         el('div.row', {}, go('Cups', 'purple', () => app.show('cups')), go('Blend ▶', 'green.big', () => app.show('blender'))),
       ),

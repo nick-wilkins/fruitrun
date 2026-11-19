@@ -517,7 +517,7 @@ export class Sim {
     let from = this.routeS0;
     for (let gate = 0; gate < this.gates; gate++) {
       const to = this.routeX[gate];
-      if (look <= this.routeIn[gate]) return x + clamp(to - x, -1, 1) * Math.min(Math.abs(to - x), this.routeRate * Math.max(0, look - from));
+      if (look <= this.routeIn[gate]) return x + Math.sign(to - x) * Math.min(Math.abs(to - x), this.routeRate * Math.max(0, look - from));
       if (look <= this.routeOut[gate]) return to;
       x = to;
       from = this.routeOut[gate];

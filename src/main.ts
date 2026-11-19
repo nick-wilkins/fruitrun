@@ -1,7 +1,6 @@
 import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
-import { claimAwards } from './core/awards';
 import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
@@ -102,6 +101,7 @@ const app: App = {
   leave(id: string) {
     removePlayer(roster, id);
     ghostStore.clear(id, LEVELS.map((l) => l.id));
+    setMuted(app.save.muted);
     app.world = worldOf(app.save);
     app.persist();
   },
@@ -170,8 +170,6 @@ const app: App = {
           if (!draft || !order) return;
           app.save = draft;
           app.cupResult = scoreCupRace(app.save, order);
-          // A finished cup can earn awards of its own.
-          claimAwards(app.save);
           app.persist();
           if (trace && app.player) ghostStore.set(app.player.id, level.id, trace);
           app.show('cuptable');

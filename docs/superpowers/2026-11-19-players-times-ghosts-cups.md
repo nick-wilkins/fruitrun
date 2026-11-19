@@ -79,3 +79,20 @@ Built ahead of the difficulty tuning after all: the rules do not depend on it, o
 - RED: `tests/cups.test.ts` failed (no `cups` module); the awards test failed with `expected [] to include 'race-wins-1'`. GREEN: 6 tests.
 - Runtime, desktop Chrome, sound off, a throwaway player with six levels finished: PASS. Cups screen listed 19 cups, one open. Apple Cup on Easy run through the real game loop: four races in order (Apple Orchard, Banana Bend, Strawberry Fields, Orange Grove), the hint named the cup and race each time, the table after each race added up (10, 20, 30, 40 for four wins; rivals 22, 20, 18), the trophy card showed gold, the save held `cup-0-1: easy 1`, and the awards Cup Runner, Going for Gold and Perfect Forty were earned. The player was then removed, leaving Player 1 untouched.
 - Not checked in the browser: carrying a cup on after leaving it (covered by the unit test), losing a cup, a phone-sized screen.
+
+### Review (`/code-review medium`, one round over players, ghost, cups and the rival retune, 2026-11-19)
+
+Fixed:
+- A cup race could be restarted from the pause menu until it was won: the restart button is gone in a cup, and the way out reads "Leave the cup for now". Leaving before the line still means that race is run again on carrying on.
+- Cup awards were earned silently: they now come back with the cup result and show on the trophy card.
+- A finisher whose name matched no rival would have scored for the player: now scores for nobody.
+- Five cup names were used twice across worlds: a cup now takes the first fruit among its levels not already used.
+- The day a best time was set was kept in UTC and shown as local: now the player's own date.
+- Removing the player whose turn it was left the sound as they had it.
+- Rivals (from the retune): the "keep to the main road" scouting run could wander down a side road; small sideways moves under one unit undershot; the search for how keen a rival should be kept stale limits after the driver itself was changed.
+
+Left, with reasons:
+- A player whose stored save cannot be read is dropped, and an unreadable roster falls back to the single save from before players. Both need the settings store itself to be corrupted; falling back to an old save beats starting with nothing.
+- Each world's last cup shares levels with the one before it (the worlds do not divide by four).
+
+After the fixes: `npm test` 922 passed, `npx tsc --noEmit` clean.

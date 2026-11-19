@@ -46,6 +46,12 @@ export interface LevelRecord {
   races?: Partial<Record<Difficulty, number>>;
 }
 
+/** Today as the player's own calendar has it, as 2026-11-19. */
+function today(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 /** How many best times a level remembers. */
 export const BEST_TIMES = 5;
 
@@ -215,7 +221,7 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
   // The list starts from the best time a save already had, from before the list was kept.
   const before = comparable ? (previous.times ?? [{ time: previous.time, on: '' }]) : [];
   const rank = before.filter((t) => t.time <= seconds).length + 1;
-  const times = [...before.slice(0, rank - 1), { time: seconds, on: new Date().toISOString().slice(0, 10) }, ...before.slice(rank - 1)].slice(0, BEST_TIMES);
+  const times = [...before.slice(0, rank - 1), { time: seconds, on: today() }, ...before.slice(rank - 1)].slice(0, BEST_TIMES);
   save.levels[level.id] = {
     stars: Math.max(stars, previous?.stars ?? 0),
     time: newBest ? seconds : previous.time,

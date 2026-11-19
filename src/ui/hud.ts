@@ -74,9 +74,10 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
         'div.column',
         {},
         el('button.btn.green', { onclick: () => setPaused(false) }, '▶ Carry on'),
-        el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Start level again'),
+        // A cup race is run once: no starting it again when it is going badly.
+        cup ? null : el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Start level again'),
         soundButton,
-        el('button.btn.purple', { onclick: () => handlers.quit() }, '← Back to map'),
+        el('button.btn.purple', { onclick: () => handlers.quit() }, cup ? '← Leave the cup for now' : '← Back to map'),
       ),
     ),
   );

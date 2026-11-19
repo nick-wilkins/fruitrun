@@ -103,7 +103,8 @@ function sideRoads(level: Level): number[] {
       for (let step = 0; step < 600 / TICK && !sim.finished; step++) sim.step(TICK);
       return sim.finished ? sim.time : Infinity;
     };
-    const main = course.lanes.length > 1 ? scout([]) : 0;
+    // Told to keep off every side road: left to itself it would fancy one now and then, and spoil the comparison.
+    const main = course.lanes.length > 1 ? scout(course.lanes.map(() => -9)) : 0;
     saves = course.lanes.map((_, lane) => (lane ? main - scout(course.lanes.map((__, other) => (other === lane ? 9 : -9))) : 0));
     shortCuts.set(level.id, saves);
   }
@@ -175,11 +176,20 @@ export function rivalDrivers(level: Level, difficulty: Difficulty): Driver[] {
             driver.drift /= 2;
           }
           tidied[i]++;
+          // A tidier driver is a different driver: what was learnt about how keen it needs to be no longer holds.
+          least[i] = 0;
+          most[i] = 1;
+          return;
         } else if (!late && driver.keen < 0.15) {
           // Taking next to nothing and still too quick: only now is its marble itself held back.
           const speed = Math.max(0.8, (driver.speed * times[i]) / targets[i]);
           if (driver.speed - speed > 0.01) settled = false;
-          driver.speed = speed;
+          if (driver.speed - speed > 0.01) {
+            least[i] = 0;
+            most[i] = 1;
+            driver.speed = speed;
+            return;
+          }
         } else if (most[i] - least[i] > 0.06) settled = false;
         driver.keen = (least[i] + most[i]) / 2;
       });

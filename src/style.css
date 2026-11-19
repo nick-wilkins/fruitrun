@@ -2654,3 +2654,21 @@ input.name {
   width: 75%;
   font-size: 1.1em;
 }
+
+.cup-award {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0.15em 0.2em;
+  padding: 0.1em 0.8em;
+  font-size: 0.9em;
+  color: #fff;
+  background: linear-gradient(#b574f2, #7a3fc9);
+  border-radius: 99em;
+}
+
+.cup-award img {
+  width: 1.4em;
+  height: 1.4em;
+  object-fit: contain;
+}
