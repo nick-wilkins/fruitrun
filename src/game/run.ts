@@ -97,29 +97,45 @@ interface Flying {
   life: number;
 }
 
-/**
- * A crest of fire: tongues fanned across the top of the marble that lean back as it goes, so they show from behind
- * as well as from the side. Solid colour rather than glow, so it shows against a bright sky.
- */
+/** A tail of fire streaming out of the back of a marble, made to ripple by `waveFlame`. */
 function buildFlame(): Group {
   const flame = new Group();
-  const tongues: [string, number, number, number][] = [
-    ['#e3262b', 0.5, 1.7, -0.75],
-    ['#ff8a1f', 0.55, 2.3, -0.38],
-    ['#e3262b', 0.62, 2.9, 0],
-    ['#ff8a1f', 0.55, 2.3, 0.38],
-    ['#e3262b', 0.5, 1.7, 0.75],
-    ['#ffe14d', 0.36, 1.9, 0],
+  const tongues: [string, number, number][] = [
+    ['#ff5a1f', 0.55, 3.6],
+    ['#ffd84a', 0.32, 2.5],
   ];
-  tongues.forEach(([color, radius, length, splay], i) => {
-    const tongue = new Mesh(new ConeGeometry(radius, length, 10, 1, true), new MeshBasicMaterial({ color, transparent: true, opacity: 0.92, depthWrite: false, fog: false }));
+  tongues.forEach(([color, radius, length], i) => {
+    const geometry = new ConeGeometry(radius, length, 8, 12, true);
+    // Lay it down pointing backwards, its mouth at the marble.
+    geometry.rotateX(-Math.PI / 2).translate(0, 0, -length / 2);
+    geometry.userData = { rest: geometry.attributes.position.array.slice(), length };
+    const tongue = new Mesh(geometry, new MeshBasicMaterial({ color, transparent: true, opacity: 0.8, depthWrite: false, fog: false }));
+    tongue.position.set(0, 0.35, -0.55);
     tongue.renderOrder = 2 + i;
-    const pivot = new Group();
-    pivot.rotation.z = splay;
-    pivot.add(tongue);
-    flame.add(pivot);
+    tongue.frustumCulled = false;
+    flame.add(tongue);
   });
   return flame;
+}
+
+/** Ripple a flame like a ribbon in the wind: still at the marble, swinging wider towards its tip. `burn` is how long it is. */
+function waveFlame(flame: Group, clock: number, burn: number): void {
+  flame.children.forEach((child, i) => {
+    const geometry = (child as Mesh).geometry;
+    const { rest, length } = geometry.userData as { rest: Float32Array; length: number };
+    const at = geometry.attributes.position;
+    for (let v = 0; v < at.count; v++) {
+      const along = -rest[v * 3 + 2] / length;
+      const sway = along * along;
+      at.setXYZ(
+        v,
+        rest[v * 3] + Math.sin(clock * 11 - along * 5.5 + i * 0.9) * 1.05 * sway,
+        rest[v * 3 + 1] + Math.sin(clock * 8 - along * 4 + i) * 0.2 * sway + sway * 0.7,
+        rest[v * 3 + 2] * burn,
+      );
+    }
+    at.needsUpdate = true;
+  });
 }
 
 /** A small pool of glowing dots for sparkles, splinters and confetti. */
@@ -820,16 +836,9 @@ export class Run {
     for (const racer of this.racers) {
       if (racer.flame) {
         // It smoulders on the grid and streams out with speed, flickering all the while.
-        const burn = racer.sim.countdown > 0 ? 0.45 : 0.55 + clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.75;
+        const burn = racer.sim.countdown > 0 ? 0.3 : 0.5 + clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.6;
         racer.flame.visible = !racer.sim.finished;
-        const lean = racer.sim.countdown > 0 ? 0.35 : 0.6 + clamp(racer.sim.v / MAX_SPEED, 0, 1) * 0.5;
-        racer.flame.children.forEach((pivot, i) => {
-          const tongue = pivot.children[0] as Mesh<ConeGeometry>;
-          const flicker = burn * (1 + Math.sin(sim.clock * (31 + i * 13) + i * 2) * 0.14 + (Math.random() - 0.5) * 0.12);
-          pivot.rotation.x = -lean + Math.sin(sim.clock * (17 + i * 7)) * 0.08;
-          tongue.scale.set(1, flicker, 1);
-          tongue.position.y = 0.6 + (tongue.geometry.parameters.height * flicker) / 2;
-        });
+        waveFlame(racer.flame, sim.clock, burn);
       }
       if (racer.sim.countdown > 0) continue;
       racer.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (racer.sim.v * racer.sim.gait * dt) / BALL_RADIUS));
