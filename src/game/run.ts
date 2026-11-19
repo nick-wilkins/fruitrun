@@ -57,10 +57,6 @@ export interface Field {
 }
 
 /** How a race ended: everyone in finishing order, and where the player came. */
-export interface RaceResult {
-  order: Finisher[];
-  place: number;
-}
 
 interface Racer {
   rival: Rival;
@@ -73,12 +69,16 @@ export interface RunHooks {
   hud(state: HudState): void;
   pickup(id: string): void;
   /** The line has been crossed: bank the result now. */
-  finish(time: number, bonuses: string[], feats: Feats, race: RaceResult | null): void;
-  /** The celebration has played: show the results. */
-  results(): void;
+  /** In a race, `place` is where the player came. */
+  finish(time: number, bonuses: string[], feats: Feats, place: number | null): void;
+  /** The celebration has played: show the results, with everyone's finishing order if it was a race. */
+  results(order: Finisher[] | null): void;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** How long after the player crosses the line the results will wait for a rival who is nearly home, in seconds. */
+const WAIT_FOR_RIVALS = 7;
 
 /** How much of the screen's width a finger swipes to take the ball from one kerb to the other. */
 const SWIPE = 0.24;
@@ -226,6 +226,8 @@ export class Run {
   private readonly recorder = new Recorder();
   /** The player's best run here, shown as a see-through marble to chase. It touches nothing. */
   private ghost: { run: Ghost; pip: Pip } | null = null;
+  /** The celebration is over and the results are owed, once any rival about to finish has done so. */
+  private resultsDue = false;
   /** Set once the player has finished and the rivals still out have been brought home out of sight. */
   private over = false;
 
@@ -437,6 +439,10 @@ export class Run {
       this.recorder.sample(this.sim);
       for (const racer of this.racers) racer.sim.step(TICK);
       if (this.racers.length) jostle(this.marbles);
+      if (this.resultsDue && !this.awaited()) {
+        this.resultsDue = false;
+        this.hooks.results(this.raceResult());
+      }
       this.owed -= TICK;
     }
     this.animate(dt);
@@ -509,7 +515,7 @@ export class Run {
   }
 
   /** The line is crossed: bring home anyone still out on the course, so the result is complete. */
-  private raceResult(): RaceResult | null {
+  private raceResult(): Finisher[] | null {
     if (!this.racers.length) return null;
     this.over = true;
     for (const racer of this.racers) {
@@ -524,8 +530,21 @@ export class Run {
       racer.pip.root.visible = false;
       racer.shadow.visible = false;
     }
-    const order = finishingOrder(this.sim.time, this.racers.map((racer) => ({ name: racer.rival.name, color: racer.rival.color, time: racer.sim.time })));
-    return { order, place: order.findIndex((row) => row.you) + 1 };
+    return finishingOrder(this.sim.time, this.racers.map((racer) => ({ name: racer.rival.name, color: racer.rival.color, time: racer.sim.time })));
+  }
+
+  /**
+   * After the player is home the results wait a little for rivals close behind, so they are seen crossing the
+   * line. Nobody is waited for who will not make it in the time left.
+   */
+  private awaited(): boolean {
+    const left = WAIT_FOR_RIVALS - this.sim.finishT;
+    return this.racers.some((racer) => {
+      const rival = racer.sim;
+      if (rival.finished) return rival.finishT < 0.6 && left > 0;
+      const togo = (1 - rival.progress()) * (this.course.finishS - 12);
+      return togo / Math.max(MIN_SPEED, rival.pace) < left;
+    });
   }
 
   // ---- reactions ----
@@ -561,6 +580,7 @@ export class Run {
     } else if (event.type === 'pin') this.fling(sim, this.world.pins, event.index, 0.75, 11);
     else if (event.type === 'pickup') this.sparks.burst(this.world.pickups.get(event.index)!.base, 8, ['#ffffff', '#ffe066'], 4);
     else if (event.type === 'bump') this.sparks.burst(sim.point(sim.s, sim.x, 0.8, this.v1), 10, ['#ffffff', '#ffd9a8'], 5);
+    else if (event.type === 'finish') this.sparks.burst(sim.point(sim.s, sim.x, 2, this.v1), 40, ['#ffffff', '#ffd23f', '#4aa3ff', '#ff7ac0'], 10);
     else if (event.type === 'boost' || event.type === 'turbo') this.sparks.burst(sim.point(sim.s, sim.x, 0.5, this.v1), 8, ['#eaff3d', '#ffffff'], 4);
   }
 
@@ -640,14 +660,16 @@ export class Run {
         break;
       }
       case 'finish': {
-        this.hooks.finish(sim.time, sim.bonuses, sim.feats(), this.raceResult());
+        // Anyone already home is ahead; the rest race on to the line by themselves, with nobody left to wait for.
+        this.hooks.finish(sim.time, sim.bonuses, sim.feats(), this.racers.length ? this.place() : null);
+        for (const racer of this.racers) racer.sim.chase = null;
         sfx.finish();
         const f = sim.frameAt(sim.s, this.f);
         this.sparks.burst(this.ballAt(2, this.v1), 90, ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#ffffff'], 14, this.v2.copy(f.t).multiplyScalar(sim.v * 0.5));
         break;
       }
       case 'results':
-        this.hooks.results();
+        this.resultsDue = true;
         break;
     }
   }
@@ -679,7 +701,8 @@ export class Run {
     // The rules move in fixed steps that rarely line up with the screen's frames. Draw each marble where it will
     // be by now, part-way into the next step, so its motion is even rather than a step ahead or behind.
     const lead = sim.countdown > 0 || sim.finished ? 0 : this.owed;
-    for (const racer of this.racers) this.seat(racer.sim, racer.pip, racer.shadow, racer.sim.finished ? 0 : lead);
+    // A rival still racing after the player is home keeps its own smooth motion.
+    for (const racer of this.racers) this.seat(racer.sim, racer.pip, racer.shadow, racer.sim.finished || racer.sim.countdown > 0 ? 0 : this.owed);
     this.seatGhost(lead);
     // The player last: the camera works from what is left behind.
     this.seat(sim, this.pip, this.shadow, lead);

@@ -200,16 +200,18 @@ const app: App = {
       {
         hud: (state) => hud.update(state),
         pickup: (id) => hud.pickup(id),
-        finish: (time, bonuses, feats, raced) => {
+        finish: (time, bonuses, feats, place) => {
           // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
           // retrying throws the whole run away, fruit, stars, podium place and all.
           draft = structuredClone(app.save);
-          result = completeLevel(draft, level, time, bonuses, feats, raced?.place, race);
-          order = raced?.order;
+          result = completeLevel(draft, level, time, bonuses, feats, place ?? undefined, race);
           trace = result.newBest ? (run?.trace() ?? null) : null;
           hud.finished();
         },
-        results: () => result && hud.results(result, order),
+        results: (finished) => {
+          order = finished ?? undefined;
+          if (result) hud.results(result, order);
+        },
       },
       race ? { rivals: RIVALS, drivers: rivalDrivers(level, race) } : null,
     );

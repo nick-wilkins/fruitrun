@@ -264,3 +264,9 @@ Other numbers:
 - The seven-level tests pin today's numbers. Retuning will move them; that is their job.
 
 Checked by the session owner after the tuning agent reported (2026-11-19): `npm test` 921 passed, `npx tsc --noEmit` clean, `npm run build` clean. Real game loop in desktop Chrome, sound off: level 7 Hard, careful line 57.4 s came 4th behind 53.6 to 54.3 s; expert line 53.2 s won by 0.1 s. Level 3 Easy, a marble that never steers won by 0.2 s. Level 15 Medium, careful line won by 3 s. Rival setup on starting a race took 15 to 100 ms. No console errors. Not watched by eye.
+
+## Rivals seen finishing (2026-11-19)
+
+Nick asked to see the racers behind him cross the line. Before, everyone still out was brought home out of sight the moment the player finished. Now they race on in view, with no easing off, and the results card waits for any rival who will cross within 7 seconds of the player, plus a moment after. Rivals further back than that are still brought home out of sight, so nobody sits waiting. The player's place is known at the line (rivals already home are ahead); the finishing times in the table come when the card appears.
+
+Evidence, desktop Chrome, sound off, real game loop: level 7 Hard on the expert line (won by 0.1 s): all three rivals crossed in view and the card came 2.1 s after the player's finish, order and times correct. Level 15 Medium and level 3 Easy (rivals 10 s or more behind): card at 1.8 s as before, rivals out of sight. Level 7 Hard never steering (last): card at 1.8 s, placed 4th. `npm test` 922 passed. How it looks in motion has not been watched.
