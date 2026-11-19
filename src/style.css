@@ -1119,9 +1119,15 @@ body::before {
   grid-column: 1 / -1;
   grid-row: 1 / -1;
   align-self: center;
-  padding: 0 1em;
+  justify-self: center;
+  max-width: 88%;
+  padding: 0.7em 1em;
   text-align: center;
   font-size: 1.5cqw;
+  background: #fff8e6;
+  border: 0.2cqw solid #c98f52;
+  border-radius: 1em;
+  box-shadow: 0 0.3cqw 0.6cqw rgba(90, 50, 10, 0.25);
 }
 
 .pager {
@@ -1195,7 +1201,14 @@ body::before {
   width: 6%;
   aspect-ratio: 1;
   border-radius: 50%;
-  pointer-events: none;
+  padding: 0;
+  background: none;
+  border: 0;
+  transition: transform 0.08s;
+}
+
+.power:active {
+  transform: scale(0.92);
 }
 
 .blending .power {

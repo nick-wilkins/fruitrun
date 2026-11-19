@@ -43,7 +43,7 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
   const glassItems = el('div.glass-items');
   const liquid = el('div.liquid');
   const glass = el('div.glass', {}, liquid, glassItems);
-  const power = el('div.power');
+  const power = el('button.power', { ariaLabel: 'Blend' });
   const mixTitle = el('h3');
   const mix = el('div.mix');
   const mixHint = el('p.mix-hint');
@@ -214,7 +214,7 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
     }, SIP_SECONDS * 1000 + 900);
   }
 
-  onTap(blendButton, () => {
+  const go = () => {
     if (busy) return;
     if (!jug.length) {
       sfx.nope();
@@ -235,7 +235,10 @@ export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
       render();
       reveal(result, fresh);
     }, BLEND_SECONDS * 1000);
-  });
+  };
+  // The button on the blender itself works as well as the one beside it.
+  onTap(blendButton, go);
+  onTap(power, go);
 
   onTap(close, () => {
     if (busy) return;
