@@ -3050,3 +3050,23 @@ input.name {
 .cup.champion .cup-art {
   margin-top: 0.9em;
 }
+
+/* What each column of the records list is. */
+.record.head {
+  padding-top: 0;
+  padding-bottom: 0.1em;
+  font-size: 1cqw;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #b0763a;
+  border-bottom: 0;
+}
+
+.record.head span {
+  text-align: right;
+}
+
+.record.head span:nth-of-type(1) {
+  text-align: center;
+}

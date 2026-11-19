@@ -218,6 +218,8 @@ function records(app: App): HTMLElement {
     const levels = played.filter((l) => l.world === index);
     if (!levels.length) return;
     page.append(el('h3', {}, world.name));
+    // Say what each column is: the pills are places in races, nothing to do with blending.
+    page.append(el('div.record.head', {}, el('i'), el('i'), el('span', {}, 'Stars'), el('span', {}, 'Best time'), racing ? el('span', {}, '🏁 Best place in races') : null));
     for (const level of levels) {
       const record = save.levels[level.id];
       page.append(
