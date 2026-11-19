@@ -445,7 +445,23 @@ export class Run {
 
   // ---- loop ----
 
+  /**
+   * Get every shader and picture onto the graphics chip now. Left alone, each is prepared the first time it comes
+   * into view, which is a dropped frame or several in the middle of a run.
+   */
+  private warm(): void {
+    this.renderer.compile(this.world.scene, this.camera);
+    this.world.scene.traverse((object) => {
+      const material = (object as Mesh).material;
+      for (const one of Array.isArray(material) ? material : material ? [material] : []) {
+        const { map, emissiveMap, alphaMap } = one as MeshBasicMaterial & { emissiveMap?: MeshBasicMaterial['map'] };
+        for (const texture of [map, emissiveMap, alphaMap]) if (texture?.image) this.renderer.initTexture(texture);
+      }
+    });
+  }
+
   start(): void {
+    this.warm();
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
   }
@@ -520,6 +536,8 @@ export class Run {
     pip.root.matrixAutoUpdate = false;
     pip.root.visible = false;
     this.world.scene.add(pip.root);
+    // It arrives during the countdown: have its see-through shaders ready before it is first shown.
+    this.renderer.compile(pip.root, this.camera, this.world.scene);
     this.ghost = { run, pip };
   }
 

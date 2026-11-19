@@ -96,3 +96,18 @@ Left, with reasons:
 - Each world's last cup shares levels with the one before it (the worlds do not divide by four).
 
 After the fixes: `npm test` 922 passed, `npx tsc --noEmit` clean.
+
+### Performance pass against the Brackenmere three.js playbook (2026-11-19)
+
+Measured in desktop Chrome (M5 Pro, 1100x620, sound off) by stepping the real game loop over levels 1, 7, 20, 40, 60 and 68. Nothing here was measured on an iPhone or iPad, which is where the playbook says the order of costs is decided.
+
+Already in line: one WebGL context; no live shadows and no post-processing; Lambert and basic materials only, 17 or 18 shader programs a level; 175 to 325 draws; 3 KB of garbage a frame; HUD written every 0.08 s, 0.002 ms a frame; images total 58 MB decoded with nothing oversized.
+
+Fixed:
+- Shaders were compiled and pictures uploaded the first time each came into view: 4 or 5 programs and 2 or 3 textures after a run had started, some of them 12 seconds into the run. Now all are prepared before the countdown (`Run.warm`), and the ghost's when it arrives. After: 0 programs and 0 textures after start on all six levels. PASS. Cost: starting a level takes 55 to 160 ms, up from about 25.
+- Laying out the other 67 courses in the background (25 to 40 ms each on this Mac, several times that on a phone) carried on during a run started in the first minute. It now waits while a run is on screen.
+
+Left, for a device to decide:
+- Pixel ratio is capped at 2 with 4x anti-aliasing. The playbook's first lever is 1.5; it is a visible change, so it is Nick's call once a device shows missed frames.
+- About 250,000 to 295,000 triangles a level, over half of them the small round fruit on the trees. Triangles were the cheapest thing on the playbook's iPad, so not touched.
+- One long frame (17 to 110 ms) turned up in some stepped runs, never at the same place twice and inside the draw call itself: the harness pushing thousands of frames with no screen refresh between them, or the browser tidying memory. Not reproduced in isolation.

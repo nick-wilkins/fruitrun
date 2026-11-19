@@ -255,7 +255,7 @@ document.addEventListener('visibilitychange', () => {
 app.show('menu');
 
 // Lay out courses in the background, starting with the ones the player can reach.
-warmCourses([...LEVELS].sort((a, b) => Number(isUnlocked(app.save, b)) - Number(isUnlocked(app.save, a))));
+warmCourses([...LEVELS].sort((a, b) => Number(isUnlocked(app.save, b)) - Number(isUnlocked(app.save, a))), () => !run);
 
 if (import.meta.env.DEV) {
   // Console helpers for tuning and testing.

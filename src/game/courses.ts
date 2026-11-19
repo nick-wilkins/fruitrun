@@ -349,9 +349,11 @@ export const handsFreeFor = (level: Level): { smart: number; ace: number } => pr
  * Build courses a few at a time while nothing else is happening, so opening a level never has to wait for one.
  * `order` is the levels to prepare, soonest-needed first.
  */
-export function warmCourses(order: Level[]): void {
+export function warmCourses(order: Level[], idle: () => boolean = () => true): void {
   const queue = order.filter((level) => !built.has(level.id));
   const next = () => {
+    // Laying out a course holds everything up for a moment: never while a run is on screen.
+    if (!idle()) return void window.setTimeout(next, 1000);
     const level = queue.shift();
     if (!level) return;
     prepared(level);
