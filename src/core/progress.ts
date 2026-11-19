@@ -1,7 +1,7 @@
 import { LEVELS, levelByNumber, type Level } from '../data/levels';
 import { starTimesFor } from '../game/courses';
 import { claimAwards, type Award } from './awards';
-import { podiumFruit, type Difficulty } from './race';
+import { DIFFICULTIES, podiumFruit, type Difficulty } from './race';
 import { MAX_JUG, scoreSmoothie, type SmoothieResult } from './smoothie';
 
 /** What happened on a run, beyond the time: counted by the rules engine. */
@@ -39,6 +39,13 @@ export interface LevelRecord {
   time: number;
   /** Which set of course layouts the time was set on. Missing on saves from before layouts were versioned. */
   courses?: number;
+  /** The best place finished in a race here, at each difficulty raced. */
+  races?: Partial<Record<Difficulty, number>>;
+}
+
+/** Has every difficulty of race been won on this level? */
+export function swept(record: LevelRecord | undefined): boolean {
+  return DIFFICULTIES.every(({ id }) => record?.races?.[id] === 1);
 }
 
 export interface Save {
@@ -187,7 +194,7 @@ export interface RunResult {
 }
 
 /** Bank a finished run: one fruit per star and every bonus picked up. Finishing a level opens the ones after it. */
-export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats, place?: number): RunResult {
+export function completeLevel(save: Save, level: Level, seconds: number, bonuses: string[], feats?: Feats, place?: number, difficulty?: Difficulty): RunResult {
   const stars = starsForTime(level, seconds);
   const podium = place === undefined ? 0 : podiumFruit(place);
   const previous = save.levels[level.id];
@@ -199,7 +206,14 @@ export function completeLevel(save: Save, level: Level, seconds: number, bonuses
     stars: Math.max(stars, previous?.stars ?? 0),
     time: newBest ? seconds : previous.time,
     courses: COURSES,
+    ...(previous?.races ? { races: previous.races } : {}),
   };
+  if (place !== undefined && difficulty) {
+    const record = save.levels[level.id];
+    const before = swept(record);
+    record.races = { ...record.races, [difficulty]: Math.min(place, record.races?.[difficulty] ?? Infinity) };
+    if (!before && swept(record)) save.stats.sweeps = (save.stats.sweeps ?? 0) + 1;
+  }
   save.inventory[level.fruit] = (save.inventory[level.fruit] ?? 0) + stars + podium;
   for (const id of bonuses) save.inventory[id] = (save.inventory[id] ?? 0) + 1;
   for (const id of [level.fruit, ...bonuses]) if (!save.seen.includes(id)) save.seen.push(id);

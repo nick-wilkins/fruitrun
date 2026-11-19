@@ -1,13 +1,14 @@
 import { sfx } from '../audio';
 import { AWARDS } from '../core/awards';
-import { isUnlocked, type Sip } from '../core/progress';
+import { COURSES, isUnlocked, swept, type Sip } from '../core/progress';
+import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { COMBOS, COMBO_GROUPS, RATINGS, type Combo } from '../core/smoothie';
 import { CATEGORY_LABEL, INGREDIENTS, ingredient } from '../data/ingredients';
 
 type Show = (dialog: HTMLElement) => void;
 import { LEVELS, WORLDS } from '../data/levels';
 import type { App } from './app';
-import { asset, el, onTap } from './dom';
+import { asset, el, formatTime, onTap, raceMedals, stars } from './dom';
 import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
 
@@ -194,12 +195,52 @@ function collection(app: App): HTMLElement {
   return page;
 }
 
+/** Best times and race results, level by level. */
+function records(app: App): HTMLElement {
+  const { save } = app;
+  const page = el('div.book-page');
+  const played = LEVELS.filter((l) => save.levels[l.id]);
+  if (!played.length) page.append(el('p', {}, 'No records yet. Play a level to set your first best time!'));
+  const racing = racesUnlocked();
+  const won = (id: string) => played.filter((l) => save.levels[l.id].races?.[id as 'easy'] === 1).length;
+  if (racing && played.length) {
+    page.append(
+      el(
+        'div.book-stats',
+        {},
+        ...DIFFICULTIES.map(({ id, name }) => el('div.stat', {}, el('b', {}, `${won(id)}`), el('span', {}, `${name} races won of ${LEVELS.length}`))),
+        el('div.stat', {}, el('b', {}, `${played.filter((l) => swept(save.levels[l.id])).length} 🏆`), el('span', {}, 'won at every difficulty')),
+      ),
+    );
+  }
+  WORLDS.forEach((world, index) => {
+    const levels = played.filter((l) => l.world === index);
+    if (!levels.length) return;
+    page.append(el('h3', {}, world.name));
+    for (const level of levels) {
+      const record = save.levels[level.id];
+      page.append(
+        el(
+          'div.record',
+          {},
+          el('img', { src: asset(ingredient(level.fruit).img), alt: '' }),
+          el('span', {}, `${level.label}. ${level.name}`),
+          stars(record.stars),
+          el('b', {}, record.courses === COURSES ? formatTime(record.time) : '-'),
+          racing ? raceMedals(record.races, DIFFICULTIES) : null,
+        ),
+      );
+    }
+  });
+  return page;
+}
+
 /** The smoothie book: everything the player has done, found and collected. */
 export function bookScreen(app: App): HTMLElement {
   const stage = el('div.stage.book-stage');
   stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
   setBackdrop(asset('assets/stall.webp'));
-  const pages = { Trophies: trophies, Awards: awards, Recipes: recipes, Collection: collection };
+  const pages = { Trophies: trophies, Records: records, Awards: awards, Recipes: recipes, Collection: collection };
   const body = el('div.book-body');
   const tabs = el('div.book-tabs');
   const open = (name: keyof typeof pages) => {

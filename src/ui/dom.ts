@@ -19,6 +19,18 @@ export function el<K extends keyof HTMLElementTagNameMap>(
 
 export const asset = (path: string) => `${import.meta.env.BASE_URL}${path}`;
 
+const MEDAL = ['', '🥇', '🥈', '🥉', '4th'];
+
+/** A level's race record: for each difficulty, the best place finished, or a blank where it has not been raced. */
+export function raceMedals(races: Partial<Record<string, number>> | undefined, difficulties: { id: string; name: string }[]): HTMLElement {
+  const row = el('div.medals');
+  for (const { id, name } of difficulties) {
+    const place = races?.[id];
+    row.append(el(`div.medal${place ? `.p${place}` : '.none'}`, { title: place ? `${name}: best place ${place}` : `${name}: not raced yet` }, el('span', {}, name), el('b', {}, place ? MEDAL[place] : '·')));
+  }
+  return row;
+}
+
 export function formatTime(seconds: number): string {
   const whole = Math.floor(seconds);
   const tenths = Math.floor((seconds - whole) * 10);

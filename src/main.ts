@@ -137,7 +137,7 @@ const app: App = {
           // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
           // retrying throws the whole run away, fruit, stars, podium place and all.
           draft = structuredClone(app.save);
-          result = completeLevel(draft, level, time, bonuses, feats, raced?.place);
+          result = completeLevel(draft, level, time, bonuses, feats, raced?.place, race);
           order = raced?.order;
           hud.finished();
         },

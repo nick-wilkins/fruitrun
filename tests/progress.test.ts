@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blend, clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, starsForTime, storeSave, superBlenderOpen, type Save, type SaveStore } from '../src/core/progress';
+import { blend, clearSave, completeLevel, isUnlocked, keepSavesIn, newSave, readSave, starsForTime, storeSave, superBlenderOpen, swept, type Save, type SaveStore } from '../src/core/progress';
 import { LEVELS, levelByNumber } from '../src/data/levels';
 import { starTimesFor } from '../src/game/courses';
 
@@ -238,5 +238,36 @@ describe('keeping the save', () => {
   it('starts fresh when nothing is stored or it cannot be read', () => {
     expect(readSave(null)).toBeNull();
     expect(readSave('{"version":1,"poi')).toBeNull();
+  });
+});
+
+describe('race records', () => {
+  it('keeps the best place finished at each difficulty, per level', () => {
+    const save = newSave();
+    const level = LEVELS[0];
+    completeLevel(save, level, 50, [], undefined, 3, 'easy');
+    completeLevel(save, level, 50, [], undefined, 1, 'easy');
+    completeLevel(save, level, 50, [], undefined, 2, 'easy');
+    completeLevel(save, level, 50, [], undefined, 4, 'hard');
+    expect(save.levels[level.id].races).toEqual({ easy: 1, hard: 4 });
+  });
+
+  it('are untouched by a run on your own', () => {
+    const save = newSave();
+    const level = LEVELS[0];
+    completeLevel(save, level, 50, [], undefined, 2, 'medium');
+    completeLevel(save, level, 40, []);
+    expect(save.levels[level.id].races).toEqual({ medium: 2 });
+  });
+
+  it('counts a level as swept once it has been won at every difficulty', () => {
+    const save = newSave();
+    const level = LEVELS[0];
+    for (const difficulty of ['easy', 'medium'] as const) completeLevel(save, level, 50, [], undefined, 1, difficulty);
+    completeLevel(save, level, 50, [], undefined, 2, 'hard');
+    expect(swept(save.levels[level.id])).toBe(false);
+    completeLevel(save, level, 50, [], undefined, 1, 'hard');
+    expect(swept(save.levels[level.id])).toBe(true);
+    expect(save.stats.sweeps).toBe(1);
   });
 });

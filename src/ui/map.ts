@@ -1,12 +1,12 @@
 import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
-import { COURSES, isUnlocked, superBlenderOpen } from '../core/progress';
+import { COURSES, isUnlocked, superBlenderOpen, swept } from '../core/progress';
 import { DIFFICULTIES, racesUnlocked } from '../core/race';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { newOn, starTimesFor } from '../game/courses';
 import { rivalDrivers } from '../game/rivals';
 import type { App } from './app';
-import { asset, countOf, el, formatTime, onTap, stars } from './dom';
+import { asset, countOf, el, formatTime, onTap, raceMedals, stars } from './dom';
 import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
 
@@ -98,6 +98,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
       record ? el('div.best', {}, stars(record.stars), record.courses === COURSES ? el('span', {}, `Best ${formatTime(record.time)}`) : null) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
+      record && racesUnlocked() ? raceMedals(record.races, DIFFICULTIES) : null,
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
       targets,
@@ -131,6 +132,8 @@ export function mapScreen(app: App): HTMLElement {
       node.append(el('img.prize', { src: asset(fruit.img), alt: fruit.name, title: fruit.name, draggable: false }));
     }
     if (record) node.append(stars(record.stars));
+    // Won at every difficulty: the level wears a trophy.
+    if (swept(record)) node.append(el('div.swept', { title: 'Won on Easy, Medium and Hard' }, '🏆'));
     // Played, but not yet with enough stars to open what comes next.
     if (record && record.stars < level.need && LEVELS.some((l) => l.after.includes(level.n))) node.append(el('div.short', {}, `needs ${level.need}★`));
     // Every level waiting to be played pulses, so a fork in the path reads as a choice.

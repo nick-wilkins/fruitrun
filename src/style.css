@@ -2341,3 +2341,80 @@ button.mix-item {
 .level-card .race-pick p {
   margin: 0 0 0.4em;
 }
+
+/* ---------- race records ---------- */
+
+.medals {
+  display: flex;
+  justify-content: center;
+  gap: 0.5em;
+  margin: 0.1em 0 0.4em;
+}
+
+.medal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 0.1em 0.7em;
+  font-size: 0.8em;
+  line-height: 1.5;
+  color: #5a3310;
+  background: #fff3d1;
+  border: 0.14em solid #e0b866;
+  border-radius: 99em;
+}
+
+.medal.p1 {
+  background: #ffe27a;
+  border-color: #e0a000;
+}
+
+.medal.none {
+  color: #9a8a70;
+  background: rgba(255, 255, 255, 0.5);
+  border-style: dashed;
+}
+
+.medal b {
+  font-size: 1.1em;
+}
+
+.node .swept {
+  position: absolute;
+  left: -4%;
+  top: 28%;
+  font-size: 1.7cqw;
+  filter: drop-shadow(0 0.15cqw 0.1cqw rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+}
+
+.record {
+  display: grid;
+  grid-template-columns: 2.4cqw 1fr auto 6cqw auto;
+  align-items: center;
+  gap: 1cqw;
+  padding: 0.3em 0.6em;
+  font-size: 1.3cqw;
+  border-bottom: 0.12cqw dashed rgba(138, 75, 0, 0.3);
+}
+
+.record > img {
+  width: 2.4cqw;
+  height: 2.4cqw;
+  object-fit: contain;
+}
+
+.record b {
+  text-align: right;
+  color: #e2551f;
+}
+
+.record .stars img {
+  width: 1.4cqw;
+  height: 1.4cqw;
+}
+
+.record .medals {
+  margin: 0;
+  font-size: 0.85em;
+}
