@@ -61,9 +61,10 @@ const FACES: Record<PipMood, { eyes: string; mouth: string; extra?: string; skin
 };
 
 /** Pip the sprout, drawn flat for menus, the map and the taste test. Matches the 3D model in game/character.ts. */
-export function pipSvg(mood: PipMood = 'happy'): string {
+/** `tint` gives the sprout another body colour, for Pip's friends. */
+export function pipSvg(mood: PipMood = 'happy', tint?: string): string {
   const face = FACES[mood];
-  const skin = face.skin ?? '#8fe04a';
+  const skin = tint ?? face.skin ?? '#8fe04a';
   const arm = (cx: number, up: boolean, flip: number) =>
     `<ellipse cx="${cx}" cy="${up ? 44 : 66}" rx="7" ry="${up ? 12 : 11}" ${up ? `transform="rotate(${flip * 35} ${cx} 44)"` : ''} fill="${skin}" stroke="#2e6b1f" stroke-width="3"/>`;
   return `<svg viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

@@ -184,21 +184,41 @@ export function cupTableScreen(app: App): HTMLElement {
 
   if (done) {
     app.cupResult = null;
-    const prize = done.position <= 3 ? TROPHY[done.position] : '';
     const line = done.position === 1 ? 'You won the cup!' : done.position <= 3 ? `You came ${ORDINAL[done.position]}!` : 'So close! Have another go.';
-    setTimeout(() => stage.isConnected && (done.position <= 3 ? sfx.reveal(4) : sfx.tap()), 300);
+    const onPodium = done.position <= 3;
+    setTimeout(() => stage.isConnected && (onPodium ? sfx.reveal(4) : sfx.tap()), 300);
+    // The top three on their steps, silver and bronze either side of gold, with the winner jumping for joy.
+    const step = (place: number) => {
+      const row = done.table[place - 1];
+      return el(
+        `div.podium-step.p${place}`,
+        {},
+        el(`div.podium-pip${place === 1 ? '.jump' : ''}`, { innerHTML: pipSvg(place === 1 ? 'cheer' : 'happy', row.you ? undefined : row.color) }),
+        el(`div.podium-name${row.you ? '.you' : ''}`, {}, row.name),
+        el('div.podium-block', {}, el('b', {}, TROPHY[place]), el('span', {}, `${row.points} pts`)),
+      );
+    };
+    const confetti = el('div.confetti');
+    if (onPodium) {
+      const colors = ['#ff4d6d', '#ffd23f', '#4cd964', '#4aa3ff', '#b574f2', '#ff9f1c'];
+      for (let i = 0; i < 60; i++) {
+        confetti.append(el('i', { style: `left:${Math.random() * 100}%;background:${colors[i % colors.length]};animation-delay:${(Math.random() * 3).toFixed(2)}s;animation-duration:${(2.4 + Math.random() * 2).toFixed(2)}s;rotate:${Math.floor(Math.random() * 360)}deg` }));
+      }
+    }
+    const fourth = done.table[3];
     stage.append(
+      confetti,
       el(
         'div.card.cup-card',
         {},
         el('div.kicker', {}, `${done.cup.name} · ${DIFFICULTIES.find((d) => d.id === done.difficulty)!.name}`),
         el('h2', {}, line),
-        prize ? el('div.cup-prize', {}, prize) : el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
+        el('div.podium', {}, step(2), step(1), step(3)),
+        fourth ? el('div.kicker.small', {}, `4th: ${fourth.name}, ${fourth.points} pts`) : null,
         done.perfect ? el('div.kicker', {}, '★ Perfect Forty: every race won!') : null,
-        done.best && done.position <= 3 ? el('div.kicker.small', {}, 'A new trophy for your shelf') : null,
+        done.best && onPodium ? el('div.kicker.small', {}, 'A new trophy for your shelf') : null,
         ...done.awards.slice(0, 3).map((award) => el('div.cup-award', {}, el('img', { src: asset(award.icon), alt: '' }), `Award: ${award.name}`)),
-        table(done.table),
-        el('div.row', {}, go('Cups', 'purple', () => app.show('cups')), go('Blend ▶', 'green.big', () => app.show('blender'))),
+        el('div.row', {}, go('Cups', 'purple', () => app.show('cups')), go('Map ▶', 'green.big', () => app.show('map'))),
       ),
     );
     return stage;
