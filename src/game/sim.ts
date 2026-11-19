@@ -23,6 +23,8 @@ export const TICK = 1 / 120;
 const LIFT_SPEED = 24;
 /** Reach of a windmill sail, and how far round from straight down it still sweeps the road. */
 export const SAIL = 6.2;
+/** In a race anyone may take a fruit, so it is back this many seconds later for whoever comes next. */
+export const FRUIT_BACK = 0.5;
 const SAIL_LOW = 0.76;
 
 export type Autopilot = 'none' | 'smart' | 'ace';
@@ -81,7 +83,7 @@ export interface Traffic {
 const SLOTS = 15;
 
 export type SimEvent =
-  | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' }
+  | { type: 'tick' | 'go' | 'land' | 'scrape' | 'finish' | 'results' | 'fork' | 'goo' | 'launch' | 'lift' | 'knock' }
   | { type: 'boost' | 'turbo' | 'crate' | 'pin' | 'bump' | 'ring' | 'jump'; index: number }
   | { type: 'pickup'; index: number; id: string };
 
@@ -154,8 +156,13 @@ export class Sim {
   readonly tally = { rings: 0, hits: 0, pins: 0, turbos: 0, launches: 0 };
   /** Fork arms the ball went down. */
   private readonly taken = new Set<number>();
-  /** Per course object: used up (smashed, collected). */
-  readonly done: boolean[];
+  /** Per course object: smashed or knocked over. Marbles racing each other share the one list. */
+  done: boolean[];
+  /** Per course object: this marble has had it, a ring threaded or a fruit collected. */
+  private readonly mine: boolean[];
+  /** Per fruit: when it is next there to be collected. Shared in a race, where fruit comes back. */
+  private freshAt: number[];
+  private fruitBack = Infinity;
   /** Per course object: the ingredient a pickup holds. */
   readonly items: (string | undefined)[];
   /** Seconds of turbo left. */
@@ -188,12 +195,69 @@ export class Sim {
   ) {
     const pool = level.bonusPool.length ? level.bonusPool : [level.fruit];
     this.done = course.objects.map(() => false);
+    this.mine = course.objects.map(() => false);
+    this.freshAt = course.objects.map(() => 0);
     this.readyAt = course.objects.map(() => 0);
     this.items = course.objects.map((o) =>
       o.kind !== 'pickup' ? undefined : o.item === LEVEL_FRUIT ? level.fruit : (o.item ?? pool[Math.floor(random() * pool.length)]),
     );
     this.byLane = course.lanes.map(() => []);
     course.objects.forEach((o, i) => this.byLane[o.lane].push(i));
+  }
+
+  /**
+   * Race on the same course as another marble: what either smashes is smashed for both, and a fruit either takes
+   * is gone for the other until it comes back.
+   */
+  shareWith(other: Sim): void {
+    this.done = other.done;
+    this.freshAt = other.freshAt;
+    this.fruitBack = other.fruitBack = FRUIT_BACK;
+  }
+
+  /** Has this marble threaded this ring or collected this fruit? */
+  had(index: number): boolean {
+    return this.mine[index];
+  }
+
+  /** Is this fruit there to be collected right now? */
+  fresh(index: number): boolean {
+    return this.clock >= this.freshAt[index];
+  }
+
+  /** Nothing left of this for the marble: smashed, already had, or a fruit somebody has just taken. */
+  private gone(index: number): boolean {
+    return this.done[index] || this.mine[index] || this.clock < this.freshAt[index];
+  }
+
+  /**
+   * Knocked by another marble: its speed changes by `along` down the road and `across` it, and it is moved `aside`
+   * so the two no longer overlap. A hard knock takes the steering away for a moment.
+   */
+  shove(along: number, across: number, aside: number, hard: boolean): void {
+    // Never off the road: a marble against the kerb stays put and the other one gives way.
+    const [lo, hi] = this.bounds();
+    this.x = clamp(this.x + aside, Math.min(lo, this.x), Math.max(hi, this.x));
+    this.xv += across;
+    // A held-back rival covers less ground for its speed, so it takes more of a change to shift it as far. Past
+    // the line a marble is rolling to a stop, and a knock must not set it off again; nor does a knock ever send a
+    // marble off faster than the road allows.
+    const change = along / Math.max(0.5, this.pace / Math.max(this.v, 1));
+    this.v = clamp(this.v + change, this.finished ? 0 : MIN_SPEED, Math.max(this.v, MAX_SPEED));
+    if (!hard || this.finished) return;
+    if (this.knockT <= 0) this.emit({ type: 'knock' });
+    this.knockT = Math.max(this.knockT, 0.15);
+  }
+
+  /** How fast the marble is really covering the road: a held-back rival uses only part of its speed on the ground. */
+  get pace(): number {
+    return this.v * (this.h > 0 || this.riding ? 1 : this.gait);
+  }
+
+  /** Stop sharing the course: from here what this marble smashes or takes is its own affair. */
+  goAlone(): void {
+    this.done = [...this.done];
+    this.freshAt = [...this.freshAt];
   }
 
   /** How far from the centre the ball can go where it is now: the road narrows and widens. */
@@ -240,7 +304,7 @@ export class Sim {
     objects.forEach((o, i) => {
       if (o.kind !== 'pickup' || !reachable(o)) return;
       possible++;
-      if (this.done[i]) pickups++;
+      if (this.had(i)) pickups++;
     });
     return { ...this.tally, pickups, possible };
   }
@@ -445,7 +509,7 @@ export class Sim {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
       if (ahead > pace * sight) break;
-      if (ahead < -1 || this.done[i]) continue;
+      if (ahead < -1 || this.gone(i)) continue;
       const much = clamp(1.15 - ahead / (pace * sight), 0, 1);
       if (o.kind === 'crate') mark(o.x, 2.15, much);
       else if (o.kind === 'goo') mark(o.x, 2, much * 0.8);
@@ -527,7 +591,7 @@ export class Sim {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
       if (ahead > 30) break;
-      if (ahead < -2 || this.done[i]) continue;
+      if (ahead < -2 || this.gone(i)) continue;
       if (o.kind === 'crate' || o.kind === 'goo' || o.kind === 'slider' || o.kind === 'pendulum' || o.kind === 'spinner' || o.kind === 'windmill') return true;
     }
     return false;
@@ -540,7 +604,7 @@ export class Sim {
     for (const i of this.byLane[this.lane]) {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
-      if (ahead < 0.5 || ahead > 36 * far || this.done[i]) continue;
+      if (ahead < 0.5 || ahead > 36 * far || this.gone(i)) continue;
       if (o.kind === 'crate' || o.kind === 'goo') hazards.push({ s: ahead, x: o.x, wide: 2.3 });
       else if (o.kind === 'slider' || o.kind === 'pendulum') hazards.push({ s: ahead, x: this.swingX(o), wide: 2.4 });
       else if (o.kind === 'spinner') hazards.push({ s: ahead, x: o.x, wide: (o.len ?? 3.2) + 0.6 });
@@ -570,7 +634,7 @@ export class Sim {
     for (const i of this.byLane[this.lane]) {
       const o = this.course.objects[i];
       const ahead = o.s - this.s;
-      if (ahead < -1 || ahead > 60 || this.done[i]) continue;
+      if (ahead < -1 || ahead > 60 || this.gone(i)) continue;
       if (o.kind === 'crate') blockers.push({ s: ahead, x: o.x, wide: 2.15 });
       else if (o.kind === 'goo') blockers.push({ s: ahead, x: o.x, wide: 2.0 });
       else if (o.kind === 'slider' || o.kind === 'pendulum') blockers.push({ s: ahead, x: this.swingX(o), wide: 2.1 });
@@ -760,7 +824,7 @@ export class Sim {
       for (const i of this.byLane[this.lane]) {
         const ds = objects[i].s - this.s;
         if (ds > 6) break;
-        if (ds < -6 || this.done[i]) continue;
+        if (ds < -6 || this.gone(i)) continue;
         this.touch(objects[i], i, before);
       }
       if (this.lane === 0 && this.s >= finishS) {
@@ -876,7 +940,7 @@ export class Sim {
         break;
       case 'ring':
         if (crossed && dx < 1.75 && Math.abs(this.h + BALL_RADIUS - (o.y ?? 2)) < 2.4) {
-          this.done[index] = true;
+          this.mine[index] = true;
           this.v = Math.max(this.v, Math.min(MAX_SPEED, this.v + 6));
           this.boostT = Math.max(this.boostT, 0.5);
           this.tally.rings++;
@@ -893,7 +957,8 @@ export class Sim {
         break;
       case 'pickup':
         if (Math.abs(ds) < 1.5 && dx < 1.6 && Math.abs(this.h + BALL_RADIUS - (o.y ?? 1.3)) < 1.9) {
-          this.done[index] = true;
+          this.mine[index] = true;
+          this.freshAt[index] = this.clock + this.fruitBack;
           const id = this.items[index]!;
           this.bonuses.push(id);
           this.emit({ type: 'pickup', index, id });

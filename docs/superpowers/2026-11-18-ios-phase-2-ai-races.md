@@ -110,7 +110,7 @@ Runtime verification (desktop Chrome, sound off, 2026-11-18):
 
 After the last change: `npm test` 885 passed, `npm run typecheck` clean, `npm run ios` built and synced, simulator `xcodebuild` BUILD SUCCEEDED.
 
-Known and left: a rival can pass through a crate the player still sees standing, because each marble has its own copy of the course (as designed). Rivals on the same racing line can overlap each other on the inside of a bend.
+Known and left: a rival can pass through a crate the player still sees standing, because each marble has its own copy of the course (as designed). Rivals on the same racing line can overlap each other on the inside of a bend. Both replaced on 2026-11-19: see Contact racing below.
 
 ## Rivals that drive like people (2026-11-18, later)
 
@@ -139,3 +139,28 @@ Evidence (desktop Chrome, sound off, five whole races stepped as the frame loop 
 - Direction changes 16 to 40 a minute; marbles overlapped another for 0 to 3 s of a race; hits 0 to 6 each.
 - `tests/race.test.ts`: every rival finishes every level at every difficulty within a quarter of its guide time; star times unchanged.
 - Not yet watched by eye on a device.
+
+## Contact racing (2026-11-19)
+
+Nick's decisions: marbles bump each other; a crate hit by anyone is gone for everyone; fruit a rival takes is simply not there for you, and is back within 0.5 seconds for whoever comes next (as in Mario Kart). This replaces the earlier "each marble has its own crates and fruit".
+
+Global constraints: no file-path header comments or task-restating docblocks; new behavioural tests shown failing first; commits use explicit paths; all browser checks with sound off.
+
+What was built:
+- `src/game/sim.ts`: `shareWith(other)` puts marbles on one course. Crates and pins share one smashed list. Fruit has a shared "back at" time, `FRUIT_BACK = 0.5` seconds after anyone takes it; on your own it never comes back. Rings and "which fruit I collected" stay per marble (`had(index)`), so the fruit count and awards are the player's own. `shove(...)` applies a knock; a hard one takes the steering away for 0.15 s and raises a `knock` event.
+- `src/game/contact.ts`: `jostle(sims)` runs after every step. Two overlapping marbles on the same road trade speed along the line between them with a soft bounce (0.5): run into from behind, the front one is pushed on and the one behind is checked; steered into, it is knocked aside. They are only ever moved apart across the road. No contact in the air over one another, on escalators, or during the countdown. Being bumped does not count as a hit for the clean-run awards.
+- `src/game/run.ts`, `src/audio.ts`: crates and pins a rival smashes fly for everyone; fruit hides while taken and reappears; a knock gives a small shake, sparks and a new soft sound. Rivals brought home out of sight after the player finishes are taken out of contact.
+- Rivals already steer round other marbles and skip smashed crates, so their driving needed no change.
+
+Evidence:
+- RED: `tests/contact.test.ts` failed before the code existed (missing `contact` module), and one expectation of mine was wrong and corrected (equal marbles do not bounce back, the striker keeps a quarter of its speed). GREEN: 10 tests. `tests/sim.test.ts` now asks `had(i)` for rings and fruit.
+- `npm test`: 894 passed. `npx tsc --noEmit` clean. `npm run build` clean.
+- Runtime, desktop Chrome, sound off, whole races run through the real frame loop with the player on the careful hands-free line: PASS.
+  - Level 7 medium: 4 marbles share one course; 12 of 16 crates smashed, 5 by the player; fruit hidden then back 50 times, about half a second each; 16 hard knocks, 4 to the player; rivals took 8, 2 and 13 fruit, the player 28.
+  - Level 7 easy and level 30 hard: finished; most any two marbles overlapped was 0.05 of a 2 wide marble; biggest sideways correction in one step 0.015; no console errors.
+- Not yet watched by eye or on a device: how the bumps feel is Nick's call.
+
+For multiplayer later: smashed crates, fruit times and knocks will have to be sent between devices.
+
+Review (`/code-review medium`, one round, 2026-11-19). Fixed: a knock can no longer push a marble off the road or past the normal top speed; a marble on turbo keeps its speed and only nudges what it hits; speed in the air is read correctly; held-back rivals respond in proportion; rivals brought home out of sight after the player finishes each run on their own copy of the course, with nothing shown and no fruit left hidden; no knock sound or shake once past the line; tests added for different roads, the countdown, the kerb and turbo. Left: rival pace is still tuned on a solo run (times are a guide, placings matter); `shareWith` assumes everyone shares with the same marble, which is how it is used.
+After the fixes: `npm test` 895 passed, `tsc` clean; level 7 medium and level 30 easy raced through the real loop to the results: most overlap 0.12, no fruit left hidden at the finish.

@@ -30,7 +30,7 @@ describe('turbo jump', () => {
   it('hangs its rings and fruit where a turbo-launched ball can reach them', () => {
     const course = courseOf((b) => PIECES.turboJump(b));
     const sim = roll(course);
-    const missed = course.objects.filter((o, i) => (o.kind === 'ring' || o.kind === 'pickup') && !sim.done[i]);
+    const missed = course.objects.filter((o, i) => (o.kind === 'ring' || o.kind === 'pickup') && !sim.had(i));
     expect(missed.map((o) => `${o.kind} at ${o.s}`)).toEqual([]);
     expect(sim.bonuses).toContain(level.fruit);
   });

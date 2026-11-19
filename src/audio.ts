@@ -218,6 +218,10 @@ export const sfx = {
     tone(160, 0.25, { type: 'square', volume: 0.26, to: 55 });
     noise(0.08, 0.3, 3500, 0.02);
   },
+  knock: () => {
+    noise(0.12, 0.3, 700, 0, 160);
+    tone(220, 0.12, { type: 'triangle', volume: 0.18, to: 120 });
+  },
   pin: () => {
     tone(1100 + Math.random() * 500, 0.08, { type: 'square', volume: 0.14, to: 600 });
     noise(0.05, 0.14, 4000);

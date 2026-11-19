@@ -25,6 +25,7 @@ import { finishingOrder, type Finisher, type Rival } from '../core/race';
 import type { Level } from '../data/levels';
 import { Rig } from './camera';
 import { buildPip, type Pip } from './character';
+import { jostle } from './contact';
 import type { Course } from './course';
 import { seeded } from './random';
 import { GRID } from './rivals';
@@ -219,6 +220,10 @@ export class Run {
   private readonly flying: Flying[] = [];
   private readonly weather: Weather | null;
   private readonly racers: Racer[] = [];
+  /** Every marble on the course, the player's first. */
+  private readonly marbles: Sim[];
+  /** Set once the player has finished and the rivals still out have been brought home out of sight. */
+  private over = false;
 
   /** Where the steering finger is across the screen, -0.5 to 0.5, or null when nothing is held. */
   private pointerAcross: number | null = null;
@@ -279,8 +284,9 @@ export class Run {
     // Line the field up side by side across the road, a bubble's width apart.
     if (field) this.sim.x = GRID[3];
     field?.rivals.forEach((rival, i) => {
-      // A rival has its own copy of the course: what it smashes or collects is its own affair, and makes no sound.
+      // Everyone races on the one course: a crate a rival smashes is gone for all, and so is fruit it takes.
       const sim = new Sim(course, level, (event) => this.rivalReact(sim, event), seeded(level.n * 31 + i));
+      sim.shareWith(this.sim);
       sim.driver = field.drivers[i];
       sim.chase = () => this.sim.progress();
       sim.x = GRID[i] ?? 0;
@@ -293,9 +299,9 @@ export class Run {
       this.racers.push({ rival, sim, pip, shadow });
     });
     // Each rival can see every other marble, the player's included, and makes room for it.
-    const everyone = [this.sim, ...this.racers.map((racer) => racer.sim)];
+    this.marbles = [this.sim, ...this.racers.map((racer) => racer.sim)];
     for (const racer of this.racers) {
-      const others = everyone.filter((sim) => sim !== racer.sim);
+      const others = this.marbles.filter((sim) => sim !== racer.sim);
       racer.sim.traffic = () => others;
     }
     this.weather = course.mood === 'rain' || course.mood === 'snow' ? new Weather(course.mood) : null;
@@ -425,6 +431,7 @@ export class Run {
     while (this.owed >= TICK) {
       this.sim.step(TICK);
       for (const racer of this.racers) racer.sim.step(TICK);
+      if (this.racers.length) jostle(this.marbles);
       this.owed -= TICK;
     }
     this.animate(dt);
@@ -461,8 +468,13 @@ export class Run {
   /** The line is crossed: bring home anyone still out on the course, so the result is complete. */
   private raceResult(): RaceResult | null {
     if (!this.racers.length) return null;
+    this.over = true;
     for (const racer of this.racers) {
       if (racer.sim.finished) continue;
+      // Each on its own copy of the course, so who is brought home first makes no difference to anyone's time.
+      racer.sim.goAlone();
+      // Out of sight is out of the way: nothing left on the road to bump into, and nothing it does is shown.
+      this.marbles.splice(this.marbles.indexOf(racer.sim), 1);
       // They run their own race from here, out of sight: nobody waits for a player who has already finished.
       racer.sim.chase = null;
       for (let step = 0; step < 600 / TICK && !racer.sim.finished; step++) racer.sim.step(TICK);
@@ -485,8 +497,7 @@ export class Run {
     return this.sim.point(this.sim.s, this.sim.x, y, out);
   }
 
-  private fling(mesh: InstancedMesh, index: number, height: number, lift: number): void {
-    const sim = this.sim;
+  private fling(sim: Sim, mesh: InstancedMesh, index: number, height: number, lift: number): void {
     const o = this.course.objects[index];
     const f = sim.frameAt(sim.s, this.f);
     const pos = this.objectAt(index, height, new Vector3());
@@ -498,9 +509,15 @@ export class Run {
     this.flying.push({ mesh, index: this.world.instance[index], pos, vel, spin: new Vector3(Math.random(), Math.random(), Math.random()).normalize(), angle: 0, life: 1.6 });
   }
 
-  /** A rival's own knocks and boosts: a few sparks where it is, so its mistakes can be seen. No sound. */
+  /** What a rival does to the course is seen by everyone: crates and pins fly, fruit goes. No sound. */
   private rivalReact(sim: Sim, event: SimEvent): void {
-    if (event.type === 'crate' || event.type === 'bump') this.sparks.burst(sim.point(sim.s, sim.x, 0.8, this.v1), 10, ['#ffffff', '#ffd9a8'], 5);
+    if (this.over && !this.marbles.includes(sim)) return;
+    if (event.type === 'crate') {
+      this.fling(sim, this.world.crates, event.index, 1.05, 9);
+      this.sparks.burst(this.objectAt(event.index, 1, this.v1), 16, ['#d89a4e', '#8a531f', '#fff2a8'], 7);
+    } else if (event.type === 'pin') this.fling(sim, this.world.pins, event.index, 0.75, 11);
+    else if (event.type === 'pickup') this.sparks.burst(this.world.pickups.get(event.index)!.base, 8, ['#ffffff', '#ffe066'], 4);
+    else if (event.type === 'bump') this.sparks.burst(sim.point(sim.s, sim.x, 0.8, this.v1), 10, ['#ffffff', '#ffd9a8'], 5);
     else if (event.type === 'boost' || event.type === 'turbo') this.sparks.burst(sim.point(sim.s, sim.x, 0.5, this.v1), 8, ['#eaff3d', '#ffffff'], 4);
   }
 
@@ -525,17 +542,22 @@ export class Run {
       case 'crate':
         this.shake = 0.5;
         sfx.hit();
-        this.fling(this.world.crates, event.index, 1.05, 9);
+        this.fling(sim, this.world.crates, event.index, 1.05, 9);
         this.sparks.burst(this.objectAt(event.index, 1, this.v1), 16, ['#d89a4e', '#8a531f', '#fff2a8'], 7);
         break;
       case 'pin':
         sfx.pin();
-        this.fling(this.world.pins, event.index, 0.75, 11);
+        this.fling(sim, this.world.pins, event.index, 0.75, 11);
         break;
       case 'bump':
         this.shake = 0.4;
         sfx.hit();
         this.sparks.burst(this.ballAt(0.8, this.v1), 12, ['#ff4fa3', '#ffffff'], 6);
+        break;
+      case 'knock':
+        this.shake = 0.25;
+        sfx.knock();
+        this.sparks.burst(this.ballAt(0.8, this.v1), 8, ['#ffffff', '#ffd9a8'], 5);
         break;
       case 'ring':
         sfx.ring();
@@ -569,8 +591,6 @@ export class Run {
         break;
       case 'pickup': {
         const visual = this.world.pickups.get(event.index)!;
-        visual.sprite.visible = false;
-        visual.glow.visible = false;
         sfx.pickup();
         this.hooks.pickup(event.id);
         this.sparks.burst(visual.base, 14, ['#ffffff', '#ffe066', '#ff9ecb'], 6);
@@ -712,8 +732,11 @@ export class Run {
         this.m.makeBasis(this.camUp, this.v3.multiplyScalar(length), f.t).setPosition(this.v1.add(this.v2).multiplyScalar(0.5));
         world.rods.setMatrixAt(slot, this.m);
         moved.pendulum = true;
-      } else if (o.kind === 'pickup' && !sim.done[i]) {
+      } else if (o.kind === 'pickup') {
+        // In a race a fruit somebody has taken is back a moment later.
         const visual = world.pickups.get(i)!;
+        visual.sprite.visible = visual.glow.visible = sim.fresh(i);
+        if (!visual.sprite.visible) return;
         const bob = Math.sin(sim.clock * 3 + i) * 0.22;
         visual.sprite.position.copy(visual.base).addScaledVector(visual.up, bob);
         visual.glow.position.copy(visual.sprite.position);
