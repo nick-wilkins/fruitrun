@@ -1,3 +1,5 @@
+import { shopNow } from './shop';
+
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'legendary';
 
 export const DIFFICULTIES: { id: Difficulty; name: string }[] = [
@@ -55,7 +57,7 @@ export function podiumFruit(place: number): number {
   return Math.max(0, 4 - place);
 }
 
-/** Whether races are open to this player. They sit behind the purchase; until that exists, everyone has them. */
+/** Whether races, and the cups made of them, are open: they come with the purchase. */
 export function racesUnlocked(): boolean {
-  return true;
+  return shopNow().owned;
 }

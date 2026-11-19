@@ -4,14 +4,15 @@ import { asset } from './ui/dom';
 import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
-import { rivalsFor, type Difficulty, type Finisher } from './core/race';
+import { racesUnlocked, rivalsFor, type Difficulty, type Finisher } from './core/race';
+import { CLOSED, settle, shopNow, stock } from './core/shop';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
 import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import { readGhost } from './game/ghost';
-import { ghostStore, oldSave, onResume, saveStore } from './platform';
+import { ghostStore, oldSave, onResume, saveStore, store } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -21,6 +22,7 @@ import { el } from './ui/dom';
 import { createHud } from './ui/hud';
 import { mapScreen } from './ui/map';
 import { menuScreen } from './ui/menu';
+import { unlockScreen } from './ui/unlock';
 import './style.css';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
@@ -53,6 +55,9 @@ try {
 } catch {
   // The store cannot be read: start with nobody.
 }
+// What this Apple account owns is kept on the device, so this answers at once and with no internet.
+stock({ ...CLOSED, owned: await store.owned().catch(() => false) });
+let showing: Screen = 'menu';
 /** Sound on or off before anyone has started: nothing else of it is ever used. */
 const nobody = newSave();
 const worldOf = (save: Save) => (save.last ? levelById(save.last).world : 0);
@@ -106,6 +111,9 @@ const app: App = {
     app.persist();
   },
   show(screen: Screen) {
+    // Cups are races: without the unlock, the way in leads to where it is offered.
+    if ((screen === 'cups' || screen === 'cuptable') && !racesUnlocked()) screen = 'unlock';
+    showing = screen;
     endRun();
     musicFor(null);
     const build = {
@@ -116,6 +124,7 @@ const app: App = {
       book: bookScreen,
       cups: cupsScreen,
       cuptable: cupTableScreen,
+      unlock: unlockScreen,
     }[screen];
     ui.replaceChildren(build(app));
   },
@@ -132,6 +141,7 @@ const app: App = {
     app.play(levelById(cup.levels[entered.race]), entered.difficulty, `${cup.name}, race ${entered.race + 1} of ${CUP_RACES}`);
   },
   play(level: Level, race?: Difficulty, cup?: string) {
+    if (race && !racesUnlocked()) return app.show('unlock');
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
       // loss was not the device's own doing. If it is still gone a good while after the first tap, start the
@@ -230,6 +240,26 @@ const app: App = {
         .catch(() => {});
     }
   },
+  get shop() {
+    return shopNow();
+  },
+  async price() {
+    if (!shopNow().price) {
+      const price = await store.price().catch(() => null);
+      if (price) stock({ ...shopNow(), price });
+    }
+    return shopNow().price;
+  },
+  async buy() {
+    const outcome = await store.buy().catch(() => 'failed' as const);
+    stock(settle(shopNow(), outcome));
+    return outcome;
+  },
+  async restore() {
+    const owned = await store.restore().catch(() => null);
+    if (owned) stock(settle(shopNow(), 'bought'));
+    return owned;
+  },
   toast(text: string) {
     toastEl.textContent = text;
     toastEl.classList.remove('hidden');
@@ -253,6 +283,13 @@ document.addEventListener('visibilitychange', () => {
 });
 
 app.show('menu');
+void app.price();
+// A grown-up's yes, a purchase on another device or a refund can arrive at any time. A run under way is left alone.
+store.onChange((owned) => {
+  if (owned === shopNow().owned) return;
+  stock({ ...shopNow(), owned, pending: owned ? false : shopNow().pending });
+  if (!run) app.show(showing);
+});
 
 // Lay out courses in the background, starting with the ones the player can reach.
 warmCourses([...LEVELS].sort((a, b) => Number(isUnlocked(app.save, b)) - Number(isUnlocked(app.save, a))), () => !run);

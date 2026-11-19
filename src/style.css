@@ -3099,3 +3099,64 @@ input.name {
 .book-stats .stat {
   flex: 0 1 15.5%;
 }
+
+/* ---------- the unlock for races and cups, and the grown-up gate ---------- */
+
+.unlock-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  min-width: 26em;
+}
+
+.unlock-list {
+  margin: 0.6em auto 0.2em;
+  padding: 0;
+  width: fit-content;
+  list-style: none;
+  text-align: left;
+  font-weight: 700;
+  font-size: 1.15em;
+  line-height: 1.7;
+}
+
+.unlock-wait {
+  color: #c0551a;
+}
+
+.unlock-note {
+  min-height: 1.3em;
+  color: #9a6a3a;
+  font-size: 0.9em;
+}
+
+.gate-answer {
+  margin: 0 auto;
+  width: 5em;
+  height: 1.6em;
+  line-height: 1.6;
+  font-size: 1.5em;
+  font-weight: 800;
+  background: #fff;
+  border: 0.12em solid #b9772f;
+  border-radius: 0.5em;
+  white-space: pre;
+}
+
+.gate-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 3.6em);
+  gap: 0.35em;
+  justify-content: center;
+  margin-top: 0.6em;
+}
+
+.gate-pad .btn {
+  padding: 0.25em 0;
+  font-size: 1em;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+}

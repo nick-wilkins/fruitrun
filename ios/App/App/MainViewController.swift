@@ -7,4 +7,8 @@ class MainViewController: CAPBridgeViewController {
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
     override var prefersStatusBarHidden: Bool { true }
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .landscape }
+
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(StorePlugin())
+    }
 }

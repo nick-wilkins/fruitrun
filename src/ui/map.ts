@@ -45,7 +45,20 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
     '▶ Play',
   );
   const starts = el('div.starts', {}, play);
-  if (racesUnlocked()) {
+  if (!racesUnlocked()) {
+    starts.append(
+      el(
+        'button.btn.purple.big.locked',
+        {
+          onclick: () => {
+            sfx.tap();
+            app.show('unlock');
+          },
+        },
+        '🔒 Race',
+      ),
+    );
+  } else {
     // Race swaps the two buttons for the choice of how hard, with the one picked last time standing out.
     const race = el('button.btn.purple.big', {}, '🏁 Race');
     race.onclick = () => {
@@ -292,7 +305,7 @@ export function mapScreen(app: App): HTMLElement {
     el('div.chip', {}, el('img', { src: asset('assets/fruits/apple.png'), alt: 'Ingredients' }), String(items)),
     el('div.chip', {}, el('img', { src: asset('assets/smoothie-cup.png'), alt: 'Smoothie points' }), String(save.points)),
     go('Blend', 'green', 'blender'),
-    racesUnlocked() ? go('Cups', 'purple', 'cups') : null,
+    go(racesUnlocked() ? 'Cups' : '🔒 Cups', 'purple', 'cups'),
     go('Book', 'orange', 'book'),
   );
   stage.append(blender, el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
