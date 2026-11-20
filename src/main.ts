@@ -77,6 +77,16 @@ function endRun(): void {
   canvas.classList.add('hidden');
 }
 
+/** The screens behind the unlock: cups are races, and so is a game with friends. */
+const PAID: Screen[] = ['cups', 'cuptable', 'party'];
+
+/** Anything with other marbles in it needs the unlock. Without it, shows where it is offered and answers true. */
+function shut(): boolean {
+  if (racesUnlocked()) return false;
+  app.show('unlock');
+  return true;
+}
+
 const party = new Party(nearby, 'Player', () => performance.now() / 1000);
 
 const app: App = {
@@ -123,8 +133,7 @@ const app: App = {
     app.persist();
   },
   show(screen: Screen) {
-    // Cups are races: without the unlock, the way in leads to where it is offered.
-    if ((screen === 'cups' || screen === 'cuptable' || screen === 'party') && !racesUnlocked()) screen = 'unlock';
+    if (PAID.includes(screen) && !racesUnlocked()) screen = 'unlock';
     showing = screen;
     endRun();
     musicFor(null);
@@ -143,7 +152,7 @@ const app: App = {
   },
   cupResult: null,
   startCup(cup: Cup, difficulty: Difficulty) {
-    if (!racesUnlocked()) return app.show('unlock');
+    if (shut()) return;
     startCup(app.save, cup, difficulty);
     app.persist();
     app.playCup();
@@ -155,7 +164,7 @@ const app: App = {
     app.play(levelById(cup.levels[entered.race]), entered.difficulty, `${cup.name}, race ${entered.race + 1} of ${CUP_RACES}`);
   },
   play(level: Level, race?: Difficulty, cup?: string, together = false) {
-    if ((race || together) && !racesUnlocked()) return app.show('unlock');
+    if ((race || together) && shut()) return;
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
       // loss was not the device's own doing. If it is still gone a good while after the first tap, start the

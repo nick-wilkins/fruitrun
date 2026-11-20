@@ -1,7 +1,9 @@
 import { setMuted, sfx } from '../audio';
 import { MAX_PLAYERS, type Player } from '../core/players';
+import { HELP_PAGE, PRIVACY_PAGE } from '../data/links';
 import type { App } from './app';
 import { asset, el, onTap } from './dom';
+import { grownUpGate } from './gate';
 import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
 
@@ -119,9 +121,41 @@ export function menuScreen(app: App): HTMLElement {
     sfx.tap();
   });
 
+  /** What a parent wants to know, and the ways out of the game, which only a grown-up may take. */
+  const forGrownUps = (dialog: HTMLElement) => {
+    const note = el('p.unlock-note');
+    const page = (label: string, url: string) => (url ? el('button.btn.blue', { onclick: () => window.open(url, '_blank') }, label) : null);
+    const restore = el('button.btn.blue', {}, 'Restore purchase');
+    const back = el('button.btn.purple', { onclick: () => dialog.remove() }, 'Back');
+    restore.onclick = async () => {
+      dialog.classList.add('busy');
+      restore.disabled = back.disabled = true;
+      note.textContent = 'Asking the store…';
+      const owned = await app.restore();
+      dialog.classList.remove('busy');
+      back.disabled = false;
+      restore.disabled = owned === true;
+      note.textContent = owned ? 'Races, cups and playing together are unlocked.' : owned === null ? 'The store could not be reached. Please try again.' : 'No purchase was found for this Apple account.';
+    };
+    return el(
+      'div.card.small.wordy',
+      {},
+      el('h2', {}, 'For grown-ups'),
+      el('p', {}, 'Smoothie Scramble has no adverts, no accounts and no tracking. Nothing your child does is collected or sent anywhere: it all stays on this device.'),
+      el('p', {}, 'Playing together talks only to the iPads and iPhones in the same room.'),
+      note,
+      el('div.row', {}, back, page('Privacy', PRIVACY_PAGE), page('Help', HELP_PAGE), app.shop.owned ? null : restore),
+    );
+  };
+  const grownUps = el('button.chip.menu-grownups', {}, 'Grown-ups');
+  onTap(grownUps, () => {
+    sfx.tap();
+    stage.append(grownUpGate(forGrownUps));
+  });
+
   const pip = el('div.menu-pip', { innerHTML: pipSvg('cheer') });
   const bubble = el('div.bubble', {}, "Hi, I'm Pip! Let's roll!");
-  stage.append(carryOn, startNew, who, mute, pip, bubble);
+  stage.append(carryOn, startNew, who, mute, grownUps, pip, bubble);
   refresh();
   return stage;
 }

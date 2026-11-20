@@ -1,10 +1,10 @@
 import { sfx } from '../audio';
-import { grownUpSum } from '../core/shop';
 import type { App } from './app';
 import { asset, el } from './dom';
+import { grownUpGate } from './gate';
 import { setBackdrop } from './screen';
 
-/** Where races and cups are offered. The child sees what they are; the buying sits behind a sum for a grown-up. */
+/** Where races, cups and playing together are offered. The child sees what they are; the buying sits behind a sum for a grown-up. */
 export function unlockScreen(app: App): HTMLElement {
   const stage = el('div.stage.book-stage');
   stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
@@ -13,7 +13,7 @@ export function unlockScreen(app: App): HTMLElement {
     el(`button.btn.${color}`, { onclick: () => (sfx.tap(), onclick()) }, label);
 
   if (app.shop.owned) {
-    stage.append(el('div.card.unlock-card', {}, el('h2', {}, '🎉 Races are open!'), el('p', {}, 'Pick any level on the map and tap Race, or go for a cup.'), el('div.row', {}, button("Let's race ▶", 'green.big', () => app.show('map')))));
+    stage.append(el('div.card.unlock-card', {}, el('h2', {}, '🎉 Races are open!'), el('p', {}, 'Pick any level on the map and tap Race, go for a cup, or play together with friends.'), el('div.row', {}, button("Let's race ▶", 'green.big', () => app.show('map')))));
     return stage;
   }
 
@@ -52,45 +52,17 @@ export function unlockScreen(app: App): HTMLElement {
       busy(false);
       note.textContent = owned === null ? 'The store could not be reached. Please try again.' : 'No purchase was found for this Apple account.';
     };
-    return el('div.card.small', {}, el('h2', {}, 'Unlock races and cups'), el('p', {}, 'One payment. No adverts and nothing else to buy.'), note, el('div.row', {}, back, restore, buy));
+    return el('div.card.small.wordy', {}, el('h2', {}, 'Unlock races and cups'), el('p', {}, 'Races, cups and playing together with friends nearby. One payment. No adverts and nothing else to buy.'), note, el('div.row', {}, back, restore, buy));
   };
 
-  /** A sum past the times tables a young child knows, answered on a number pad. */
-  const gate = () => {
-    const dialog = el('div.modal', { onclick: (e: MouseEvent) => e.target === e.currentTarget && !dialog.classList.contains('busy') && dialog.remove() });
-    let sum = grownUpSum();
-    let typed = '';
-    const ask = el('p');
-    const answer = el('div.gate-answer');
-    const draw = (again = false) => {
-      ask.textContent = `${again ? 'Not quite. Try this one: what' : 'What'} is ${sum.a} × ${sum.b}?`;
-      answer.textContent = typed || ' ';
-    };
-    const press = (key: string) => {
-      sfx.tap();
-      if (key === '⌫') typed = typed.slice(0, -1);
-      else if (key !== 'OK') typed = (typed + key).slice(0, 3);
-      else if (Number(typed) === sum.answer) return dialog.replaceChildren(counter(dialog));
-      else {
-        sfx.nope();
-        sum = grownUpSum();
-        typed = '';
-        return draw(true);
-      }
-      draw();
-    };
-    const pad = el('div.gate-pad', {}, ...['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', 'OK'].map((key) => el(`button.btn.${key === 'OK' ? 'green' : key === '⌫' ? 'orange' : 'blue'}`, { onclick: () => press(key) }, key)));
-    draw();
-    dialog.append(el('div.card.small.grownup', {}, el('h2', {}, 'Grown-ups only'), ask, answer, pad, el('div.row', {}, el('button.btn.purple', { onclick: () => dialog.remove() }, 'Back'))));
-    stage.append(dialog);
-  };
+  const gate = () => stage.append(grownUpGate(counter));
 
   stage.append(
     el(
       'div.card.unlock-card',
       {},
       el('h2', {}, '🏁 Races and Cups'),
-      el('ul.unlock-list', {}, el('li', {}, '🔵 Race three friends on any level'), el('li', {}, '🌶️ Four speeds, from Easy to Legendary'), el('li', {}, '🏆 Win trophies in the cups')),
+      el('ul.unlock-list', {}, el('li', {}, '🔵 Race three speedy marbles on any level'), el('li', {}, '🌶️ Four speeds, from Easy to Legendary'), el('li', {}, '🏆 Win trophies in the cups'), el('li', {}, '👫 Play together with friends nearby')),
       app.shop.pending ? el('p.unlock-wait', {}, '⏳ Waiting for a grown-up to say yes. Races will open by themselves!') : null,
       el('div.row', {}, button('Back', 'purple', () => app.show('map')), button('Ask a grown-up', 'green.big', gate)),
     ),

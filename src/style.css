@@ -3184,3 +3184,38 @@ input.name {
   min-width: 12em;
   white-space: nowrap;
 }
+
+.party-choices {
+  gap: 0.8em;
+  margin: 0.5em 0 0.2em;
+}
+
+.btn.party-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1em;
+  min-width: 8.5em;
+  padding: 0.5em 0.8em 0.6em;
+  font-size: 1.15em;
+}
+
+.party-choice span {
+  font-size: 2.2em;
+  line-height: 1.1;
+}
+
+/* A dialog with a sentence or two in it, kept to a width that reads well. */
+.card.small.wordy {
+  max-width: 27em;
+}
+
+.menu-grownups {
+  position: absolute;
+  left: 1.6cqw;
+  top: 1.6cqw;
+  padding: 0.25em 1em;
+  font: inherit;
+  font-size: 0.8em;
+  cursor: pointer;
+}
