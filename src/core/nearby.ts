@@ -95,6 +95,22 @@ export function decode(raw: string): Message | null {
   }
 }
 
+/** The helping hand: no help within `near` of the leader, the `most` from `far` back, in road covered for the same rolling. */
+const HELP = { near: 35, far: 150, most: 0.06, notBefore: 4, fadeFrom: 0.8 };
+
+/**
+ * How much further a player behind in a race with friends rolls for their speed, as a share: 0 to 0.06. Only the
+ * one behind is ever helped and nobody is held back. It grows with the gap, so it narrows one without closing it,
+ * and it is gone by the time the leader reaches the line, so the finish is the players' own.
+ * `gap` is how far behind the leader in road, `leader` how much of the course the leader has done, `time` seconds raced.
+ */
+export function catchUp(gap: number, leader: number, time: number): number {
+  if (time < HELP.notBefore || gap <= HELP.near) return 0;
+  const share = Math.min(1, (gap - HELP.near) / (HELP.far - HELP.near));
+  const fade = Math.min(1, Math.max(0, (1 - leader) / (1 - HELP.fadeFrom)));
+  return HELP.most * share * fade;
+}
+
 /** How long a marble is rolled on at its last speed when no report comes. */
 const AHEAD = 0.25;
 /** How long a marble takes to glide from where it was shown to where a new report says it is. */
@@ -169,7 +185,7 @@ export class Party {
   readonly marbles = new Map<string, Marble>();
   /** The cup being raced, if the host chose one. */
   cup: PartyCup | null = null;
-  /** Whose game it was, once it has closed. */
+  /** Whose game it was, once it has closed: they closed it, or the way to them was lost. */
   closedBy = '';
   /** Which race this is, counted by the host. News from any other race is ignored. */
   private race = 0;
@@ -275,6 +291,12 @@ export class Party {
     return this.phase === 'hosting' && this.players.length > 1 && this.busy.size === 0;
   }
 
+  /** Whether anyone is still out on the course, as far as this device has heard. */
+  racing(): boolean {
+    if (this.phase === 'hosting') return this.busy.size > 0;
+    return this.race > 0 && [...this.marbles.values()].some((marble) => !marble.gone && marble.time === null);
+  }
+
   raceNow(): number {
     return this.race;
   }
@@ -372,12 +394,17 @@ export class Party {
 
   private seat(players: Member[]): void {
     this.players = players;
+    const out = this.busy.size;
     for (const [id, marble] of this.marbles) {
       if (players.some((player) => player.id === id)) continue;
       marble.gone = true;
       this.marbles.delete(id);
       this.busy.delete(id);
+      // Whoever has gone is in no table: their time takes no place from those who stayed.
+      this.times.delete(id);
     }
+    // The one everybody was waiting for has gone: the race is over.
+    if (this.phase === 'hosting' && out && !this.busy.size) this.score();
     for (const friend of this.friends()) if (!this.marbles.has(friend.id)) this.marbles.set(friend.id, new Marble());
   }
 
@@ -451,8 +478,10 @@ export class Party {
   private note(message: Extract<Message, { t: 'pos' | 'done' | 'out' }>): void {
     const marble = message.from ? this.marbles.get(message.from) : undefined;
     if (!marble) return;
-    if (message.t === 'pos') marble.hear(message, this.now());
-    else if (message.t === 'done') marble.time = message.time;
+    if (message.t === 'pos') return marble.hear(message, this.now());
+    if (message.t === 'done') marble.time = message.time;
     else marble.gone = true;
+    // Who is still out has changed, which a waiting room shows.
+    if (this.phase === 'joined') this.onChange();
   }
 }

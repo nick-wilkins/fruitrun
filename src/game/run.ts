@@ -24,7 +24,7 @@ import {
 import { sfx } from '../audio';
 import { starsForTime, type Feats } from '../core/progress';
 import type { Marble } from '../core/nearby';
-import { finishingOrder, SEATS, YOUR_COLOR, type Finisher, type Rival } from '../core/race';
+import { finishingOrder, SEATS, YOUR_COLOR, type Finisher, type Rival, type Seat } from '../core/race';
 import type { Level } from '../data/levels';
 import { Rig } from './camera';
 import { buildPip, PIP, type Pip, type PipLook } from './character';
@@ -60,11 +60,11 @@ export interface Field {
 }
 
 /** How a marble in a game with friends is painted: the green one is Pip as ever, the rest in their seat's colours. */
-const seatLook = (seat: Rival): PipLook => (seat.color === YOUR_COLOR ? PIP : { skin: seat.color, belly: seat.pale, leaf: seat.deep, bands: [seat.deep, '#ffffff', seat.color] });
+const seatLook = (seat: Seat): PipLook => (seat.pip ? PIP : { skin: seat.color, belly: seat.pale, leaf: seat.deep, bands: [seat.deep, '#ffffff', seat.color] });
 
 /** Somebody racing on another device: how to draw them, and the marble their reports move. */
 export interface Friend {
-  rival: Rival;
+  rival: Seat;
   marble: Marble;
 }
 
@@ -475,8 +475,10 @@ export class Run {
   private steer(): number | null {
     // Worked out afresh every frame: the road narrows, widens, and spreads out at a fork.
     const [lo, hi] = this.sim.bounds();
-    const least = lo - PUSH;
-    const most = hi + PUSH;
+    // A swipe may reach for a side road that is about to open: it is held until the road is there.
+    const [far, wide] = this.sim.reach();
+    const least = far - PUSH;
+    const most = wide + PUSH;
     if (this.pointerAcross !== null && this.swipe) {
       // The ball moves as far as the finger moves: SWIPE of the screen's width carries it right across the road.
       // Only movement counts, so a finger held still asks for nothing when the road widens or a fork is taken.

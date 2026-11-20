@@ -12,8 +12,6 @@ export interface HudHandlers {
   restart(): void;
   quit(): void;
   blend(): void;
-  /** With friends: back to where the game is got together. */
-  done?(): void;
   /** In a cup: keep the result and go on to the points table. */
   next?(): void;
   muted(): boolean;
@@ -35,7 +33,7 @@ export interface Hud {
   standings(order: Finisher[]): void;
 }
 
-const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
+export const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
 
 /** `rivals` are the marbles being raced, if this run is a race. */
 /** A padlock, its shackle swung open or clicked shut. */
@@ -55,7 +53,7 @@ function orderTable(order: Finisher[]): HTMLElement {
   );
 }
 
-export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string, passed = false, friends?: string): Hud {
+export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string, passed = false, friends?: { note: string; color: string }): Hud {
   const fruit = ingredient(level.fruit);
   const root = el('div.hud');
 
@@ -72,6 +70,8 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
     goalNote.classList.add('hidden');
   } else prizes.append(gate, ...prizeIcons.slice(level.need));
   const progressFill = el('div.fill');
+  // With friends the bar is the player's own colour, like their marble.
+  if (friends) progressFill.style.background = friends.color;
   const dots = rivals.map((rival) => el('div.rival-dot', { style: `background:${rival.color}`, title: rival.name }));
   const progress = el('div.progress', {}, progressFill, ...dots, el('div.flag', {}, '🏁'));
   const place = rivals.length ? el('div.place', {}, '') : null;
@@ -83,7 +83,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
   const count = el('div.countdown');
   const touch = window.matchMedia('(pointer: coarse)').matches;
   const warning = { sunny: '', night: 'Night run! ', midnight: 'Midnight run: follow the lights! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
-  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + (friends ? `${friends} ` : '') + warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
+  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + (friends ? `${friends.note} ` : '') + warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
   const soundButton = el('button.btn.blue', {}, handlers.muted() ? '🔇 Sound off' : '🔊 Sound on');
@@ -194,7 +194,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
             el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
             el('div.time', {}, formatTime(time)),
             orderTable(order),
-            el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.done?.() }, on)),
+            el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.quit() }, on)),
           ),
         ),
       );

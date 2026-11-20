@@ -39,12 +39,15 @@ export function rivalsFor(difficulty: Difficulty): Rival[] {
 /** The player's own colour in race displays: Pip's green. */
 export const YOUR_COLOR = '#8fe04a';
 
+/** A seat in a game with friends: its colours, what the colour is called, and whether its marble is Pip as ever. */
+export type Seat = Rival & { called: string; pip?: boolean };
+
 /**
  * The marbles of a game with friends, by seat: whoever started it has Pip's green, then the others in the order
  * they joined. A player is the same colour on every device, their own included.
  */
-export const SEATS: (Rival & { called: string })[] = [
-  { name: 'Pip', called: 'green', color: YOUR_COLOR, pale: '#d8f7a0', deep: '#2fa23a' },
+export const SEATS: Seat[] = [
+  { name: 'Pip', called: 'green', color: YOUR_COLOR, pale: '#d8f7a0', deep: '#2fa23a', pip: true },
   { ...RIVALS[0], called: 'blue' },
   { ...RIVALS[1], called: 'orange' },
   { ...RIVALS[2], called: 'pink' },

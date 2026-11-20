@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COURSES } from '../src/core/progress';
-import { decode, encode, Marble, Party, PROTOCOL, type Nearby, type NearbyEvent } from '../src/core/nearby';
+import { catchUp, decode, encode, Marble, Party, PROTOCOL, type Nearby, type NearbyEvent } from '../src/core/nearby';
 
 /** Devices within reach of each other, with no radio: whatever one sends arrives at once. */
 function air() {
@@ -296,6 +296,37 @@ describe('a party', () => {
     expect(started).toHaveLength(6);
   });
 
+  it('counts a cup race when the last one out drops off, and leaves a leaver out of the places', () => {
+    const { sam, ada, kit } = gather();
+    sam.startCup('cup-0-1', ['level-1', 'level-2']);
+    ada.finished(20);
+    sam.finished(30);
+    kit.leave();
+    expect(sam.cup).toMatchObject({ race: 1, points: { [sam.players[1].id]: 10, host: 7 } });
+    expect(ada.cup).toMatchObject({ race: 1 });
+    // Ada wins the next and then goes: Sam, the only one left in the table, is its winner.
+    sam.nextRace();
+    ada.finished(20);
+    ada.leave();
+    sam.finished(30);
+    expect(sam.cup).toMatchObject({ race: 2, points: { host: 17 } });
+  });
+
+  it('lets a guest see whether the others are still out racing', () => {
+    const { sam, ada, kit } = gather();
+    let told = 0;
+    ada.onChange = () => told++;
+    expect(ada.racing()).toBe(false);
+    sam.start('level-1');
+    ada.finished(20);
+    expect(ada.racing()).toBe(true);
+    sam.finished(25);
+    told = 0;
+    kit.out();
+    expect(ada.racing()).toBe(false);
+    expect(told).toBeGreaterThan(0);
+  });
+
   it('only lets the host start a cup', () => {
     const { ada, sam } = gather();
     ada.startCup('cup-0-1', ['level-1']);
@@ -343,5 +374,27 @@ describe('a party', () => {
     sam.leave();
     expect(ada.phase).toBe('closed');
     expect(ada.closedBy).toBe('Sam');
+  });
+});
+
+describe('a helping hand for whoever is behind', () => {
+  // How far behind the leader, in road; how far the leader has got, 0 to 1; seconds into the race.
+  it('is nothing for the leader, or for anyone close behind', () => {
+    expect(catchUp(-50, 0.5, 20)).toBe(0);
+    expect(catchUp(0, 0.5, 20)).toBe(0);
+    expect(catchUp(30, 0.5, 20)).toBe(0);
+  });
+
+  it('grows with the gap, up to a small most', () => {
+    expect(catchUp(92.5, 0.5, 20)).toBeCloseTo(0.03);
+    expect(catchUp(150, 0.5, 20)).toBeCloseTo(0.06);
+    expect(catchUp(2000, 0.5, 20)).toBeCloseTo(0.06);
+  });
+
+  it('is not there at the very start, and fades away as the leader nears the line', () => {
+    expect(catchUp(150, 0.05, 2)).toBe(0);
+    expect(catchUp(150, 0.8, 20)).toBeCloseTo(0.06);
+    expect(catchUp(150, 0.9, 20)).toBeCloseTo(0.03);
+    expect(catchUp(150, 1, 20)).toBe(0);
   });
 });

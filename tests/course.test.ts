@@ -144,4 +144,68 @@ describe('forks', () => {
     // On the arm's side as the fork begins, then steering away from it: you stay on the main route.
     expect(play(from.side * 3, -from.side).seen.has(arm)).toBe(false);
   });
+
+  /** A swipe made 15 short of the fork and then held still, as far over as `limits` allows: which roads it leads down. */
+  const swipeEarly = (limits: (sim: Sim) => [number, number]) => {
+    const sim = new Sim(course, level);
+    sim.skipCountdown();
+    sim.s = from.s0 - 15;
+    sim.swiping = true;
+    const [lo, hi] = limits(sim);
+    sim.steer = from.side > 0 ? hi : lo;
+    const seen = new Set<number>();
+    for (let i = 0; i < 120 * 3; i++) {
+      sim.step(1 / 120);
+      seen.add(sim.lane);
+    }
+    return seen;
+  };
+
+  it('keeps a swipe for the side road made before it opens, and takes it', () => {
+    expect(swipeEarly((sim) => sim.reach()).has(arm)).toBe(true);
+    // Held at the main road's kerb, as a swipe used to be, the ball is still on the main road when they part.
+    expect(swipeEarly((sim) => sim.bounds()).has(arm)).toBe(false);
+  });
+
+  it('lets a finger reach for a side road just before it opens, and not before that', () => {
+    const sim = new Sim(course, level);
+    sim.skipCountdown();
+    const far = from.side > 0 ? 1 : 0;
+    sim.s = from.s0 - 80;
+    expect(sim.reach()).toEqual(sim.bounds());
+    sim.s = from.s0 - 15;
+    expect(Math.abs(sim.reach()[far])).toBeGreaterThan(Math.abs(sim.bounds()[far]) + 3);
+    expect(sim.reach()[1 - far]).toBe(sim.bounds()[1 - far]);
+  });
+
+  it('takes no speed off a ball reaching for the road to come, as it does off one pushing on a kerb', () => {
+    const after = (steer: number) => {
+      const sim = new Sim(course, level);
+      sim.skipCountdown();
+      sim.s = from.s0 - 15;
+      sim.x = steer > 0 ? 4.2 : -4.2;
+      sim.v = 40;
+      sim.steer = steer;
+      for (let i = 0; i < 12; i++) sim.step(1 / 120);
+      return sim.v;
+    };
+    expect(after(from.side * 8)).toBeGreaterThan(after(-from.side * 8) + 0.3);
+  });
+});
+
+describe('a helping hand', () => {
+  it('carries a ball further along the road for the same speed', () => {
+    const level = LEVELS[0];
+    const roll = (help: number) => {
+      const sim = new Sim(courseFor(level), level);
+      sim.skipCountdown();
+      sim.help = help;
+      for (let i = 0; i < 120 * 3; i++) sim.step(1 / 120);
+      return sim;
+    };
+    const plain = roll(0);
+    const helped = roll(0.06);
+    expect(helped.s / plain.s).toBeGreaterThan(1.04);
+    expect(helped.s / plain.s).toBeLessThan(1.08);
+  });
 });

@@ -27,6 +27,9 @@ export const SAIL = 6.2;
 export const FRUIT_BACK = 0.5;
 const SAIL_LOW = 0.76;
 
+/** How far before a fork opens a player can already steer for its side road: about a second's rolling. */
+const REACH_AHEAD = 40;
+
 export type Autopilot = 'none' | 'smart' | 'ace';
 
 /**
@@ -129,6 +132,8 @@ export class Sim {
   /** Set while `steer` comes from a finger swiping on a touch screen. */
   swiping = false;
   autopilot: Autopilot = 'none';
+  /** A helping hand for a player behind in a race with friends: the share further it rolls on the road for its speed. */
+  help = 0;
   /** Set for a computer rival: it drives itself, held back as the driver says. */
   driver: Driver | null = null;
   /** For a rival: how far through the course the marble it is racing has got, 0 to 1. */
@@ -288,7 +293,7 @@ export class Sim {
 
   /** How fast the marble is really covering the road: a held-back rival uses only part of its speed on the ground. */
   get pace(): number {
-    return this.v * (this.h > 0 || this.riding ? 1 : this.gait);
+    return this.v * (this.h > 0 || this.riding ? 1 : this.gait * (1 + this.help));
   }
 
   /** Stop sharing the course: from here what this marble smashes or takes is its own affair. */
@@ -324,6 +329,24 @@ export class Sim {
     let lo = -limit;
     let hi = limit;
     for (const { off } of this.parting()) {
+      lo = Math.min(lo, off - limit);
+      hi = Math.max(hi, off + limit);
+    }
+    return [lo, hi];
+  }
+
+  /**
+   * How far left and right a player may steer for. A fork about to open is included, so a finger that has already
+   * swiped for the side road is heading there the moment the road is.
+   */
+  reach(): [number, number] {
+    let [lo, hi] = this.bounds();
+    if (this.lane !== 0) return [lo, hi];
+    const limit = this.limit;
+    for (const lane of this.course.lanes) {
+      const from = lane.from;
+      if (!from || this.s < from.s0 - REACH_AHEAD || this.s >= from.s0 + from.decide) continue;
+      const off = from.spread[from.decide];
       lo = Math.min(lo, off - limit);
       hi = Math.max(hi, off + limit);
     }
@@ -928,12 +951,13 @@ export class Sim {
     }
     this.x += this.xv * dt;
     const [lo, hi] = this.bounds();
+    const [least, most] = this.reach();
     if (this.x < lo || this.x > hi) {
       // Slide back on rather than snap: the road may have just narrowed, or a fork just closed behind the ball.
       const over = this.x - clamp(this.x, lo, hi);
       this.x -= Math.sign(over) * Math.min(Math.abs(over), 30 * dt);
       if (this.xv * (this.x - (lo + hi) / 2) > 0) this.xv = 0;
-      if (target !== null && (target < lo || target > hi) && this.v > CRUISE * 0.75) {
+      if (target !== null && (target < least || target > most) && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
         this.scrapeT -= dt;
         if (this.scrapeT <= 0) {
@@ -978,7 +1002,7 @@ export class Sim {
     }
     // In the air and on an escalator a held-back rival still covers the full distance: a jump's arc is made for
     // it, and an escalator carries everyone alike.
-    const stride = this.h > 0 || riding ? 1 : this.gait;
+    const stride = this.h > 0 || riding ? 1 : this.gait * (1 + this.help);
     this.s += (this.v * stride * dt) / clamp(1 - f.k * this.x, 0.6, 1.5);
 
     if (this.lane === 0) {

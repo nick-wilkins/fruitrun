@@ -7,6 +7,7 @@ import { LEVELS } from '../data/levels';
 import { toldStore } from '../platform';
 import type { App } from './app';
 import { asset, el } from './dom';
+import { ORDINAL } from './hud';
 import { setBackdrop } from './screen';
 
 const WHY = {
@@ -51,11 +52,13 @@ export function partyScreen(app: App): HTMLElement {
   const cupOver = cup !== null && cup.race >= cup.of;
   /** The cup's points, most first. Level on points, whoever sits nearer the host is ahead. */
   const ranked = () => party.players.map((player, seat) => ({ ...player, seat, points: cup?.points[player.id] ?? 0 })).sort((a, b) => b.points - a.points || a.seat - b.seat);
-  const table = () => el('div.race-order.cup-table', {}, ...ranked().map((row, i) => el(`div.race-row${row.id === party.me ? '.you' : ''}`, {}, el('b', {}, ['1st', '2nd', '3rd', '4th'][i]), el('i', { style: `background:${SEATS[row.seat].color}` }), el('span', {}, called(row.id, row.name)), el('em', {}, `${row.points} pts`))));
+  const table = () => el('div.race-order.cup-table', {}, ...ranked().map((row, i) => el(`div.race-row${row.id === party.me ? '.you' : ''}`, {}, el('b', {}, ORDINAL[i + 1]), el('i', { style: `background:${SEATS[row.seat].color}` }), el('span', {}, called(row.id, row.name)), el('em', {}, `${row.points} pts`))));
   const winner = () => {
     const top = ranked()[0];
     return top ? `🏆 ${top.id === party.me ? 'You win' : `${top.name} wins`} the ${cupName}!` : '';
   };
+
+  const cupHeading = cup ? (cupOver ? winner() : `${cupName}: race ${cup.race} of ${cup.of} done`) : '';
 
   if (party.phase === 'hosting') {
     if (party.players.length < 2) {
@@ -64,7 +67,7 @@ export function partyScreen(app: App): HTMLElement {
       card(el('h2', {}, 'Your game'), players(), el('p', {}, 'Waiting for everyone to finish…'), el('div.row', {}, leave('Close game')));
     } else if (cup && cup.race > 0) {
       card(
-        el('h2', {}, cupOver ? winner() : `${cupName}: race ${cup.race} of ${cup.of} done`),
+        el('h2', {}, cupHeading),
         table(),
         el(
           'div.row',
@@ -107,10 +110,12 @@ export function partyScreen(app: App): HTMLElement {
   } else if (party.phase === 'joining') {
     card(el('h2', {}, 'Joining…'), el('div.row', {}, leave('Back')));
   } else if (party.phase === 'joined') {
-    if (cup && cup.race > 0) card(el('h2', {}, cupOver ? winner() : `${cupName}: race ${cup.race} of ${cup.of} done`), table(), el('p', {}, cupOver ? `Waiting for ${host} to choose what is next…` : `Waiting for ${host} to start the next race…`), el('div.row', {}, leave('Leave')));
+    // Home before the others, or out of the race: the table and the choosing wait for them.
+    if (party.racing()) card(el('h2', {}, `${host}'s game`), players(), el('p', {}, 'The others are still racing…'), el('div.row', {}, leave('Leave')));
+    else if (cup && cup.race > 0) card(el('h2', {}, cupHeading), table(), el('p', {}, cupOver ? `Waiting for ${host} to choose what is next…` : `Waiting for ${host} to start the next race…`), el('div.row', {}, leave('Leave')));
     else card(el('h2', {}, `${host}'s game`), players(), el('p', {}, `Waiting for ${host} to choose a map…`), el('div.row', {}, leave('Leave')));
   } else if (party.phase === 'closed' && party.why === 'ended') {
-    card(el('h2', {}, 'Game over'), el('p', {}, `${party.closedBy || 'Your friend'} closed the game.`), el('div.row', {}, leave('Back to map')));
+    card(el('h2', {}, 'Game over'), el('p', {}, party.closedBy ? `The game with ${party.closedBy} has ended.` : 'The game has ended.'), el('div.row', {}, leave('Back to map')));
   } else {
     party.name = app.player?.name ?? 'Player';
     // The system asks its own question the first time a game is started or looked for. Saying what it is for,

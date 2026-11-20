@@ -110,3 +110,38 @@ Run 2026-11-20, two tabs of the dev server, sound off, saves not written:
 Left as they are: the finishing card still carries the "Level complete!" banner and a green Pip; an exact dead heat shows each player first on their own card while the cup table goes by the starter's count.
 
 The second iPad's save still has what the earlier builds wrongly gave it (level 13 and anything after). Nothing in the save says which records came from friend races, so it is not undone here.
+
+## Review (`/code-review medium` on eb3b470) and fixes
+
+Ten findings. Fixed:
+
+- A cup race was never counted if the last player out dropped off, and a player who finished then left still took a place from those who stayed.
+- A device that could not start the next race while showing the last finishing order was counted as racing, leaving the starter waiting for ever.
+- A joiner home first was told the starter was choosing a map while the starter was still racing: now "The others are still racing…", updated as they come home.
+- "Sam closed the game" was also shown for a lost connection: now "The game with Sam has ended."
+- The progress bar stayed green for every player: it is the player's own colour.
+- A friend race on a level in another world moved the joiner's map to that world.
+- Tidies: one way back from the finishing card, shared place names, Pip's look marked on the seat instead of matched by colour.
+
+Left: the finishing card for a friend race repeats some of the solo card's markup.
+
+## Round three: splits and a helping hand, 2026-11-20
+
+**Splits.** How it works: a side road starts to peel away, and 18 to 25 units of road later (a third of a second flat out, up to a second at cruising speed) the two roads have separated. At that point the ball is on whichever road it is nearer the middle of. Until then it can roll anywhere across both. Measured on level 2, by the time that choice is made the kerbs have already come apart, so there is no room for a later one.
+
+What was forcing the choice: a swipe could not go past the main road's kerb before the side road began. A finger that swiped for the side road a moment early and then held still asked for nothing more when the road opened, so the ball stayed on the main road. Now a swipe can reach for a side road from about a second before it opens (40 units), is kept, and carries the ball across the moment there is road there. Pushing that way costs no speed, where pushing on a kerb does. A swipe made too late still meets the kerb.
+
+Tried and dropped: letting a ball hop to the other road just after they part. The gap is already wider than the ball within two units, so it either did nothing or jumped a visible gap.
+
+**A helping hand in friend races.** Research (Gran Turismo's Boost setting, Mario Kart 8's item bands by distance, Black Rock's write-up of Pure, a 2024 CHI study of balancing in a two-player racer) agrees on: help the one behind and never slow the leader; go by distance, not place; nothing when close; keep it small and capped; fade it out before the finish; say nothing about it. No source gave a figure for speed help between human players; the numbers here are a starting point to tune by play.
+
+As built: nothing within 35 units of the leader, growing evenly to 6% more road covered for the same speed at 150 units behind. None in the first 4 seconds. It fades to nothing as the leader covers the last fifth of the course. It eases in and out over about a second. In the air and on escalators it does nothing. It applies only in races with friends.
+
+Tests: 9 new (4 for splits, 4 for the helping hand, 2 for the review), each shown failing first. 972 pass.
+
+Run 2026-11-20, dev server, sound off:
+
+- PASS split, real touch events: on level 2, one swipe towards the side road made 20 units before it opens and then held still. The steering target reads -14.4 against a kerb at -4, no speed is lost, and the ball takes the side road.
+- PASS helping hand, two tabs: the joiner, 5% of the course behind, reads a help of 0.026 and rising; the leader reads 0.
+- PASS the joiner's progress bar is blue; their map stays on their own world; home first they read "The others are still racing…"; when the starter closes the game, "The game with Sam has ended." and Back to map.
+- NOT RUN on a device: how the split feels under a finger, and whether 6% is felt at all.

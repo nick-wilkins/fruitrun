@@ -4,7 +4,7 @@ import { asset } from './ui/dom';
 import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
-import { Party } from './core/nearby';
+import { catchUp, Party } from './core/nearby';
 import { racesUnlocked, rivalsFor, SEATS, type Difficulty, type Finisher } from './core/race';
 import { CLOSED, settle, shopNow, stock } from './core/shop';
 import { LEVELS, levelById, type Level } from './data/levels';
@@ -182,7 +182,8 @@ const app: App = {
     waitingSince = 0;
     sessionStorage.removeItem(RELOADED);
     endRun();
-    app.world = level.world;
+    // A race with friends moves nothing of the player's own, their place on the map included.
+    if (!together) app.world = level.world;
     // Everyone has the colour of their seat, the same on every device.
     const friends = together ? party.friends().flatMap((member) => {
       const marble = party.marbles.get(member.id);
@@ -194,11 +195,10 @@ const app: App = {
       level,
       {
         pause: (paused) => run?.setPaused(paused),
-        // Starting again keeps the kind of run it was: a race stays a race, as hard as before. A race with
-        // friends cannot be started again by one of them: it is back to the waiting room.
-        restart: () => (together ? app.show('party') : app.play(level, race, cup)),
+        // Starting again keeps the kind of run it was: a race stays a race, as hard as before. With friends
+        // there is no starting again.
+        restart: () => app.play(level, race, cup),
         quit: () => app.show(together ? 'party' : cup ? 'cups' : 'map'),
-        done: () => app.show('party'),
         blend: () => {
           if (draft) {
             app.save = draft;
@@ -228,7 +228,7 @@ const app: App = {
       cup,
       // With friends nothing is kept, so there is no goal to show.
       together || (app.save.levels[level.id]?.stars ?? 0) >= level.need || !LEVELS.some((l) => l.after.includes(level.n)),
-      together ? `You are the ${SEATS[party.slot()].called} marble!` : undefined,
+      together ? { note: `You are the ${SEATS[party.slot()].called} marble!`, color: SEATS[party.slot()].color } : undefined,
     );
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');
@@ -283,6 +283,10 @@ const app: App = {
         // A marble that has not moved since the last report is standing still, whatever speed it was doing: paused, say.
         if (!sim.finished) party.report({ lane: sim.lane, s: sim.s, x: sim.x, h: sim.h, v: sim.s === was ? 0 : sim.pace, p: sim.progress() });
         was = sim.s;
+        // Whoever is behind gets a little help, eased in and out over a second or so, so it is never felt as a shove.
+        const lead = Math.max(0, ...friends.filter(({ marble }) => marble.time !== null || !marble.gone).map(({ marble }) => (marble.time !== null ? 1 : marble.progress)));
+        const help = sim.finished ? 0 : catchUp((lead - sim.progress()) * mine.course.finishS, lead, sim.time);
+        sim.help += (help - sim.help) / 15;
         if (!order) return;
         const now = mine.standings();
         const key = JSON.stringify(now);
@@ -357,8 +361,9 @@ party.onStart = (id) => {
   const level = LEVELS.find((each) => each.id === id);
   const waiting = run ? racingTogether && run.sim.finished : showing === 'party';
   if (!level || !waiting) return false;
+  const before = run;
   app.play(level, undefined, undefined, true);
-  return run !== null;
+  return run !== null && run !== before;
 };
 
 app.show('menu');
