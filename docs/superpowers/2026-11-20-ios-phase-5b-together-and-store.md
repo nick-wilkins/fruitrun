@@ -281,3 +281,16 @@ No new tests: these are screens over tested rules. 998 pass; `tsc` and the build
 
 Seen in the browser, 2026-11-20: the two big buttons; the race row with Strawberry Fields in the middle and its neighbours turned away, moved on by the arrow; the cup row with the Grapes Cup's four races beneath, changing with the cup; the joiner's "Sam picked a cup" with race 1 glowing; the solo cup dialog with the four races.
 NOT RUN: swiping with a finger (the row scrolls natively; only the arrows were pressed).
+
+## The cups screen on painted shelves, 2026-11-20
+
+From Nick's asset pack (`smoothie_scramble_cups_asset_pack.zip`) and mock-up, plus a Blossom Village shelf he sent after.
+
+- Each world's cups stand on that world's painted shelf, under a wooden sign with its name. The cups in a row can be drawn sideways with a finger; the screen still scrolls up and down between worlds.
+- A cup that can be entered is gold with its fruit on it; one still shut is grey with its fruit greyed and a padlock. A cup won at every speed is the pack's prize cup.
+- Under an open cup: a star for each speed, lit once a trophy is won at it, with the medal won beside it; Legendary's star is padlocked until it opens. Under a shut cup: which levels to finish and how many of the four are done.
+- The first cup still shut is flagged "Next up!". The red "Cups" ribbon sits on top of the frame.
+- Used from the pack, converted to WebP in `public/assets/cups/`: the two shelves, the three cups, the four stars. The village shelf came with a black background, which was cut away.
+- Not used: the pack's plinth (too pale to read on the wood, with a stray orange arc; drawn in the game's own style instead) and its leaf and flower overlays (each has a smear of green behind it). The pack's own notes warn its edges need checking.
+
+No new tests: a screen over tested rules. Seen in the browser: three shelves with 19 cups; a row scrolls sideways; an open cup opens its line-up; a shut one says what to finish.

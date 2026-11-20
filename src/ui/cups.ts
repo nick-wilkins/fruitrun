@@ -1,28 +1,16 @@
 import { sfx } from '../audio';
 import { CUP_POINTS, CUP_RACES, CUPS, cupById, cupLegendaryOpen, cupOpen, quitCup, standings, type Cup, type Standing } from '../core/cups';
-import { DIFFICULTIES, type Difficulty } from '../core/race';
+import { DIFFICULTIES } from '../core/race';
 import { ingredient } from '../data/ingredients';
 import { levelById, WORLDS } from '../data/levels';
 import type { App } from './app';
-import { cupLineup, trophySvg } from './cards';
+import { cupLineup } from './cards';
 import { asset, el, onTap } from './dom';
 import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
 
 const TROPHY = ['', '🥇', '🥈', '🥉'];
-const METAL = ['none', 'gold', 'silver', 'bronze'];
 
-/** A two-handled trophy cup, in whatever colour it is given. */
-const BASE = '<rect x="28" y="40" width="8" height="10" fill="currentColor"/><rect x="18" y="49" width="28" height="8" rx="3" fill="currentColor"/>';
-const HANDLES = '<path d="M14 14H6c0 10 4 16 12 17M50 14h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>';
-const STAR = '<path class="mark" d="M32 13l3.4 7 7.6 1-5.5 5.3 1.3 7.6L32 30.3l-6.8 3.6 1.3-7.6L21 21l7.6-1z"/>';
-/** A little trophy for each difficulty, grander as they get harder: a plain goblet, a cup, a starred cup on a plinth, a crowned and burning one. */
-const SHELF: Record<Difficulty, string> = {
-  easy: `<svg viewBox="0 0 64 64"><path d="M19 14h26v9c0 10-5 17-13 17s-13-7-13-17z" fill="currentColor"/>${BASE}</svg>`,
-  medium: `<svg viewBox="0 0 64 64"><path d="M14 10h36v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/>${HANDLES}${BASE}</svg>`,
-  hard: `<svg viewBox="0 0 64 64"><path d="M14 8h36v12c0 12-7 20-18 20S14 32 14 20z" fill="currentColor"/><path d="M14 12H6c0 10 4 16 12 17M50 12h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="38" width="8" height="8" fill="currentColor"/><rect x="20" y="45" width="24" height="6" rx="2" fill="currentColor"/><rect x="14" y="51" width="36" height="8" rx="3" fill="currentColor"/><path class="mark" d="M32 11l3.4 7 7.6 1-5.5 5.3 1.3 7.6L32 28.3l-6.8 3.6 1.3-7.6L21 19l7.6-1z"/></svg>`,
-  legendary: `<svg viewBox="0 0 64 64"><path class="fire" d="M9 34c-6-8-3-16 2-22 0 6 3 8 5 10 0-7 3-12 8-16-1 8 3 12 3 18zM55 34c6-8 3-16-2-22 0 6-3 8-5 10 0-7-3-12-8-16 1 8-3 12-3 18z"/><path d="M14 22l0-12 7 6 5.500-8 5.500 8 5.500-8 5.500 8 7-6v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/>${BASE.replace('x="18" y="49" width="28"', 'x="14" y="49" width="36"')}${STAR.replace('M32 13', 'M32 15')}</svg>`,
-};
 const ORDINAL = ['', '1st', '2nd', '3rd', '4th'];
 
 function table(rows: Standing[]): HTMLElement {
@@ -148,28 +136,48 @@ export function cupsScreen(app: App): HTMLElement {
     stage.append(dialog);
   };
 
+  const art = (name: string) => asset(`assets/cups/${name}.webp`);
+  /** The shelf each world's cups stand on. A world with no picture of its own borrows the meadow's. */
+  const SHELVES: Record<string, string> = { meadow: 'shelf-meadow', tropics: 'shelf-tropics', village: 'shelf-village' };
+  // The first cup still shut is the one to work towards.
+  const nextUp = CUPS.find((cup) => !cupOpen(save, cup));
+
   WORLDS.forEach((world, index) => {
-    body.append(el('h3', {}, world.name));
-    const grid = el('div.cup-grid');
+    const strip = el('div.shelf-cups');
     for (const cup of CUPS.filter((c) => c.world === index)) {
       const open = cupOpen(save, cup);
       const won = save.trophies?.[cup.id];
-      // A big trophy with the cup's fruit on it; under it, a little trophy for each difficulty, coloured once won.
-      const shelf = el(
-        'div.cup-won',
-        {},
-        ...DIFFICULTIES.filter(({ id }) => id !== 'legendary' || cupLegendaryOpen(save, cup)).map(({ id, name }) => el(`span.${METAL[won?.[id] ?? 0]}.${id}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('i', { innerHTML: SHELF[id] }), name)),
-      );
-      // A trophy at every difficulty, Legendary included: the card itself turns into a prize.
+      // A trophy at every difficulty, Legendary included: the cup itself turns into a prize.
       const champion = DIFFICULTIES.every(({ id }) => won?.[id]);
-      const tile = el(
-        `button.cup${open ? '' : '.shut'}${entered === cup ? '.going' : ''}${champion ? '.champion' : ''}`,
+      // A star for each speed, lit once a trophy has been won at it. Legendary's is locked until it opens.
+      const stars = el(
+        'div.shelf-stars',
         {},
-        champion ? el('div.cup-champion', {}, '★ Champion ★') : null,
-        entered === cup ? el('div.cup-flag', {}, `Race ${save.cup!.race + 1} of ${CUP_RACES} next ▶`) : null,
-        el('div.cup-art', { innerHTML: trophySvg }, el('img.cup-fruit', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }), open ? null : el('img.cup-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false }), champion ? el('span.cup-crown', {}, '👑') : null, ...(champion ? [0, 1, 2].map((n) => el(`span.cup-twinkle.t${n}`, {}, '✦')) : [])),
-        el('b', {}, cup.name),
-        open ? shelf : el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`),
+        ...DIFFICULTIES.map(({ id, name }) => {
+          const shut = id === 'legendary' && !cupLegendaryOpen(save, cup);
+          const star = shut ? 'star-locked' : !won?.[id] ? 'star-unearned' : id === 'legendary' ? 'star-legend' : 'star-earned';
+          return el(`span${id === (save.race ?? 'easy') ? '.mine' : ''}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('img', { src: art(star), alt: '', draggable: false }), won?.[id] ? el('i', {}, TROPHY[won[id]!] ?? '') : null, name);
+        }),
+      );
+      const done = cup.levels.filter((id) => save.levels[id]).length;
+      const tile = el(
+        `button.shelf-cup${open ? '' : '.shut'}${entered === cup ? '.going' : ''}${champion ? '.champion' : ''}`,
+        {},
+        entered === cup ? el('div.cup-flag', {}, `Race ${save.cup!.race + 1} of ${CUP_RACES} next ▶`) : cup === nextUp ? el('div.cup-flag.next-up', {}, 'Next up!') : null,
+        el(
+          'div.shelf-trophy',
+          {},
+          el('img.shelf-cup-art', { src: art(champion ? 'cup-legend' : open ? 'cup-gold' : 'cup-grey'), alt: '', draggable: false }),
+          el('img.shelf-fruit', { src: asset(ingredient(cup.fruit).img), alt: '', draggable: false }),
+          open ? null : el('img.shelf-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false }),
+          champion ? el('span.cup-crown', {}, '👑') : null,
+        ),
+        el(
+          'div.shelf-plinth',
+          {},
+          el('b', {}, cup.name),
+          ...(open ? [stars] : [el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`), el('div.shelf-progress', {}, el('i', { style: `width:${(done / CUP_RACES) * 100}%` }), el('span', {}, `${done} / ${CUP_RACES}`))]),
+        ),
       );
       onTap(tile, () => {
         if (!open) {
@@ -182,9 +190,9 @@ export function cupsScreen(app: App): HTMLElement {
         else if (save.cup && entered) swap(cup, entered);
         else enter(cup);
       });
-      grid.append(tile);
+      strip.append(tile);
     }
-    body.append(grid);
+    body.append(el(`section.shelf.${world.id}`, {}, el('img.shelf-art', { src: art(SHELVES[world.id] ?? 'shelf-meadow'), alt: '', draggable: false }), el('div.shelf-sign', {}, world.name), strip));
   });
 
   const close = el('button.round.book-close', { ariaLabel: 'Back to map' }, '✕');
@@ -192,7 +200,7 @@ export function cupsScreen(app: App): HTMLElement {
     sfx.tap();
     app.show('map');
   });
-  stage.append(el('div.book', {}, el('h2', {}, 'Cups'), body, close));
+  stage.append(el('div.book.cups-book', {}, el('h2.cups-ribbon', {}, el('span', {}, 'Cups')), body, close));
   return stage;
 }
 
