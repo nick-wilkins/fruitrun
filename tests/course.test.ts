@@ -4,7 +4,7 @@ import { starsForTime } from '../src/core/progress';
 import { LEVELS } from '../src/data/levels';
 import { findClash, type CourseObj } from '../src/game/course';
 import { courseFor, INTRO, RECIPES, starTimesFor } from '../src/game/courses';
-import { Sim, timeCourse } from '../src/game/sim';
+import { MIN_SPEED, Sim, timeCourse } from '../src/game/sim';
 
 describe.each(LEVELS)('$name course', (level) => {
   const course = courseFor(level);
@@ -212,5 +212,88 @@ describe('a helping hand', () => {
     const helped = roll(0.06);
     expect(helped.s / plain.s).toBeGreaterThan(1.04);
     expect(helped.s / plain.s).toBeLessThan(1.08);
+  });
+});
+
+describe('holding back', () => {
+  const level = LEVELS[0];
+  const fresh = (v: number) => {
+    const sim = new Sim(courseFor(level), level);
+    sim.skipCountdown();
+    sim.s = 40;
+    sim.v = v;
+    return sim;
+  };
+  const roll = (sim: Sim, seconds: number) => {
+    for (let i = 0; i < 120 * seconds; i++) sim.step(1 / 120);
+    return sim;
+  };
+
+  it('slows the ball to a gentle roll and never stops it', () => {
+    const sim = fresh(50);
+    sim.brake = 1;
+    roll(sim, 0.5);
+    expect(sim.v).toBeLessThan(35);
+    roll(sim, 3);
+    expect(sim.v).toBeGreaterThanOrEqual(MIN_SPEED);
+    expect(sim.v).toBeLessThan(18);
+    const at = sim.s;
+    roll(sim, 1);
+    expect(sim.s).toBeGreaterThan(at + 10);
+  });
+
+  it('is felt in proportion, and lets the ball pick up again when let go', () => {
+    const hard = roll(Object.assign(fresh(50), { brake: 1 }), 0.4);
+    const soft = roll(Object.assign(fresh(50), { brake: 0.3 }), 0.4);
+    const none = roll(fresh(50), 0.4);
+    expect(hard.v).toBeLessThan(soft.v);
+    expect(soft.v).toBeLessThan(none.v);
+    const slow = roll(Object.assign(fresh(50), { brake: 1 }), 3);
+    slow.brake = 0;
+    const was = slow.v;
+    roll(slow, 1);
+    expect(slow.v).toBeGreaterThan(was + 5);
+  });
+
+  it('works in the air: the ball comes down sooner and shorter', () => {
+    const jump = (brake: number) => {
+      const sim = fresh(50);
+      sim.vh = 11.5;
+      sim.h = 0.01;
+      const from = sim.s;
+      let steps = 0;
+      sim.step(1 / 120);
+      sim.brake = brake;
+      while (sim.h > 0 && steps++ < 1200) sim.step(1 / 120);
+      return { far: sim.s - from, time: steps / 120 };
+    };
+    const free = jump(0);
+    const held = jump(1);
+    expect(held.far).toBeLessThan(free.far * 0.75);
+    expect(held.time).toBeLessThan(free.time * 0.9);
+  });
+
+  it('ends a turbo', () => {
+    const sim = fresh(80);
+    sim.turboT = 2;
+    sim.brake = 1;
+    roll(sim, 0.5);
+    expect(sim.v).toBeLessThan(65);
+    expect(sim.turboT).toBeLessThanOrEqual(0);
+  });
+});
+
+describe('fruit a friend takes', () => {
+  it('is gone for a moment and then back, as in any race', () => {
+    const level = LEVELS[0];
+    const course = courseFor(level);
+    const sim = new Sim(course, level);
+    sim.skipCountdown();
+    const fruit = course.objects.findIndex((o) => o.kind === 'pickup');
+    expect(sim.fresh(fruit)).toBe(true);
+    sim.lose(fruit);
+    expect(sim.fresh(fruit)).toBe(false);
+    for (let i = 0; i < 120; i++) sim.step(1 / 120);
+    expect(sim.fresh(fruit)).toBe(true);
   });
 });

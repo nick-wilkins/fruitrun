@@ -85,7 +85,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
   const count = el('div.countdown');
   const touch = window.matchMedia('(pointer: coarse)').matches;
   const warning = { sunny: '', night: 'Night run! ', midnight: 'Midnight run: follow the lights! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
-  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + (friends ? `${friends.note} ` : '') + warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
+  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + (friends ? `${friends.note} ` : '') + warning + (touch ? 'Swipe left and right to steer. Pull back to slow down' : 'Hold the mouse and slide, or use the arrow keys. Down slows you'));
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
   const soundButton = el('button.btn.blue', {}, handlers.muted() ? '🔇 Sound off' : '🔊 Sound on');

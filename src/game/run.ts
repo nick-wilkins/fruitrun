@@ -95,7 +95,7 @@ export interface RunHooks {
   finish(time: number, bonuses: string[], feats: Feats, place: number | null): void;
   /** The celebration has played: show the results, with everyone's finishing order if it was a race. */
   results(order: Finisher[] | null): void;
-  /** The player has smashed or knocked over the thing at `index`: friends racing along need to hear of it. */
+  /** The player has smashed, knocked over or taken the thing at `index`: friends racing along need to hear of it. */
   smash?(index: number): void;
 }
 
@@ -106,6 +106,9 @@ const WAIT_FOR_RIVALS = 7;
 
 /** How much of the screen's width a finger swipes to take the ball from one kerb to the other. */
 const SWIPE = 0.24;
+/** Holding back by drawing the finger down: this share of the screen's height is ignored, and this much more is all of it. */
+const PULL_SLIP = 0.08;
+const PULL_FULL = 0.14;
 
 interface Flying {
   mesh: InstancedMesh;
@@ -308,6 +311,10 @@ export class Run {
    */
   private swipe: { target: number; across: number; shift: number } | null = null;
   private keySteer = 0;
+  private keyBack = false;
+  /** Where down the screen the steering finger landed, and how hard it is now pulling back, 0 to 1. */
+  private pointerDown = 0;
+  private pull = 0;
   private shake = 0;
   private fov = 62;
   private raf = 0;
@@ -442,6 +449,10 @@ export class Run {
     }
     const rect = this.canvas.getBoundingClientRect();
     this.pointerAcross = (e.clientX - rect.left) / rect.width - 0.5;
+    // A finger drawn back down the screen holds the ball back: nothing for a small slip, all of it by a fifth of the way.
+    const down = (e.clientY - rect.top) / rect.height;
+    if (e.type === 'pointerdown') this.pointerDown = down;
+    this.pull = e.pointerType === 'mouse' ? 0 : clamp((down - this.pointerDown - PULL_SLIP) / PULL_FULL, 0, 1);
     // A finger steers by swiping from wherever it lands; a mouse steers by where it points.
     if (e.type === 'pointerdown') this.swipe = e.pointerType === 'mouse' ? null : { target: this.sim.x, across: this.pointerAcross, shift: this.sim.shift };
     e.preventDefault();
@@ -452,9 +463,11 @@ export class Run {
     this.pointerId = null;
     this.pointerAcross = null;
     this.swipe = null;
+    this.pull = 0;
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') this.keyBack = e.type === 'keydown';
     const dir = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : e.code === 'ArrowRight' || e.code === 'KeyD' ? 1 : 0;
     if (!dir) return;
     if (e.type === 'keydown') this.keySteer = dir;
@@ -464,6 +477,8 @@ export class Run {
   /** Forget held keys and fingers: their release can be missed while paused or in another window. */
   private readonly dropInput = () => {
     this.keySteer = 0;
+    this.keyBack = false;
+    this.pull = 0;
     this.pointerId = null;
     this.pointerAcross = null;
     this.swipe = null;
@@ -538,6 +553,7 @@ export class Run {
     if (this.paused) return;
     // Fixed steps, however long the frame took: the same line earns the same time on any device.
     this.sim.steer = this.steer();
+    this.sim.brake = this.keyBack ? 1 : this.pull;
     this.sim.swiping = this.pointerAcross !== null && this.swipe !== null;
     this.owed += dt;
     while (this.owed >= TICK) {
@@ -722,9 +738,18 @@ export class Run {
     this.flying.push({ mesh, index: this.world.instance[index], pos, vel, spin: new Vector3(Math.random(), Math.random(), Math.random()).normalize(), angle: 0, life: 1.6 });
   }
 
-  /** A friend on another device has smashed a crate or knocked a pin over: it goes on this road too, as theirs did. */
+  /**
+   * A friend on another device has smashed a crate, knocked a pin over or taken a fruit: it goes on this road
+   * too, as theirs did. The fruit is back in a moment, as in any race.
+   */
   smashed(index: number, seat: number): void {
     const o = this.course.objects[index];
+    if (o?.kind === 'pickup') {
+      const visual = this.world.pickups.get(index);
+      if (!visual || !this.sim.fresh(index) || this.sim.had(index)) return;
+      this.sim.lose(index);
+      return this.sparks.burst(visual.base, 8, ['#ffffff', '#ffe066'], 4);
+    }
     const by = this.friends.find((friend) => friend.seat === seat);
     if (!o || (o.kind !== 'crate' && o.kind !== 'pin') || this.sim.done[index]) return;
     this.sim.done[index] = true;
@@ -830,6 +855,7 @@ export class Run {
         const visual = this.world.pickups.get(event.index)!;
         sfx.pickup();
         this.hooks.pickup(event.id);
+        this.hooks.smash?.(event.index);
         this.sparks.burst(visual.base, 14, ['#ffffff', '#ffe066', '#ff9ecb'], 6);
         break;
       }

@@ -14,6 +14,9 @@ export const TURBO_SPEED = 86;
 const TURBO_TIME = 2.2;
 const GRAVITY = 11;
 export const COUNTDOWN = 3;
+/** Holding back takes this much speed off a second at its hardest, down to a gentle roll and no slower. */
+const HOLD_BACK = 45;
+const ROLL = 14;
 const START_S = 12;
 /** How far past the kerb a steering target may reach, so pressing into the wall registers as a scrape. */
 export const PUSH = 1.2;
@@ -132,6 +135,8 @@ export class Sim {
   /** Set while `steer` comes from a finger swiping on a touch screen. */
   swiping = false;
   autopilot: Autopilot = 'none';
+  /** How hard the player is holding the ball back, 0 to 1. It works in the air too, where it also brings the ball down sooner. */
+  brake = 0;
   /** A helping hand for a player behind in a race with friends: the share further it rolls on the road for its speed. */
   help = 0;
   /** Set for a computer rival: it drives itself, held back as the driver says. */
@@ -265,6 +270,11 @@ export class Sim {
   /** Is this fruit there to be collected right now? */
   fresh(index: number): boolean {
     return this.clock >= this.freshAt[index];
+  }
+
+  /** A friend racing on another device has taken this fruit: it is gone for a moment, as when a rival takes one. */
+  lose(index: number): void {
+    this.freshAt[index] = this.clock + FRUIT_BACK;
   }
 
   /** Nothing left of this for the marble: smashed, already had, or a fruit somebody has just taken. */
@@ -974,6 +984,12 @@ export class Sim {
       this.turboT = 0;
       this.v += (LIFT_SPEED - this.v) * Math.min(1, dt * 6);
       this.time += dt;
+    } else if (this.brake > 0) {
+      // Held back: the speed comes off, a turbo with it, but the ball never stops rolling.
+      this.turboT = 0;
+      this.v = this.v > ROLL ? Math.max(ROLL, this.v - HOLD_BACK * this.brake * dt) : Math.min(ROLL, this.v + 10 * dt);
+      this.v = clamp(this.v, MIN_SPEED, TURBO_SPEED);
+      this.time += dt;
     } else {
       if (this.v < CRUISE) this.v += 10 * dt;
       else this.v -= (this.v - CRUISE) * 0.24 * dt;
@@ -1052,7 +1068,9 @@ export class Sim {
     }
 
     if (this.h > 0 || this.vh > 0) {
-      this.vh -= 26 * dt;
+      // Held back in the air the ball drops sooner as well as travelling less far: a jump can be cut short to
+      // come down on something worth landing on.
+      this.vh -= 26 * (1 + this.brake) * dt;
       this.h += this.vh * dt;
       if (this.h <= 0) {
         this.h = 0;

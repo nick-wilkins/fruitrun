@@ -215,3 +215,17 @@ Ten findings. Fixed:
 Left: each crate or pin knocked is its own message, so a rack of ten pins is ten small messages. `start`, `startCup` and `nextRace` stay public: the tests drive them.
 
 Re-verified 2026-11-20: `tsc` clean; 988 tests (3 new, shown failing first). Two tabs: the leave question stays up when the starter picks a race underneath it; a starter who leaves the race is in the waiting room, the joiner's card reads "Waiting for Sam…" with a "Waiting room" button, and the joiner is brought into the waiting room by itself on finishing.
+
+## Round five: holding back, and shared fruit, 2026-11-20
+
+**Holding back (new, in every kind of run).** Drawing the steering finger back down the screen slows the ball: nothing for the first 8% of the screen's height, all of it by 22%. The down arrow or S does the same. At its hardest it takes 45 off the speed each second, down to a roll of 14 and no slower: the ball never stops. It ends a turbo. It works in the air, where the ball also falls twice as fast, so a jump can be cut short to land on a speed pad. Letting go, the ball picks up again as usual. The hint at the start of a run mentions it. Nick's intent: go over a jump, then choose to come down early for a speed-up.
+
+**Fruit a friend takes** vanishes on every player's road with a small sparkle and is back half a second later, the same as when a computer rival takes one. Rings stay each player's own.
+
+Tests: 5 new, shown failing first. 993 pass; `tsc` clean.
+
+Run 2026-11-20, dev server, sound off:
+
+- PASS holding back, real touch events on level 1: a finger moved down 5% of the screen does nothing; 15% reads half; 30% reads full and the speed falls from 36 to 14 and holds there, still covering 14 units a second; lifting the finger, the speed is back to 26 in a second and a half.
+- PASS fruit, two tabs: the joiner takes 5 fruit; the starter's road loses the same 5.
+- NOT RUN: how far down a child's finger wanders while steering. If the ball slows when nobody means it to, the 8% is the number to raise.
