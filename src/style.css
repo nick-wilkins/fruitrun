@@ -3871,7 +3871,7 @@ input.name {
 }
 
 /* The painting, always 4:3. At 4:3 it is all on show; on a wider screen it rides up so the 16:9 picture inside it is what shows. */
-.map-art {
+.tall-art {
   position: absolute;
   left: 0;
   top: calc((100% - 75cqw) * var(--lift, 0.5));
@@ -3879,10 +3879,21 @@ input.name {
   aspect-ratio: 4 / 3;
 }
 
-.map-art > .bg {
+.tall-art > .bg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* The 16:9 window over the old picture's place in a taller painting: a screen is built in here. */
+.tall-window {
+  position: absolute;
+}
+
+/* A dialog dims the whole screen, not just the window. */
+.tall-window > .modal {
+  top: -30cqw;
+  bottom: -30cqw;
 }

@@ -7,7 +7,7 @@ import type { App } from './app';
 import { cupLineup } from './cards';
 import { asset, el, onTap } from './dom';
 import { pipSvg } from './pip';
-import { setBackdrop } from './screen';
+import { STALL, tallStage } from './screen';
 
 const TROPHY = ['', '🥇', '🥈', '🥉'];
 
@@ -22,9 +22,7 @@ function table(rows: Standing[]): HTMLElement {
 }
 
 function backdrop(): HTMLElement {
-  const stage = el('div.stage.book-stage');
-  stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
-  setBackdrop(asset('assets/stall.webp'));
+  const stage = tallStage('book-stage', STALL);
   return stage;
 }
 

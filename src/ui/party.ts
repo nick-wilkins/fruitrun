@@ -7,9 +7,9 @@ import { LEVELS } from '../data/levels';
 import { toldStore } from '../platform';
 import type { App } from './app';
 import { carousel, cupCard, cupLineup, raceCard } from './cards';
-import { asset, el } from './dom';
+import { el } from './dom';
 import { ORDINAL } from './hud';
-import { setBackdrop } from './screen';
+import { STALL, tallStage } from './screen';
 
 const WHY = {
   denied: 'Smoothie Scramble is not allowed to look for devices nearby. A grown-up can turn it on in Settings, under Privacy & Security, then Local Network.',
@@ -39,9 +39,7 @@ void toldStore
 /** Getting a game together with friends nearby: start one or join one, then wait for the off. */
 export function partyScreen(app: App): HTMLElement {
   const { party } = app;
-  const stage = el('div.stage.book-stage');
-  stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
-  setBackdrop(asset('assets/stall.webp'));
+  const stage = tallStage('book-stage', STALL);
   const button = (label: string, color: string, onclick: () => void) => el(`button.btn.${color}`, { onclick: () => (sfx.tap(), onclick()) }, label);
   const card = (...children: (Node | string | null)[]) => stage.append(el('div.card.unlock-card.party-card', {}, ...children));
   const wide = (...children: (Node | string | null)[]) => stage.append(el('div.card.unlock-card.party-card.wide', {}, ...children));

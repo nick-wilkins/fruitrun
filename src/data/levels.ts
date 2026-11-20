@@ -53,9 +53,9 @@ const H = 941;
 const at = (px: number, py: number) => ({ x: (px / W) * 100, y: (py / H) * 100 });
 
 export const WORLDS: World[] = [
-  { id: 'meadow', name: 'Sunny Meadow', art: 'assets/map.webp', nodes: 'art', blender: at(1453, 590) },
+  { id: 'meadow', name: 'Sunny Meadow', art: 'assets/map.webp', nodes: 'art', blender: at(1453, 590), tall: { art: 'assets/map-tall.webp', top: 12.89, height: 74.95 } },
   { id: 'tropics', name: 'Tropical Falls', art: 'assets/map-tropics.webp', nodes: 'blue', blender: at(1545, 690), tall: { art: 'assets/map-tropics-tall.webp', top: 11.05, height: 74.95 } },
-  { id: 'village', name: 'Blossom Village', art: 'assets/map-village.webp', nodes: 'yellow', blender: at(800, 118) },
+  { id: 'village', name: 'Blossom Village', art: 'assets/map-village.webp', nodes: 'yellow', blender: at(800, 118), tall: { art: 'assets/map-village-tall.webp', top: 12.15, height: 74.59 } },
 ];
 
 /** Levels with weather, by level number. Everything else is sunny. */

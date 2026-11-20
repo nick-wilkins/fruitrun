@@ -1,17 +1,15 @@
 import { sfx } from '../audio';
 import type { App } from './app';
-import { asset, el } from './dom';
+import { el } from './dom';
 import { grownUpGate } from './gate';
-import { setBackdrop } from './screen';
+import { STALL, tallStage } from './screen';
 
 /** What to tell a grown-up after asking the store what the account owns: yes, no, or no answer. */
 export const restoreNote = (owned: boolean | null) => (owned ? 'Races, cups and playing together are unlocked.' : owned === null ? 'The store could not be reached. Please try again.' : 'No purchase was found for this Apple account.');
 
 /** Where races, cups and playing together are offered. The child sees what they are; the buying sits behind a sum for a grown-up. */
 export function unlockScreen(app: App): HTMLElement {
-  const stage = el('div.stage.book-stage');
-  stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
-  setBackdrop(asset('assets/stall.webp'));
+  const stage = tallStage('book-stage', STALL);
   const button = (label: string, color: string, onclick: () => void) =>
     el(`button.btn.${color}`, { onclick: () => (sfx.tap(), onclick()) }, label);
 

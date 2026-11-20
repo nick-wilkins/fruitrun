@@ -332,3 +332,21 @@ How it is wired: a world may now carry a taller painting and where the 16:9 pict
 Seen in the browser: at 1100 by 620 the map looks as before with every spot on its stone; at 1100 by 825 it fills the screen with more sky and river and the spots are still on their stones.
 
 To do: the file pasted was 1448 by 1086, smaller than the old map (1672 wide). The full-size original is wanted. The meadow and village maps, and every other screen, still sit in a 16:9 window. A phone wider than 16:9 still has bands at the sides.
+
+## Three more taller paintings: the meadow, the village and the stall, 2026-11-20
+
+Nick sent the Sunny Meadow map, the Blossom Village map and the smoothie stall at 4:3 (1448 by 1086 each, to be replaced by larger ones when he has them).
+
+Where each old picture sits in its new one, by measurement:
+
+| Picture | Top | Height | Fit (mean difference in 255) |
+|---|---|---|---|
+| Meadow map | 12.89% | 74.95% | 9 |
+| Village map | 12.15% | 74.59% | 21 (repainted a little; the spots are where they were) |
+| Stall | 9.21% | 74.4%, and 99.17% of the width from 0.28% | 15 |
+
+The two maps use the mechanism built for Tropical Falls. The stall is behind five screens (blender, book, cups, unlock, waiting rooms), and the blender's slots and buttons are painted into it, so those screens are now built inside a 16:9 window laid exactly over the old picture's place in the new one (`tallStage` in `src/ui/screen.ts`). Nothing inside those screens changed. Dialogs dim the whole screen, not just the window.
+
+Seen in the browser at 1100 by 620 and 1100 by 825: the blender's ingredient squares, power button and Blend button sit on their painted places at both shapes, with the stall's roof and shelf showing at 4:3; the meadow's stones and Super Blender pad, and the village's spots and stall, are under their buttons at 4:3; the cups screen sits in its window with the stall filling the rest, and its dialog dims all of it. 998 tests pass; `tsc` and the build are clean.
+
+Still in a 16:9 window: the first screen (its taller picture is ready, not wired), and races themselves fill the screen already. On the book, cups and waiting rooms the card is still 16:9-sized in the middle of a taller screen.

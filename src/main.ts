@@ -24,6 +24,7 @@ import { createHud } from './ui/hud';
 import { mapScreen } from './ui/map';
 import { menuScreen } from './ui/menu';
 import { partyScreen } from './ui/party';
+import { wholeOf } from './ui/screen';
 import { unlockScreen } from './ui/unlock';
 import './style.css';
 
@@ -156,7 +157,7 @@ const app: App = {
       unlock: unlockScreen,
       party: partyScreen,
     }[screen];
-    ui.replaceChildren(build(app));
+    ui.replaceChildren(wholeOf(build(app)));
   },
   cupResult: null,
   startCup(cup: Cup, difficulty: Difficulty) {

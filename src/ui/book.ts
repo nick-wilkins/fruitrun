@@ -10,7 +10,7 @@ import { LEVELS, WORLDS } from '../data/levels';
 import type { App } from './app';
 import { asset, el, formatTime, onTap, raceMedals, stars } from './dom';
 import { pipSvg } from './pip';
-import { setBackdrop } from './screen';
+import { STALL, tallStage } from './screen';
 
 /** One ingredient that gives a recipe away a little, for recipes not found yet. */
 function clue(combo: Combo): string | null {
@@ -243,9 +243,7 @@ function records(app: App): HTMLElement {
 
 /** The smoothie book: everything the player has done, found and collected. */
 export function bookScreen(app: App): HTMLElement {
-  const stage = el('div.stage.book-stage');
-  stage.append(el('img.bg', { src: asset('assets/stall.webp'), alt: '', draggable: false }));
-  setBackdrop(asset('assets/stall.webp'));
+  const stage = tallStage('book-stage', STALL);
   const pages = { Trophies: trophies, Records: records, Awards: awards, Recipes: recipes, Collection: collection };
   const body = el('div.book-body');
   const tabs = el('div.book-tabs');

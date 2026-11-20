@@ -195,7 +195,7 @@ export function mapScreen(app: App): HTMLElement {
   const stage = el(`div.stage.map-stage${drawn ? '.small' : ''}${tall ? '.tall' : ''}`);
   // With a taller painting the screen can be filled on a squarer device: the painting slides behind the screen's
   // window, and everything placed on the map is placed on the painting, where the 16:9 picture sits in it.
-  const art = tall ? el('div.map-art', { style: `--lift:${(tall.top / (100 - tall.height)).toFixed(4)}` }) : stage;
+  const art = tall ? el('div.tall-art', { style: `--lift:${(tall.top / (100 - tall.height)).toFixed(4)}` }) : stage;
   const down = (y: number) => (tall ? tall.top + (y * tall.height) / 100 : y);
   art.append(el('img.bg', { src: asset(tall?.art ?? world.art), alt: '', draggable: false }));
   if (tall) stage.append(art);
