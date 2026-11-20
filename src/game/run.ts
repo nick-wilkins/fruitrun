@@ -486,7 +486,7 @@ export class Run {
       swipe.target += ((this.pointerAcross - swipe.across) / SWIPE) * (this.sim.limit + PUSH) * 2 + (this.sim.shift - swipe.shift);
       swipe.across = this.pointerAcross;
       swipe.shift = this.sim.shift;
-      // Never beyond the kerb, so swiping back answers straight away.
+      // Never far beyond the kerb, so swiping back is soon answered.
       swipe.target = clamp(swipe.target, least, most);
       return swipe.target;
     }

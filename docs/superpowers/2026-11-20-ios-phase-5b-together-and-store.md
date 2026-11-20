@@ -145,3 +145,18 @@ Run 2026-11-20, dev server, sound off:
 - PASS helping hand, two tabs: the joiner, 5% of the course behind, reads a help of 0.026 and rising; the leader reads 0.
 - PASS the joiner's progress bar is blue; their map stays on their own world; home first they read "The others are still racing…"; when the starter closes the game, "The game with Sam has ended." and Back to map.
 - NOT RUN on a device: how the split feels under a finger, and whether 6% is felt at all.
+
+## Review (`/code-review medium` on d428e5d) and fixes
+
+Nine findings. Fixed:
+
+- A full early swipe for a side road still scraped the kerb and lost speed (43.4 at the fork against 49.45): reaching for a road about to open now never scrapes, however hard the swipe.
+- The swipe could run 10 units past the kerb, leaving a swipe back dead for a whole road's width: it now reaches 60% of the way to the side road, enough to take it.
+- A player joining between races made the others read "still racing".
+- The helping hand was eased by a timer's count: it now goes by the race's own clock, and stands still while paused.
+- A friend whose reports had stopped still counted as the leader: one not heard from for two seconds is left out.
+- The reach is only worked out when a ball is against a kerb.
+
+Left: pushing on the outer kerb while a side road is opening, or on the main kerb just before one with keys or a mouse, costs no speed. `reach()` and `bounds()` share a shape. The cup table is sent twice when a leaver ends a race.
+
+Re-verified 2026-11-20: `tsc` clean; 974 tests (3 new, shown failing first). Real touch events on level 2: a full swipe 38 units early gives a target of -10.7, arrives at the fork at 49.45 with no scrape, and takes the side road.

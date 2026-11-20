@@ -336,8 +336,9 @@ export class Sim {
   }
 
   /**
-   * How far left and right a player may steer for. A fork about to open is included, so a finger that has already
-   * swiped for the side road is heading there the moment the road is.
+   * How far left and right a player may steer for. A fork about to open, or opening, is reached for: far enough
+   * over that a finger which has already swiped for the side road takes it the moment the road is there, and no
+   * further, so a swipe back is soon answered.
    */
   reach(): [number, number] {
     let [lo, hi] = this.bounds();
@@ -346,7 +347,7 @@ export class Sim {
     for (const lane of this.course.lanes) {
       const from = lane.from;
       if (!from || this.s < from.s0 - REACH_AHEAD || this.s >= from.s0 + from.decide) continue;
-      const off = from.spread[from.decide];
+      const off = from.spread[from.decide] * 0.6;
       lo = Math.min(lo, off - limit);
       hi = Math.max(hi, off + limit);
     }
@@ -951,13 +952,14 @@ export class Sim {
     }
     this.x += this.xv * dt;
     const [lo, hi] = this.bounds();
-    const [least, most] = this.reach();
     if (this.x < lo || this.x > hi) {
       // Slide back on rather than snap: the road may have just narrowed, or a fork just closed behind the ball.
       const over = this.x - clamp(this.x, lo, hi);
       this.x -= Math.sign(over) * Math.min(Math.abs(over), 30 * dt);
       if (this.xv * (this.x - (lo + hi) / 2) > 0) this.xv = 0;
-      if (target !== null && (target < least || target > most) && this.v > CRUISE * 0.75) {
+      // Pushing on a kerb costs speed, except on the side where a fork is about to open: that is reaching for it.
+      const [least, most] = target === null ? [lo, hi] : this.reach();
+      if (target !== null && (target < lo ? least >= lo : target > hi && most <= hi) && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
         this.scrapeT -= dt;
         if (this.scrapeT <= 0) {

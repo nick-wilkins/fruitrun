@@ -190,6 +190,8 @@ describe('forks', () => {
       return sim.v;
     };
     expect(after(from.side * 8)).toBeGreaterThan(after(-from.side * 8) + 0.3);
+    // However hard the swipe: as far as a finger can ask for, and further.
+    expect(after(from.side * 30)).toBeCloseTo(after(from.side * 8));
   });
 });
 

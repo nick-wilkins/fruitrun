@@ -277,6 +277,7 @@ const app: App = {
       const mine = run;
       let shown = '';
       let was = NaN;
+      let raceClock = 0;
       const telling = window.setInterval(() => {
         if (run !== mine) return window.clearInterval(telling);
         const { sim } = mine;
@@ -284,9 +285,13 @@ const app: App = {
         if (!sim.finished) party.report({ lane: sim.lane, s: sim.s, x: sim.x, h: sim.h, v: sim.s === was ? 0 : sim.pace, p: sim.progress() });
         was = sim.s;
         // Whoever is behind gets a little help, eased in and out over a second or so, so it is never felt as a shove.
-        const lead = Math.max(0, ...friends.filter(({ marble }) => marble.time !== null || !marble.gone).map(({ marble }) => (marble.time !== null ? 1 : marble.progress)));
+        // A friend whose reports have stopped is not counted: where they were says nothing of where they are.
+        const clock = performance.now() / 1000;
+        const lead = Math.max(0, ...friends.map(({ marble }) => (marble.time !== null ? 1 : marble.gone || marble.quiet(clock) ? 0 : marble.progress)));
         const help = sim.finished ? 0 : catchUp((lead - sim.progress()) * mine.course.finishS, lead, sim.time);
-        sim.help += (help - sim.help) / 15;
+        // By the race's own clock, so it keeps pace however often this runs and stands still while paused.
+        sim.help += (help - sim.help) * Math.min(1, Math.max(0, sim.time - raceClock));
+        raceClock = sim.time;
         if (!order) return;
         const now = mine.standings();
         const key = JSON.stringify(now);

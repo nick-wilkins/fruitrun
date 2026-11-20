@@ -139,6 +139,11 @@ export class Marble {
     this.progress = report.p;
   }
 
+  /** No report has come for a couple of seconds: its device is asleep or out of reach, and where it was says nothing of where it is. */
+  quiet(now: number): boolean {
+    return !this.last || now - this.at > 2;
+  }
+
   /** Where to draw it at `now`, or null before the first report. */
   spot(now: number): { lane: number; s: number; x: number; h: number } | null {
     const { last, off } = this;
@@ -192,7 +197,7 @@ export class Party {
   /** The host's list of the cup's levels, and of who has finished the race under way and when. */
   private cupLevels: string[] = [];
   private readonly times = new Map<string, number>();
-  /** The host's list of who is still out on the course. */
+  /** Who is still out on the course. The host's list has everyone on it; a guest's has the others. */
   private readonly busy = new Set<string>();
   /** Something on show has changed. */
   onChange = (): void => {};
@@ -293,8 +298,7 @@ export class Party {
 
   /** Whether anyone is still out on the course, as far as this device has heard. */
   racing(): boolean {
-    if (this.phase === 'hosting') return this.busy.size > 0;
-    return this.race > 0 && [...this.marbles.values()].some((marble) => !marble.gone && marble.time === null);
+    return this.busy.size > 0;
   }
 
   raceNow(): number {
@@ -470,6 +474,8 @@ export class Party {
     }
     if (message.t === 'start') {
       this.race = message.n;
+      this.busy.clear();
+      for (const friend of this.friends()) this.busy.add(friend.id);
       return this.begin(message.level);
     }
     if ((message.t === 'pos' || message.t === 'done' || message.t === 'out') && message.n === this.race) this.note(message);
@@ -481,6 +487,7 @@ export class Party {
     if (message.t === 'pos') return marble.hear(message, this.now());
     if (message.t === 'done') marble.time = message.time;
     else marble.gone = true;
+    if (this.phase === 'joined' && message.from) this.busy.delete(message.from);
     // Who is still out has changed, which a waiting room shows.
     if (this.phase === 'joined') this.onChange();
   }

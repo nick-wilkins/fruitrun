@@ -73,6 +73,14 @@ describe("a friend's marble", () => {
     expect(new Marble().spot(0)).toBeNull();
   });
 
+  it('is known to have gone quiet when no report has come for a while', () => {
+    const marble = new Marble();
+    expect(marble.quiet(5)).toBe(true);
+    marble.hear(report(100), 10);
+    expect(marble.quiet(11)).toBe(false);
+    expect(marble.quiet(13)).toBe(true);
+  });
+
   it('keeps rolling at its last speed between reports', () => {
     const marble = new Marble();
     marble.hear(report(100), 10);
@@ -325,6 +333,23 @@ describe('a party', () => {
     kit.out();
     expect(ada.racing()).toBe(false);
     expect(told).toBeGreaterThan(0);
+  });
+
+  it('does not take a newcomer between races for somebody still out', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    sam.host();
+    ada.browse();
+    ada.join(ada.hosts[0].id);
+    sam.start('level-1');
+    sam.finished(20);
+    ada.finished(21);
+    kit.browse();
+    kit.join(kit.hosts[0].id);
+    expect(ada.racing()).toBe(false);
+    expect(kit.racing()).toBe(false);
   });
 
   it('only lets the host start a cup', () => {
