@@ -27,8 +27,10 @@ export interface Hud {
   finished(): void;
   /** `order` is everyone in finishing order, for a race. */
   results(result: RunResult, order?: Finisher[]): void;
-  /** A race with friends is over for this player: the time and the order, with nothing to keep. `on` words the way on. */
-  raced(time: number, order: Finisher[], on: string): void;
+  /** A race with friends is over for this player: the time and the order, with nothing to keep. */
+  raced(time: number, order: Finisher[]): void;
+  /** What is under that order: a button to move on, for whoever may, or word of who is being waited for. */
+  racedNext(on: string | null, note: string): void;
   /** The finishing order has moved on since the results went up: a friend still out has come home. */
   standings(order: Finisher[]): void;
 }
@@ -109,6 +111,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       ),
     ),
   );
+  const racedFoot = el('div.row');
   /** The card a run ends on, over the stopped race with its gauges put away. */
   const resultCard = (kind: string, ...children: (Node | string | null)[]) => {
     root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
@@ -186,7 +189,10 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
     finished() {
       pauseButton.classList.add('hidden');
     },
-    raced(time, order, on) {
+    racedNext(on, note) {
+      racedFoot.replaceChildren(on ? el('button.btn.green.big', { onclick: () => handlers.quit() }, on) : el('p.raced-wait', {}, note));
+    },
+    raced(time, order) {
       // No banner here: nothing was completed or won, it is who came where.
       root.append(
         resultCard(
@@ -195,7 +201,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
           el('div.pip-cheer', { innerHTML: pipSvg('cheer', friends?.color) }),
           el('div.time', {}, formatTime(time)),
           orderTable(order),
-          el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.quit() }, on)),
+          racedFoot,
         ),
       );
     },

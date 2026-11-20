@@ -67,11 +67,14 @@ const worldOf = (save: Save) => (save.last ? levelById(save.last).world : 0);
 
 /** The run on now is a race with friends. */
 let racingTogether = false;
+/** Something about the game with friends has changed while a finishing order is up. */
+let partyMoved: (() => void) | null = null;
 
 function endRun(): void {
   // Leaving a race with friends before the line takes this marble off their roads.
   if (run && racingTogether && !run.sim.finished) party.out();
   racingTogether = false;
+  partyMoved = null;
   run?.dispose();
   run = null;
   canvas.classList.add('hidden');
@@ -199,7 +202,11 @@ const app: App = {
         // Starting again keeps the kind of run it was: a race stays a race, as hard as before. With friends
         // there is no starting again.
         restart: () => app.play(level, race, cup),
-        quit: () => app.show(together ? 'party' : cup ? 'cups' : 'map'),
+        quit: () => {
+          // Whoever started the game takes everyone back to the waiting room with them.
+          if (together && run?.sim.finished) party.toRoom();
+          app.show(together ? 'party' : cup ? 'cups' : 'map');
+        },
         blend: () => {
           if (draft) {
             app.save = draft;
@@ -262,9 +269,22 @@ const app: App = {
           trace = result.newBest ? (run?.trace() ?? null) : null;
           hud.finished();
         },
+        // What this player smashes is gone from friends' roads too.
+        smash: together ? (index) => party.hit(index) : undefined,
         results: (finished) => {
           order = finished ?? undefined;
-          if (together && order) hud.raced(raced, order, party.cup ? 'Cup points ▶' : 'Done ▶');
+          if (together && order) {
+            hud.raced(raced, order);
+            partyMoved = () => {
+              // The starter moves everyone on together, once they are all home. If the game has gone, it is each to their own.
+              const { phase } = party;
+              if (phase !== 'hosting' && phase !== 'joined') hud.racedNext('Done ▶', '');
+              else if (party.racing()) hud.racedNext(null, 'Waiting for everyone to finish…');
+              else if (phase === 'hosting') hud.racedNext(party.cup ? 'Cup points ▶' : 'Done ▶', '');
+              else hud.racedNext(null, `Waiting for ${party.players[0]?.name ?? 'your friend'}…`);
+            };
+            partyMoved();
+          }
           else if (result) hud.results(result, order);
         },
       },
@@ -358,8 +378,17 @@ document.addEventListener('visibilitychange', () => {
 
 party.onChange = () => {
   if (run) {
+    partyMoved?.();
     if (party.phase === 'closed') app.toast('The game with friends has ended.');
   } else if (showing === 'party') app.show('party');
+};
+// The starter has moved on, or picked what is next: anyone still looking at the finishing order goes with them.
+party.onRoom = () => {
+  if (run && racingTogether && run.sim.finished) app.show('party');
+};
+// What a friend smashes on their device goes from this road too.
+party.onHit = (from, index) => {
+  if (racingTogether) run?.smashed(index, party.players.findIndex((player) => player.id === from));
 };
 // Only someone in the waiting room, or still looking at the last race's finishing order, is taken into a race:
 // anyone who has wandered off elsewhere sits it out. So does a device that cannot draw the track just now.

@@ -174,3 +174,27 @@ Nick asked for everything left over to be fixed first.
 Not fixable here: the second iPad's save keeps the levels the earlier build opened. Still not done: a StoreKit test file.
 
 Tests: 2 new, shown failing first; 975 pass. `tsc` and the build are clean. Browser: the solo results card is unchanged after sharing its shell; in an exact dead heat between two tabs both cards put the starter first; the joiner's card shows a blue Pip.
+
+## Round four: from build 5 on two iPads, 2026-11-20
+
+Nick's notes and what was done:
+
+- **A friend's marble did not roll.** It now rolls at the speed their device last reported, and its leaves lean with it.
+- **A friend went through crates and they stayed.** What any player smashes or knocks over (crates, pins) is now gone from every player's road, flying off as it did on theirs. Fruit and rings stay each player's own.
+- **Nobody starts racing unready.** The starter picks a race, a cup or the cup's next race; nothing starts. Everyone else sees what was picked and one button, "I'm ready!". The race starts when all have tapped it. The starter sees a tick by each ready player and can pick again. A player who leaves instead is gone without.
+- **The starter moves the screens on.** After a race only the starter's finishing card has a button, and only once everyone is home; the others read "Waiting for Sam…". The starter's tap takes everyone to the waiting room together. If the game has gone, every card gets its own Done.
+- **Leaving is asked about.** Leave and Close game ask "Leave the game with your friends?" or "Close the game for everyone?" with Stay as the big button.
+- The messages changed again: every device needs this build.
+
+Tests: 10 new, each shown failing first (smash told to all, the smash message, a marble's speed, and seven for getting ready). 985 pass; `tsc` and the build are clean.
+
+Run 2026-11-20, two tabs, sound off, saves not written:
+
+- PASS the starter picks the Apple Cup: no race starts; the starter reads "Get ready!" with a tick for themselves and an hourglass for the joiner; the joiner reads "Sam picked a race, Apple Cup: Apple Orchard" with "I'm ready!". The tap starts level 1 on both.
+- PASS smashes: the joiner drives through crates and pins 9, 10, 13, 16, 22, 58 and 70; the same seven are gone on the starter's road.
+- PASS finishing: the joiner, home first, has no button and reads "Waiting for everyone to finish…", then "Waiting for Sam…". The starter, once all are home, has "Cup points ▶".
+- PASS the starter's tap puts both in the waiting room with the table; "Next race" offers Banana Bend; the joiner's Ready starts level 2 on both.
+- PASS leaving a race by the pause menu puts the joiner in the waiting room reading "The others are still racing…"; Leave asks first and Stay keeps them in.
+- PASS Stop the cup, then a single race: offered and readied the same way.
+- PASS rolling: given a report at speed 30, the friend's bubble turns over half a second of frames and its leaves lean.
+- NOT RUN on devices.

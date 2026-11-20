@@ -3240,3 +3240,17 @@ input.name {
 .card.results:has(.raced-title) {
   padding-top: 1.2em;
 }
+
+.party-next {
+  font-size: 1.3em;
+}
+
+.party-card .race-row em {
+  margin-left: auto;
+  font-style: normal;
+}
+
+.raced-wait {
+  margin: 0.2em 0 0;
+  color: #9a6a3a;
+}

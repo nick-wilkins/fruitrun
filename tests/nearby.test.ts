@@ -51,6 +51,12 @@ describe('messages between devices', () => {
     expect(decode(encode({ t: 'start', n: 2, level: 'level-3' }))).toEqual({ t: 'start', n: 2, level: 'level-3' });
   });
 
+  it('carry word of a smash, and only of a thing that can be on a course', () => {
+    expect(decode(encode({ t: 'hit', n: 2, i: 14 }))).toEqual({ t: 'hit', n: 2, i: 14 });
+    expect(decode('{"t":"hit","n":2,"i":-1}')).toBeNull();
+    expect(decode('{"t":"hit","n":2,"i":1.5}')).toBeNull();
+  });
+
   it('carry a cup table', () => {
     const table = { t: 'cup' as const, id: 'cup-0-1', race: 1, of: 4, points: [{ id: 'host', p: 10 }, { id: 'd2', p: 7 }] };
     expect(decode(encode(table))).toEqual(table);
@@ -79,6 +85,14 @@ describe("a friend's marble", () => {
     marble.hear(report(100), 10);
     expect(marble.quiet(11)).toBe(false);
     expect(marble.quiet(13)).toBe(true);
+  });
+
+  it('says how fast it is rolling, and that it has stopped when the reports do', () => {
+    const marble = new Marble();
+    expect(marble.speed(0)).toBe(0);
+    marble.hear(report(100, 30), 10);
+    expect(marble.speed(10.1)).toBe(30);
+    expect(marble.speed(13)).toBe(0);
   });
 
   it('keeps rolling at its last speed between reports', () => {
@@ -362,6 +376,22 @@ describe('a party', () => {
     expect(sam.cup!.points).toEqual({ [adaId]: 10, [kitId]: 7, host: 5 });
   });
 
+  it('tells everyone else what a player smashes, so it is gone on every road', () => {
+    const { sam, ada, kit } = gather();
+    const seen: string[] = [];
+    sam.onHit = (from, index) => seen.push(`sam:${from}:${index}`);
+    ada.onHit = (from, index) => seen.push(`ada:${from}:${index}`);
+    kit.onHit = (from, index) => seen.push(`kit:${from}:${index}`);
+    sam.start('level-1');
+    const [, adaId, kitId] = sam.players.map((p) => p.id);
+    ada.hit(7);
+    expect(seen).toEqual([`sam:${adaId}:7`, `kit:${adaId}:7`]);
+    seen.length = 0;
+    sam.hit(3);
+    expect(seen).toEqual(['ada:host:3', 'kit:host:3']);
+    void kitId;
+  });
+
   it('only lets the host start a cup', () => {
     const { ada, sam } = gather();
     ada.startCup('cup-0-1', ['level-1']);
@@ -409,6 +439,120 @@ describe('a party', () => {
     sam.leave();
     expect(ada.phase).toBe('closed');
     expect(ada.closedBy).toBe('Sam');
+  });
+});
+
+describe('getting everyone ready', () => {
+  const gather = () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    sam.host();
+    for (const guest of [ada, kit]) {
+      guest.browse();
+      guest.join(guest.hosts[0].id);
+    }
+    const started: string[] = [];
+    for (const party of [sam, ada, kit]) party.onStart = (level) => (started.push(level), true);
+    return { sam, ada, kit, started };
+  };
+
+  it('starts nothing until every player has said they are ready', () => {
+    const { sam, ada, kit, started } = gather();
+    sam.pick({ level: 'level-4' });
+    for (const party of [sam, ada, kit]) expect(party.offer).toEqual({ level: 'level-4' });
+    expect(started).toEqual([]);
+    ada.ready();
+    expect(started).toEqual([]);
+    const [, adaId] = sam.players.map((p) => p.id);
+    for (const party of [sam, ada, kit]) expect(party.readyIds).toEqual(['host', adaId]);
+    kit.ready();
+    expect(started).toEqual(['level-4', 'level-4', 'level-4']);
+    for (const party of [sam, ada, kit]) expect(party.offer).toBeNull();
+  });
+
+  it('only takes a pick from whoever started the game', () => {
+    const { sam, ada, started } = gather();
+    ada.pick({ level: 'level-4' });
+    expect(sam.offer).toBeNull();
+    expect(ada.offer).toBeNull();
+    expect(started).toEqual([]);
+  });
+
+  it('lets the starter change their mind before everyone is ready', () => {
+    const { sam, ada, kit, started } = gather();
+    sam.pick({ level: 'level-4' });
+    ada.ready();
+    sam.unpick();
+    for (const party of [sam, ada, kit]) expect(party.offer).toBeNull();
+    kit.ready();
+    expect(started).toEqual([]);
+  });
+
+  it('runs a cup the same way, a race at a time', () => {
+    const { sam, ada, kit, started } = gather();
+    sam.pick({ cup: 'cup-0-1', levels: ['level-1', 'level-2'] });
+    expect(kit.offer).toEqual({ level: 'level-1', cup: 'cup-0-1' });
+    ada.ready();
+    kit.ready();
+    expect(started).toEqual(['level-1', 'level-1', 'level-1']);
+    for (const party of [sam, ada, kit]) party.finished(30);
+    expect(kit.cup).toMatchObject({ race: 1 });
+    sam.pick('next');
+    expect(ada.offer).toEqual({ level: 'level-2', cup: 'cup-0-1' });
+    expect(started).toHaveLength(3);
+    ada.ready();
+    kit.ready();
+    expect(started.slice(3)).toEqual(['level-2', 'level-2', 'level-2']);
+  });
+
+  it('goes without a player who leaves instead of getting ready, and calls it off if nobody is left to race', () => {
+    const { sam, ada, kit, started } = gather();
+    sam.pick({ level: 'level-4' });
+    ada.ready();
+    kit.leave();
+    expect(started).toEqual(['level-4', 'level-4']);
+    sam.finished(20);
+    ada.finished(21);
+    sam.pick({ level: 'level-5' });
+    ada.leave();
+    expect(sam.offer).toBeNull();
+    expect(started).toHaveLength(2);
+  });
+
+  it('shows a newcomer what has been picked', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    sam.host();
+    ada.browse();
+    ada.join(ada.hosts[0].id);
+    sam.pick({ level: 'level-4' });
+    kit.browse();
+    kit.join(kit.hosts[0].id);
+    expect(kit.offer).toEqual({ level: 'level-4' });
+    expect(kit.readyIds).toEqual(['host']);
+    // And the race now waits for them too.
+    const started: string[] = [];
+    kit.onStart = (level) => (started.push(level), true);
+    ada.ready();
+    expect(started).toEqual([]);
+    kit.ready();
+    expect(started).toEqual(['level-4']);
+  });
+
+  it('brings everyone back to the waiting room when the starter moves on from the finishing order', () => {
+    const { sam, ada, kit } = gather();
+    const moved: string[] = [];
+    ada.onRoom = () => moved.push('ada');
+    kit.onRoom = () => moved.push('kit');
+    sam.toRoom();
+    expect(moved).toEqual(['ada', 'kit']);
+    moved.length = 0;
+    sam.pick({ level: 'level-4' });
+    expect(moved).toEqual(['ada', 'kit']);
   });
 });
 

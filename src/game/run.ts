@@ -95,6 +95,8 @@ export interface RunHooks {
   finish(time: number, bonuses: string[], feats: Feats, place: number | null): void;
   /** The celebration has played: show the results, with everyone's finishing order if it was a race. */
   results(order: Finisher[] | null): void;
+  /** The player has smashed or knocked over the thing at `index`: friends racing along need to hear of it. */
+  smash?(index: number): void;
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -707,16 +709,30 @@ export class Run {
     return this.sim.point(this.sim.s, this.sim.x, y, out);
   }
 
-  private fling(sim: Sim, mesh: InstancedMesh, index: number, height: number, lift: number): void {
+  private fling(by: { v: number; x: number }, mesh: InstancedMesh, index: number, height: number, lift: number): void {
     const o = this.course.objects[index];
-    const f = sim.frameAt(sim.s, this.f);
+    // Whatever hit it was where it stands, going the way its road goes.
+    const f = this.course.lanes[o.lane].track.at(o.s, this.f);
     const pos = this.objectAt(index, height, new Vector3());
     const vel = f.t
       .clone()
-      .multiplyScalar(sim.v * (0.8 + Math.random() * 0.4))
+      .multiplyScalar(by.v * (0.8 + Math.random() * 0.4))
       .addScaledVector(f.u, lift * (0.7 + Math.random() * 0.6))
-      .addScaledVector(f.r, (o.x - sim.x) * 5 + (Math.random() - 0.5) * 4);
+      .addScaledVector(f.r, (o.x - by.x) * 5 + (Math.random() - 0.5) * 4);
     this.flying.push({ mesh, index: this.world.instance[index], pos, vel, spin: new Vector3(Math.random(), Math.random(), Math.random()).normalize(), angle: 0, life: 1.6 });
+  }
+
+  /** A friend on another device has smashed a crate or knocked a pin over: it goes on this road too, as theirs did. */
+  smashed(index: number, seat: number): void {
+    const o = this.course.objects[index];
+    const by = this.friends.find((friend) => friend.seat === seat);
+    if (!o || (o.kind !== 'crate' && o.kind !== 'pin') || this.sim.done[index]) return;
+    this.sim.done[index] = true;
+    const now = performance.now() / 1000;
+    const from = { v: by?.marble.speed(now) || CRUISE, x: by?.marble.spot(now)?.x ?? o.x };
+    if (o.kind === 'pin') return this.fling(from, this.world.pins, index, 0.75, 11);
+    this.fling(from, this.world.crates, index, 1.05, 9);
+    this.sparks.burst(this.objectAt(index, 1, this.v1), 16, ['#d89a4e', '#8a531f', '#fff2a8'], 7);
   }
 
   /** What a rival does to the course is seen by everyone: crates and pins fly, fruit goes. No sound. */
@@ -763,10 +779,12 @@ export class Run {
         sfx.hit();
         this.fling(sim, this.world.crates, event.index, 1.05, 9);
         this.sparks.burst(this.objectAt(event.index, 1, this.v1), 16, ['#d89a4e', '#8a531f', '#fff2a8'], 7);
+        this.hooks.smash?.(event.index);
         break;
       case 'pin':
         sfx.pin();
         this.fling(sim, this.world.pins, event.index, 0.75, 11);
+        this.hooks.smash?.(event.index);
         break;
       case 'bump':
         this.shake = 0.4;
@@ -915,6 +933,13 @@ export class Run {
     if (racing) {
       this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (sim.v * dt) / BALL_RADIUS));
       this.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisZ, (sim.xv * dt) / BALL_RADIUS));
+    }
+    // A friend's bubble rolls at the speed their device last gave, and their leaves lean with it.
+    const clock = performance.now() / 1000;
+    for (const friend of this.friends) {
+      const speed = dt > 0 ? friend.marble.speed(clock) : 0;
+      friend.pip.shell.quaternion.premultiply(this.q.setFromAxisAngle(this.axisX, (speed * dt) / BALL_RADIUS));
+      friend.pip.leaves.rotation.x = -clamp(speed / MAX_SPEED, 0, 1) * 0.9;
     }
     for (const racer of this.racers) {
       if (racer.flame) {
