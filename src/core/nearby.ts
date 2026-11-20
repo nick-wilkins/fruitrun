@@ -231,6 +231,8 @@ export class Party {
   /** The starter's pick, kept to act on once everyone is ready. */
   private picked: Pick | null = null;
   private picks = 0;
+  /** A player has left the game, or the way to them was lost. */
+  onLeft = (_name: string): void => {};
   /** The starter has moved on from the finishing order: everyone goes back to the waiting room together. */
   onRoom = (): void => {};
   /** Whose game it was, once it has closed: they closed it, or the way to them was lost. */
@@ -509,7 +511,9 @@ export class Party {
   }
 
   private seat(players: Member[]): void {
+    const gone = this.players.filter((was) => was.id !== this.me && !players.some((player) => player.id === was.id));
     this.players = players;
+    for (const { name } of gone) this.onLeft(name);
     const out = this.busy.size;
     for (const [id, marble] of this.marbles) {
       if (players.some((player) => player.id === id)) continue;

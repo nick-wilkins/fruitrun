@@ -43,7 +43,8 @@ const RELOADED = 'fruitrun.reloadedForSurface';
 // The device can take the surface away when it is short of memory. A run in progress cannot be drawn, so it ends;
 // one that has crossed the line stays, so its result can still be blended.
 canvas.addEventListener('webglcontextlost', () => {
-  if (run && !run.sim.finished) app.show('map');
+  // From a race with friends it is back to the waiting room, still in the game: never out onto the map alone.
+  if (run && !run.sim.finished) app.show(racingTogether ? 'party' : 'map');
 });
 canvas.addEventListener('webglcontextrestored', () => (waitingSince = 0));
 let toastTimer = 0;
@@ -140,6 +141,8 @@ const app: App = {
   show(screen: Screen) {
     if (PAID.includes(screen) && !racesUnlocked()) screen = 'unlock';
     showing = screen;
+    // Anywhere but the waiting room is out of the game with friends: nobody plays alone while still counted in.
+    if (screen !== 'party' && party.phase !== 'idle') party.leave();
     endRun();
     musicFor(null);
     const build = {
@@ -170,6 +173,7 @@ const app: App = {
   },
   play(level: Level, race?: Difficulty, cup?: string, together = false) {
     if ((race || together) && shut()) return;
+    if (!together && party.phase !== 'idle') party.leave();
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
       // loss was not the device's own doing. If it is still gone a good while after the first tap, start the
@@ -388,8 +392,15 @@ party.onChange = () => {
   wasRacing = racing;
   if (run) {
     partyMoved?.();
-    if (party.phase === 'closed') app.toast('The game with friends has ended.');
+    // The game has gone in the middle of a race: nobody is left racing by themselves without knowing why.
+    if (party.phase === 'closed' && racingTogether && !run.sim.finished) app.show('party');
+    else if (party.phase === 'closed') app.toast('The game with friends has ended.');
   } else if (showing === 'party') app.show('party');
+};
+party.onLeft = (name) => {
+  app.toast(`${name} has left the game.`);
+  // The last friend has gone in the middle of a race: back to the waiting room, where that is plain to see.
+  if (run && racingTogether && !run.sim.finished && party.players.length < 2) app.show('party');
 };
 // The starter has moved on, or picked what is next: anyone still looking at the finishing order goes with them.
 party.onRoom = () => {

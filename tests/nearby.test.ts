@@ -200,6 +200,16 @@ describe('a party', () => {
     expect(ada.phase).toBe('idle');
   });
 
+  it('says who has gone when a player leaves, to everyone still there', () => {
+    const { sam, ada, kit } = gather();
+    const told: string[] = [];
+    sam.onLeft = (name) => told.push(`sam:${name}`);
+    ada.onLeft = (name) => told.push(`ada:${name}`);
+    kit.onLeft = (name) => told.push(`kit:${name}`);
+    kit.leave();
+    expect(told.sort()).toEqual(['ada:Kit', 'sam:Kit']);
+  });
+
   it('closes for everyone when the host leaves', () => {
     const { sam, ada, kit } = gather();
     sam.leave();

@@ -245,3 +245,25 @@ Nine findings. Fixed:
 Left: a fruit two friends reach at the same moment can be had by both, and on the taker's own road it does not come back while on the others' it does. Nothing is kept from a friend race, so neither changes a result.
 
 Re-verified 2026-11-20: `tsc` clean; 997 tests (4 new, shown failing first). Real touch events: a finger landing at 85% down the screen reads no pull, and 0.92 at the bottom edge; a finger wandering 18% down over five seconds never reads a pull; a quick pull reads full; lifting reads none.
+
+## Sanity pass: playing together and playing alone, 2026-11-20
+
+Nick asked for a check that a game with friends cannot drift into a weird state, in particular a player ending up alone or against the computer without anyone being told.
+
+Found by reading and fixed:
+
+- **A way onto the map while still counted in.** If the device took the drawing surface away mid-race, the player was put on the map but stayed in the game: free to start a race against the computer while friends waited on them. Now it is the waiting room. And as a rule for every route: showing any screen but the waiting room, or starting any run that is not the friends' race, leaves the game first.
+- **Nobody was told when a friend left.** Everyone still in now sees "Ada has left the game."
+- **Racing on alone after the game had gone.** If the starter closed the game mid-race the others raced on by themselves with a two second note. Now the race stops and they see "The game with Sam has ended." with Back to map. The same if the last friend leaves mid-race: back to the waiting room.
+
+Walked with real button presses, two tabs, sound off, saves not written:
+
+- PASS join by the buttons; Leave asks, and on yes the joiner is on the map and out; the starter sees "Ada has left the game." and "Waiting for other players…".
+- PASS a single race: nothing starts on the starter's pick; the joiner's Ready starts it; afterwards the starter has Race again or Close game, and the joiner waits or leaves.
+- PASS surface lost mid-race: the joiner is in the waiting room, still in the game, reading "The others are still racing…".
+- PASS forced to the map by code while joined: the joiner is out of the game and the starter is told.
+- PASS the starter leaves the race by the pause menu and closes the game (it asks first): the joiner's race stops on "Game over. The game with Sam has ended." and Back to map; from the map a level starts as a run alone with no friends and no rivals.
+- PASS alone: a level ends on Retry and Keep and blend, and blending opens the blender; a race has three rivals and the same two buttons; a cup against the computer goes to the points table with Next race.
+- NOT RUN in the browser: the last friend leaving mid-race sending the starter to the waiting room (it uses the same step as the case above).
+
+Tests: 1 new, shown failing first. 998 pass.
