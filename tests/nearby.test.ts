@@ -352,6 +352,16 @@ describe('a party', () => {
     expect(kit.racing()).toBe(false);
   });
 
+  it('settles a dead heat by who sits nearer the starter, whoever was heard from first', () => {
+    const { sam, ada, kit } = gather();
+    sam.startCup('cup-0-1', ['level-1']);
+    kit.finished(30);
+    ada.finished(30);
+    sam.finished(40);
+    const [, adaId, kitId] = sam.players.map((p) => p.id);
+    expect(sam.cup!.points).toEqual({ [adaId]: 10, [kitId]: 7, host: 5 });
+  });
+
   it('only lets the host start a cup', () => {
     const { ada, sam } = gather();
     ada.startCup('cup-0-1', ['level-1']);

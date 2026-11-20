@@ -109,6 +109,11 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       ),
     ),
   );
+  /** The card a run ends on, over the stopped race with its gauges put away. */
+  const resultCard = (kind: string, ...children: (Node | string | null)[]) => {
+    root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
+    return el('div.modal.clear', {}, el(`div.card.results${kind ? `.${kind}` : ''}`, {}, ...children));
+  };
   const setPaused = (value: boolean) => {
     sfx.tap();
     pauseMenu.classList.toggle('hidden', !value);
@@ -182,20 +187,15 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       pauseButton.classList.add('hidden');
     },
     raced(time, order, on) {
-      root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
+      // No banner here: nothing was completed or won, it is who came where.
       root.append(
-        el(
-          'div.modal.clear',
-          {},
-          el(
-            'div.card.results.raced',
-            {},
-            el('img.banner', { src: asset('assets/ui/level-complete.png'), alt: 'Level complete!' }),
-            el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
-            el('div.time', {}, formatTime(time)),
-            orderTable(order),
-            el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.quit() }, on)),
-          ),
+        resultCard(
+          'raced',
+          el('h2.raced-title', {}, '🏁 Finished!'),
+          el('div.pip-cheer', { innerHTML: pipSvg('cheer', friends?.color) }),
+          el('div.time', {}, formatTime(time)),
+          orderTable(order),
+          el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.quit() }, on)),
         ),
       );
     },
@@ -203,7 +203,6 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       root.querySelector('.race-order')?.replaceWith(orderTable(order));
     },
     results(result, order) {
-      root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
       // A race: who came where, and what the place was worth.
       const podium = result.podium ?? 0;
       const table = order ? orderTable(order) : null;
@@ -241,12 +240,8 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       // Only if the card is still up: the player may already have moved on.
       if (result.awards.length) setTimeout(() => feats.isConnected && sfx.reveal(4), 1500);
 
-      const card = el(
-        'div.modal.clear',
-        {},
-        el(
-          `div.card.results${order ? '.raced' : ''}`,
-          {},
+      const card = resultCard(
+          order ? 'raced' : '',
           el('img.banner', { src: asset('assets/ui/level-complete.png'), alt: 'Level complete!' }),
           el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
           el('div.time', {}, formatTime(result.time), result.newBest && !result.firstClear ? el('span.new-best', {}, 'New best!') : result.rank > 1 ? el('span.new-best.ranked', {}, `Your ${['', '', '2nd', '3rd', '4th', '5th'][result.rank]} best`) : null),
@@ -268,7 +263,6 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
                 el('button.btn.green.big', { onclick: () => handlers.blend() }, 'Keep and blend ▶'),
               ),
           cup ? null : el('p.retry-note', {}, 'Retry starts the level again. This run\'s fruit and stars are only kept if you blend.'),
-        ),
       );
       root.append(card);
       const icons = starRow.querySelectorAll('img');

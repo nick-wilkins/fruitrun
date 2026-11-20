@@ -3231,3 +3231,12 @@ input.name {
 .party-pick .btn.green {
   min-width: 5.6em;
 }
+
+.raced-title {
+  margin-bottom: 0;
+}
+
+/* No banner sits on top of this card, so it needs none of the room one takes. */
+.card.results:has(.raced-title) {
+  padding-top: 1.2em;
+}

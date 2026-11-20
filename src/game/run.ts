@@ -64,6 +64,8 @@ const seatLook = (seat: Seat): PipLook => (seat.pip ? PIP : { skin: seat.color, 
 
 /** Somebody racing on another device: how to draw them, and the marble their reports move. */
 export interface Friend {
+  /** Where they sit: 0 for whoever started the game. */
+  seat: number;
   rival: Seat;
   marble: Marble;
 }
@@ -328,6 +330,7 @@ export class Run {
   private readonly axisZ = new Vector3(0, 0, 1);
   /** The player's colour in the finishing order: Pip's green, or their seat's in a game with friends. */
   private readonly color: string;
+  private readonly mySeat: number;
 
   constructor(
     private readonly renderer: WebGLRenderer,
@@ -342,6 +345,7 @@ export class Run {
     this.world = buildWorld(course, this.sim.items, level.fruit);
 
     this.color = together ? SEATS[together.slot].color : YOUR_COLOR;
+    this.mySeat = together?.slot ?? 0;
     this.pip = buildPip(together ? seatLook(SEATS[together.slot]) : undefined);
     this.pip.root.matrixAutoUpdate = false;
     this.world.scene.add(this.pip.root);
@@ -642,10 +646,10 @@ export class Run {
   standings(): Finisher[] {
     const sim = this.sim;
     const rows = [
-      { name: 'You', color: this.color, time: sim.finished ? sim.time : Infinity, you: true, progress: sim.progress() },
-      ...this.friends.filter(({ marble }) => marble.time !== null || !marble.gone).map(({ rival, marble }) => ({ name: rival.name, color: rival.color, time: marble.time ?? Infinity, you: false, progress: marble.progress })),
+      { name: 'You', color: this.color, time: sim.finished ? sim.time : Infinity, you: true, progress: sim.progress(), seat: this.mySeat },
+      ...this.friends.filter(({ marble }) => marble.time !== null || !marble.gone).map(({ rival, marble, seat }) => ({ name: rival.name, color: rival.color, time: marble.time ?? Infinity, you: false, progress: marble.progress, seat })),
     ];
-    rows.sort((a, b) => (a.time === b.time ? (Number.isFinite(a.time) ? Number(b.you) - Number(a.you) : b.progress - a.progress) : a.time - b.time));
+    rows.sort((a, b) => (a.time === b.time ? (Number.isFinite(a.time) ? a.seat - b.seat : b.progress - a.progress) : a.time - b.time));
     return rows.map(({ name, color, time, you }) => ({ name, color, time, you }));
   }
 

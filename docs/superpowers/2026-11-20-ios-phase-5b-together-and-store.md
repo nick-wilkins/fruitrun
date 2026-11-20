@@ -160,3 +160,17 @@ Nine findings. Fixed:
 Left: pushing on the outer kerb while a side road is opening, or on the main kerb just before one with keys or a mouse, costs no speed. `reach()` and `bounds()` share a shape. The cup table is sent twice when a leaver ends a race.
 
 Re-verified 2026-11-20: `tsc` clean; 974 tests (3 new, shown failing first). Real touch events on level 2: a full swipe 38 units early gives a target of -10.7, arrives at the fork at 49.45 with no scrape, and takes the side road.
+
+## Clearing what was left, 2026-11-20
+
+Nick asked for everything left over to be fixed first.
+
+- **Kerbs beside a split**: only a swipe may reach for a road about to open without losing speed. Keys and a mouse scrape as on any kerb. With the reach now 60% of the way over, the outer kerb of an opening side road scrapes again once the road is that wide.
+- **Dead heats**: a tie goes to whoever sits nearer the starter, on every finishing card and in the cup count alike.
+- **The friend-race finishing card** reads "🏁 Finished!" with no "Level complete!" banner, and its Pip is the player's colour. It shares its shell with the solo card.
+- **Tidies**: the road's edges are worked out in one place for both `bounds()` and `reach()`; the cup table is sent once when a leaver ends a race.
+- Two players with the same name are told apart by their colours, which are now the same on every device.
+
+Not fixable here: the second iPad's save keeps the levels the earlier build opened. Still not done: a StoreKit test file.
+
+Tests: 2 new, shown failing first; 975 pass. `tsc` and the build are clean. Browser: the solo results card is unchanged after sharing its shell; in an exact dead heat between two tabs both cards put the starter first; the joiner's card shows a blue Pip.

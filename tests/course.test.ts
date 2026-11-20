@@ -179,19 +179,22 @@ describe('forks', () => {
   });
 
   it('takes no speed off a ball reaching for the road to come, as it does off one pushing on a kerb', () => {
-    const after = (steer: number) => {
+    const after = (steer: number, swiping = true) => {
       const sim = new Sim(course, level);
       sim.skipCountdown();
       sim.s = from.s0 - 15;
       sim.x = steer > 0 ? 4.2 : -4.2;
       sim.v = 40;
       sim.steer = steer;
+      sim.swiping = swiping;
       for (let i = 0; i < 12; i++) sim.step(1 / 120);
       return sim.v;
     };
     expect(after(from.side * 8)).toBeGreaterThan(after(-from.side * 8) + 0.3);
     // However hard the swipe: as far as a finger can ask for, and further.
     expect(after(from.side * 30)).toBeCloseTo(after(from.side * 8));
+    // Only a swipe can be held for a road to come. Keys and a mouse ask afresh all the time: for them it is a kerb.
+    expect(after(from.side * 8, false)).toBeCloseTo(after(-from.side * 8, false));
   });
 });
 

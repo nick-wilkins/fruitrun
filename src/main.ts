@@ -187,7 +187,8 @@ const app: App = {
     // Everyone has the colour of their seat, the same on every device.
     const friends = together ? party.friends().flatMap((member) => {
       const marble = party.marbles.get(member.id);
-      return marble ? [{ rival: { ...SEATS[party.players.indexOf(member)], name: member.name }, marble }] : [];
+      const seat = party.players.indexOf(member);
+      return marble ? [{ seat, rival: { ...SEATS[seat], name: member.name }, marble }] : [];
     }) : [];
     const partyCup = together && party.cup ? cupById(party.cup.id) : undefined;
     if (together && partyCup && party.cup) cup = `${partyCup.name}, race ${party.cup.race + 1} of ${party.cup.of}`;

@@ -281,14 +281,16 @@ export class Party {
   }
 
   /** Everyone is home or out: the host counts the cup race, quickest first by each player's own clock. Not finishing scores nothing. */
-  private score(): void {
+  private score(tell = true): void {
     const { cup } = this;
     if (!cup || cup.race >= cup.of) return;
-    const home = [...this.times].sort((a, b) => a[1] - b[1]).map(([id]) => id);
+    // A dead heat goes to whoever sits nearer the starter, the same rule as on every finishing card.
+    const seat = (id: string) => this.players.findIndex((player) => player.id === id);
+    const home = [...this.times].sort((a, b) => a[1] - b[1] || seat(a[0]) - seat(b[0])).map(([id]) => id);
     const points: Record<string, number> = {};
     for (const { id } of this.players) points[id] = (cup.points[id] ?? 0) + (CUP_POINTS[home.indexOf(id)] ?? 0);
     this.cup = { ...cup, race: cup.race + 1, points };
-    this.tellCup();
+    if (tell) this.tellCup();
   }
 
   /** Whether the host may set a race off: somebody to race, and nobody still out from the last one. */
@@ -407,8 +409,8 @@ export class Party {
       // Whoever has gone is in no table: their time takes no place from those who stayed.
       this.times.delete(id);
     }
-    // The one everybody was waiting for has gone: the race is over.
-    if (this.phase === 'hosting' && out && !this.busy.size) this.score();
+    // The one everybody was waiting for has gone: the race is over. The new table goes out with the new roster.
+    if (this.phase === 'hosting' && out && !this.busy.size) this.score(false);
     for (const friend of this.friends()) if (!this.marbles.has(friend.id)) this.marbles.set(friend.id, new Marble());
   }
 

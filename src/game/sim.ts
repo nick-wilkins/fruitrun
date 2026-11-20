@@ -325,14 +325,13 @@ export class Sim {
    * so the choice can be left until they have actually separated.
    */
   bounds(): [number, number] {
+    return this.across(this.parting().map(({ off }) => off));
+  }
+
+  /** The road's edges where it takes in other roads whose centres lie `offs` to the right of this one's. */
+  private across(offs: number[]): [number, number] {
     const limit = this.limit;
-    let lo = -limit;
-    let hi = limit;
-    for (const { off } of this.parting()) {
-      lo = Math.min(lo, off - limit);
-      hi = Math.max(hi, off + limit);
-    }
-    return [lo, hi];
+    return [Math.min(0, ...offs) - limit, Math.max(0, ...offs) + limit];
   }
 
   /**
@@ -341,17 +340,13 @@ export class Sim {
    * further, so a swipe back is soon answered.
    */
   reach(): [number, number] {
-    let [lo, hi] = this.bounds();
-    if (this.lane !== 0) return [lo, hi];
-    const limit = this.limit;
-    for (const lane of this.course.lanes) {
-      const from = lane.from;
-      if (!from || this.s < from.s0 - REACH_AHEAD || this.s >= from.s0 + from.decide) continue;
-      const off = from.spread[from.decide] * 0.6;
-      lo = Math.min(lo, off - limit);
-      hi = Math.max(hi, off + limit);
+    const offs = this.parting().map(({ off }) => off);
+    if (this.lane === 0) {
+      for (const { from } of this.course.lanes) {
+        if (from && this.s >= from.s0 - REACH_AHEAD && this.s < from.s0 + from.decide) offs.push(from.spread[from.decide] * 0.6);
+      }
     }
-    return [lo, hi];
+    return this.across(offs);
   }
 
   /** What the run achieved, for the results and the awards. */
@@ -957,8 +952,9 @@ export class Sim {
       const over = this.x - clamp(this.x, lo, hi);
       this.x -= Math.sign(over) * Math.min(Math.abs(over), 30 * dt);
       if (this.xv * (this.x - (lo + hi) / 2) > 0) this.xv = 0;
-      // Pushing on a kerb costs speed, except on the side where a fork is about to open: that is reaching for it.
-      const [least, most] = target === null ? [lo, hi] : this.reach();
+      // Pushing on a kerb costs speed, except for a swipe on the side where a fork is about to open: that is
+      // reaching for it. Keys and a mouse ask afresh every moment, so for them a kerb is a kerb.
+      const [least, most] = target !== null && this.swiping ? this.reach() : [lo, hi];
       if (target !== null && (target < lo ? least >= lo : target > hi && most <= hi) && this.v > CRUISE * 0.75) {
         this.v -= 7 * dt;
         this.scrapeT -= dt;
