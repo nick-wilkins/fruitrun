@@ -322,3 +322,13 @@ Nick's new first-screen picture (2732 by 2048, full colour) was checked: sharp a
 ## Cups screen: softening the ends of each row, 2026-11-20
 
 Nick's screenshots showed cups and their panels cut off at a straight vertical line at each end of a row. Now the row fades out over its last 4 units at each end, and each world's plants stand in front of both ends (daisies for the meadow, hibiscus and a monstera leaf for the falls, pink hibiscus and daisies for the village), so cups slide out from behind leaves. The plants sit inside the frame so they are not cut themselves, and taps pass through them. Seen in the browser with both rows scrolled: no straight cut at either end.
+
+## The first taller map: Tropical Falls, 2026-11-20
+
+Nick sent Tropical Falls extended to 4:3. Measured against the old picture: the old one sits across the full width of the new, from 11.05% to 86.0% of its height (a mean difference of 11 in 255 at the best fit, and the level spots line up by eye).
+
+How it is wired: a world may now carry a taller painting and where the 16:9 picture sits in it. With one, the map screen is as tall as the device allows, from 16:9 up to 4:3. The painting is always 4:3 and rides up behind the screen so that on a 16:9 screen exactly the old picture shows, and on a 4:3 screen all of it does. Level spots and the blender stand are placed on the painting, so they stay on their painted places at every shape. The top bar and the corner buttons stay at the screen's edges.
+
+Seen in the browser: at 1100 by 620 the map looks as before with every spot on its stone; at 1100 by 825 it fills the screen with more sky and river and the spots are still on their stones.
+
+To do: the file pasted was 1448 by 1086, smaller than the old map (1672 wide). The full-size original is wanted. The meadow and village maps, and every other screen, still sit in a 16:9 window. A phone wider than 16:9 still has bands at the sides.

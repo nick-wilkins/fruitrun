@@ -3860,3 +3860,29 @@ input.name {
   width: 6cqw;
   rotate: -14deg;
 }
+
+/* ---------- a screen with a taller painting fills squarer devices ---------- */
+
+/* As tall as the device allows, from 16:9 up to the painting's own 4:3. */
+.stage.tall {
+  width: min(100vw, calc(100dvh * 16 / 9));
+  height: min(100dvh, calc(100vw * 3 / 4));
+  aspect-ratio: auto;
+}
+
+/* The painting, always 4:3. At 4:3 it is all on show; on a wider screen it rides up so the 16:9 picture inside it is what shows. */
+.map-art {
+  position: absolute;
+  left: 0;
+  top: calc((100% - 75cqw) * var(--lift, 0.5));
+  width: 100%;
+  aspect-ratio: 4 / 3;
+}
+
+.map-art > .bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

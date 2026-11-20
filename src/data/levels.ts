@@ -13,6 +13,12 @@ export interface World {
   nodes: 'art' | 'blue' | 'yellow';
   /** Where the blender stand is on the map, as a percentage of its width and height. */
   blender: { x: number; y: number };
+  /**
+   * A taller, 4:3 painting of the same map for squarer screens, with more sky above and ground below. `top` and
+   * `height` say where the 16:9 picture sits inside it, as percentages of its height: everything on the map is
+   * placed by the 16:9 picture.
+   */
+  tall?: { art: string; top: number; height: number };
 }
 
 export interface Level {
@@ -48,7 +54,7 @@ const at = (px: number, py: number) => ({ x: (px / W) * 100, y: (py / H) * 100 }
 
 export const WORLDS: World[] = [
   { id: 'meadow', name: 'Sunny Meadow', art: 'assets/map.webp', nodes: 'art', blender: at(1453, 590) },
-  { id: 'tropics', name: 'Tropical Falls', art: 'assets/map-tropics.webp', nodes: 'blue', blender: at(1545, 690) },
+  { id: 'tropics', name: 'Tropical Falls', art: 'assets/map-tropics.webp', nodes: 'blue', blender: at(1545, 690), tall: { art: 'assets/map-tropics-tall.webp', top: 11.05, height: 74.95 } },
   { id: 'village', name: 'Blossom Village', art: 'assets/map-village.webp', nodes: 'yellow', blender: at(800, 118) },
 ];
 

@@ -191,16 +191,22 @@ export function mapScreen(app: App): HTMLElement {
   const { save } = app;
   const world = WORLDS[app.world];
   const drawn = world.nodes !== 'art';
-  const stage = el(`div.stage.map-stage${drawn ? '.small' : ''}`);
-  stage.append(el('img.bg', { src: asset(world.art), alt: '', draggable: false }));
-  setBackdrop(asset(world.art));
+  const { tall } = world;
+  const stage = el(`div.stage.map-stage${drawn ? '.small' : ''}${tall ? '.tall' : ''}`);
+  // With a taller painting the screen can be filled on a squarer device: the painting slides behind the screen's
+  // window, and everything placed on the map is placed on the painting, where the 16:9 picture sits in it.
+  const art = tall ? el('div.map-art', { style: `--lift:${(tall.top / (100 - tall.height)).toFixed(4)}` }) : stage;
+  const down = (y: number) => (tall ? tall.top + (y * tall.height) / 100 : y);
+  art.append(el('img.bg', { src: asset(tall?.art ?? world.art), alt: '', draggable: false }));
+  if (tall) stage.append(art);
+  setBackdrop(asset(tall?.art ?? world.art));
 
   const here = save.last ?? LEVELS[0].id;
   for (const level of LEVELS) {
     if (level.world !== app.world) continue;
     const locked = !isUnlocked(save, level);
     const record = save.levels[level.id];
-    const node = el('button.node', { style: `left:${level.x}%;top:${level.y}%`, ariaLabel: `Level ${level.label}` });
+    const node = el('button.node', { style: `left:${level.x}%;top:${down(level.y)}%`, ariaLabel: `Level ${level.label}` });
     if (locked) {
       node.append(lockCover(level));
     } else {
@@ -240,7 +246,7 @@ export function mapScreen(app: App): HTMLElement {
         stage.append(card);
       }
     });
-    stage.append(node);
+    art.append(node);
   }
 
   // The purple pad on the first map is the Super Blender, powered up by finishing the path that leads to it.
@@ -249,7 +255,7 @@ export function mapScreen(app: App): HTMLElement {
   const powered = superBlenderOpen(save);
   const blender = el(
     `button.blend-node${superPad ? '.super' : ''}${superPad && !powered ? '.shut' : ''}`,
-    { style: `left:${world.blender.x}%;top:${world.blender.y}%`, ariaLabel: superPad ? 'Super Blender' : 'Blend a smoothie' },
+    { style: `left:${world.blender.x}%;top:${down(world.blender.y)}%`, ariaLabel: superPad ? 'Super Blender' : 'Blend a smoothie' },
     el('img', { src: asset('assets/smoothie-cup.png'), alt: '', draggable: false }),
     el('span', {}, superPad ? 'Super Blender' : 'Blend!'),
   );
@@ -309,6 +315,7 @@ export function mapScreen(app: App): HTMLElement {
     go(racesUnlocked() ? 'Together' : '🔒 Together', 'blue', 'party'),
     go('Book', 'orange', 'book'),
   );
-  stage.append(blender, el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
+  art.append(blender);
+  stage.append(el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
   return stage;
 }
