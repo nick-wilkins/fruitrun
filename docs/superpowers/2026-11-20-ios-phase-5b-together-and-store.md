@@ -294,3 +294,27 @@ From Nick's asset pack (`smoothie_scramble_cups_asset_pack.zip`) and mock-up, pl
 - Not used: the pack's plinth (too pale to read on the wood, with a stray orange arc; drawn in the game's own style instead) and its leaf and flower overlays (each has a smear of green behind it). The pack's own notes warn its edges need checking.
 
 No new tests: a screen over tested rules. Seen in the browser: three shelves with 19 cups; a row scrolls sideways; an open cup opens its line-up; a shut one says what to finish.
+
+## The cups screen, second pass with Nick's two new sheets, 2026-11-20
+
+Nick sent two sprite sheets (shelves, cups, plinth, stars; vines and flowers) painted on a blurred background, and asked for a critical pass.
+
+Cutting them out: the Mac's subject detection found almost nothing on a sheet. What worked was following the sprites' firm outlines: the soft background has no edges, so it floods away from the picture's border and stops at each outline. The results were checked on a bright background before use. Grey rocks on the grey part of the background were lost, and the prize cup kept specks of its glow, so the pack's prize cup is kept.
+
+What was wrong with the first pass, and what changed:
+
+- The plinths were drawn in code because the pack's was unusable. The sheet's wooden plinth is now used, with the cup's name on its label.
+- The stars' words made the panels wider than their cups, so they ran into each other and the first was cut off at the shelf's end. Panels are now the width of their cup.
+- The medal won was a speck on the corner of each star. Now the star itself is gold, silver or bronze, and one not yet won is a ghost.
+- What hung under one shelf ran into the next shelf's sign. There is room for it now.
+- At phone size the words under the stars were 6 pixels high. Below 760 wide the words go and the stars are bigger; names and the levels to finish are larger.
+- Added from the sheets: flowering vines over the frame's top corners (taps pass through them; the close button stays on top), and each world's flower on its sign.
+- The shelves themselves were re-cut from the new sheet, without the hazy fringe the first ones had.
+
+Seen in the browser at 1100 by 620, 1100 by 825 and 844 by 390: three shelves, a prize cup, a cup with silver, bronze and gold stars, an open cup with none, shut cups with their bar, and "Next up!" on the first shut one. An open cup opens its line-up; the close button is what a tap in its middle reaches. 998 tests pass; `tsc` and the build are clean.
+
+Still true: on an iPad the whole screen sits in a 16:9 window with bands above and below, until the backgrounds are redone at 4:3.
+
+## The first 4:3 background
+
+Nick's new first-screen picture (2732 by 2048, full colour) was checked: sharp at full size, the same scene as the old one extended up and down, and the middle band an iPhone would show holds the cottage, lake, mountain and waterfall. Good to use. Not wired in yet: the screens still fit inside the device rather than filling it.

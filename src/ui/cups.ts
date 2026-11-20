@@ -139,6 +139,8 @@ export function cupsScreen(app: App): HTMLElement {
   const art = (name: string) => asset(`assets/cups/${name}.webp`);
   /** The shelf each world's cups stand on. A world with no picture of its own borrows the meadow's. */
   const SHELVES: Record<string, string> = { meadow: 'shelf-meadow', tropics: 'shelf-tropics', village: 'shelf-village' };
+  /** A flower from each world, for its sign. */
+  const BLOOMS: Record<string, string> = { meadow: 'daisy', tropics: 'hibiscus-red', village: 'hibiscus-pink' };
   // The first cup still shut is the one to work towards.
   const nextUp = CUPS.find((cup) => !cupOpen(save, cup));
 
@@ -156,7 +158,9 @@ export function cupsScreen(app: App): HTMLElement {
         ...DIFFICULTIES.map(({ id, name }) => {
           const shut = id === 'legendary' && !cupLegendaryOpen(save, cup);
           const star = shut ? 'star-locked' : !won?.[id] ? 'star-unearned' : id === 'legendary' ? 'star-legend' : 'star-earned';
-          return el(`span${id === (save.race ?? 'easy') ? '.mine' : ''}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('img', { src: art(star), alt: '', draggable: false }), won?.[id] ? el('i', {}, TROPHY[won[id]!] ?? '') : null, name);
+          // The star takes the colour of the trophy won there: gold, silver or bronze. Legendary's own star is for winning it.
+          const metal = id !== 'legendary' && won?.[id] ? ['', 'gold', 'silver', 'bronze'][won[id]!] : '';
+          return el(`span.${metal || (!shut && !won?.[id] ? 'none' : 'plain')}`, { title: won?.[id] ? `${name}: ${ORDINAL[won[id]!]}` : `${name}: not won yet` }, el('img', { src: art(star), alt: '', draggable: false }), name);
         }),
       );
       const done = cup.levels.filter((id) => save.levels[id]).length;
@@ -172,12 +176,9 @@ export function cupsScreen(app: App): HTMLElement {
           open ? null : el('img.shelf-lock', { src: asset('assets/ui/lock.png'), alt: 'Locked', draggable: false }),
           champion ? el('span.cup-crown', {}, '👑') : null,
         ),
-        el(
-          'div.shelf-plinth',
-          {},
-          el('b', {}, cup.name),
-          ...(open ? [stars] : [el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`), el('div.shelf-progress', {}, el('i', { style: `width:${(done / CUP_RACES) * 100}%` }), el('span', {}, `${done} / ${CUP_RACES}`))]),
-        ),
+        // The cup stands on a plinth with its name on, and under that what has been won, or what it takes to open.
+        el('div.shelf-plinth', {}, el('img', { src: art('plinth'), alt: '', draggable: false }), el('b', {}, cup.name)),
+        el('div.shelf-under', {}, ...(open ? [stars] : [el('small', {}, `Finish levels ${levelById(cup.levels[0]).label} to ${levelById(cup.levels[CUP_RACES - 1]).label}`), el('div.shelf-progress', {}, el('i', { style: `width:${(done / CUP_RACES) * 100}%` }), el('span', {}, `${done} / ${CUP_RACES}`))])),
       );
       onTap(tile, () => {
         if (!open) {
@@ -192,7 +193,7 @@ export function cupsScreen(app: App): HTMLElement {
       });
       strip.append(tile);
     }
-    body.append(el(`section.shelf.${world.id}`, {}, el('img.shelf-art', { src: art(SHELVES[world.id] ?? 'shelf-meadow'), alt: '', draggable: false }), el('div.shelf-sign', {}, world.name), strip));
+    body.append(el(`section.shelf.${world.id}`, {}, el('img.shelf-art', { src: art(SHELVES[world.id] ?? 'shelf-meadow'), alt: '', draggable: false }), el('div.shelf-sign', {}, el('img', { src: art(BLOOMS[world.id] ?? 'daisy'), alt: '', draggable: false }), world.name), strip));
   });
 
   const close = el('button.round.book-close', { ariaLabel: 'Back to map' }, '✕');
@@ -200,7 +201,8 @@ export function cupsScreen(app: App): HTMLElement {
     sfx.tap();
     app.show('map');
   });
-  stage.append(el('div.book.cups-book', {}, el('h2.cups-ribbon', {}, el('span', {}, 'Cups')), body, close));
+  const vine = (side: string) => el(`img.cups-vine.${side}`, { src: asset(`assets/cups/vine-${side}.webp`), alt: '', draggable: false });
+  stage.append(el('div.book.cups-book', {}, vine('left'), vine('right'), el('h2.cups-ribbon', {}, el('span', {}, 'Cups')), body, close));
   return stage;
 }
 
