@@ -141,6 +141,8 @@ export function cupsScreen(app: App): HTMLElement {
   const SHELVES: Record<string, string> = { meadow: 'shelf-meadow', tropics: 'shelf-tropics', village: 'shelf-village' };
   /** A flower from each world, for its sign. */
   const BLOOMS: Record<string, string> = { meadow: 'daisy', tropics: 'hibiscus-red', village: 'hibiscus-pink' };
+  /** Plants at each end of a shelf, in front of the cups: they slide out from behind leaves instead of being cut off straight. */
+  const EDGES: Record<string, string[]> = { meadow: ['daisies', 'daisy'], tropics: ['hibiscus-bush', 'monstera'], village: ['hibiscus-pink', 'daisies'] };
   // The first cup still shut is the one to work towards.
   const nextUp = CUPS.find((cup) => !cupOpen(save, cup));
 
@@ -193,7 +195,7 @@ export function cupsScreen(app: App): HTMLElement {
       });
       strip.append(tile);
     }
-    body.append(el(`section.shelf.${world.id}`, {}, el('img.shelf-art', { src: art(SHELVES[world.id] ?? 'shelf-meadow'), alt: '', draggable: false }), el('div.shelf-sign', {}, el('img', { src: art(BLOOMS[world.id] ?? 'daisy'), alt: '', draggable: false }), world.name), strip));
+    body.append(el(`section.shelf.${world.id}`, {}, el('img.shelf-art', { src: art(SHELVES[world.id] ?? 'shelf-meadow'), alt: '', draggable: false }), el('div.shelf-sign', {}, el('img', { src: art(BLOOMS[world.id] ?? 'daisy'), alt: '', draggable: false }), world.name), strip, ...['left', 'right'].map((side) => el(`div.shelf-edge.${side}`, {}, ...(EDGES[world.id] ?? EDGES.meadow).map((name) => el('img', { src: art(name), alt: '', draggable: false }))))));
   });
 
   const close = el('button.round.book-close', { ariaLabel: 'Back to map' }, '✕');

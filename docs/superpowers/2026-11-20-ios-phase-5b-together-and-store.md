@@ -318,3 +318,7 @@ Still true: on an iPad the whole screen sits in a 16:9 window with bands above a
 ## The first 4:3 background
 
 Nick's new first-screen picture (2732 by 2048, full colour) was checked: sharp at full size, the same scene as the old one extended up and down, and the middle band an iPhone would show holds the cottage, lake, mountain and waterfall. Good to use. Not wired in yet: the screens still fit inside the device rather than filling it.
+
+## Cups screen: softening the ends of each row, 2026-11-20
+
+Nick's screenshots showed cups and their panels cut off at a straight vertical line at each end of a row. Now the row fades out over its last 4 units at each end, and each world's plants stand in front of both ends (daisies for the meadow, hibiscus and a monstera leaf for the falls, pink hibiscus and daisies for the village), so cups slide out from behind leaves. The plants sit inside the frame so they are not cut themselves, and taps pass through them. Seen in the browser with both rows scrolled: no straight cut at either end.

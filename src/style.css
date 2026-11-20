@@ -3563,11 +3563,15 @@ input.name {
 /* The cups stand along the shelf and can be drawn along it with a finger when there are more than fit. */
 .shelf-cups {
   position: absolute;
-  inset: 0 5.5% -3.6cqw 5.5%;
+  inset: 0 3.5% -3.6cqw 3.5%;
   display: flex;
   align-items: flex-end;
   gap: 0.7cqw;
-  padding: 0 0.6cqw 0.4cqw;
+  padding: 0 4.2cqw 0.4cqw;
+  scroll-padding: 0 4.2cqw;
+  /* The cups fade out at each end instead of stopping at a straight line. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4cqw, #000 calc(100% - 4cqw), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 4cqw, #000 calc(100% - 4cqw), transparent);
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x proximity;
@@ -3816,4 +3820,43 @@ input.name {
     font-size: 1.15cqw;
     line-height: 1.25cqw;
   }
+}
+
+/* Plants in front of each end of a shelf. Taps pass through them. */
+.shelf-edge {
+  position: absolute;
+  bottom: -4.4cqw;
+  z-index: 2;
+  width: 9cqw;
+  height: 13cqw;
+  pointer-events: none;
+}
+
+.shelf-edge.left {
+  left: 0;
+}
+
+.shelf-edge.right {
+  right: 0;
+  scale: -1 1;
+}
+
+.shelf-edge img {
+  position: absolute;
+  filter: drop-shadow(0 0.25cqw 0.2cqw rgba(0, 0, 0, 0.3));
+}
+
+/* A bushy clump at the foot, and something taller leaning in above it. */
+.shelf-edge img:first-child {
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 9.6cqw;
+}
+
+.shelf-edge img:last-child {
+  left: 0.3cqw;
+  bottom: 4.4cqw;
+  width: 6cqw;
+  rotate: -14deg;
 }
