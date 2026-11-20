@@ -3254,3 +3254,213 @@ input.name {
   margin: 0.2em 0 0;
   color: #9a6a3a;
 }
+
+/* ---------- picture cards for races and cups, and the row to swipe through ---------- */
+
+.race-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2em;
+  width: 9.5em;
+  height: 10.5em;
+  padding: 0.5em 0.4em 0.55em;
+  color: #4a2a08;
+  background: linear-gradient(#bfe9ff, #eaf8d8 62%, #c9ef9a);
+  border: 0.22em solid #fff;
+  border-radius: 1.1em;
+  box-shadow:
+    0 0 0 0.14em #b9772f,
+    0 0.4em 0 rgba(0, 0, 0, 0.22);
+}
+
+.race-card.night,
+.race-card.midnight {
+  color: #fff;
+  background: linear-gradient(#1d2456, #3b3f8a 62%, #2d6a4f);
+}
+
+.race-card.rain {
+  background: linear-gradient(#9fb3c8, #d5dfe8 62%, #a9d18e);
+}
+
+.race-card.snow {
+  background: linear-gradient(#cfe8ff, #ffffff 62%, #e4f1fb);
+}
+
+.race-card.cup-face {
+  color: #fff;
+  background: linear-gradient(#5b46c9, #8a63ea 62%, #b08cf5);
+}
+
+.race-card img {
+  flex: 1;
+  min-height: 0;
+  max-width: 78%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.25em 0.15em rgba(0, 0, 0, 0.3));
+}
+
+.race-card b {
+  font-size: 0.95em;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.race-card-n {
+  position: absolute;
+  left: -0.5em;
+  top: -0.5em;
+  min-width: 1.9em;
+  height: 1.9em;
+  padding: 0 0.3em;
+  font-weight: 800;
+  line-height: 1.9;
+  text-align: center;
+  color: #fff;
+  background: #e8552d;
+  border: 0.14em solid #fff;
+  border-radius: 99em;
+  box-shadow: 0 0.15em 0 rgba(0, 0, 0, 0.25);
+}
+
+.race-card-sky {
+  position: absolute;
+  right: 0.35em;
+  top: 0.25em;
+  font-size: 1.2em;
+}
+
+.race-card .cup-art {
+  flex: 1;
+  width: 6.2em;
+  height: auto;
+  min-height: 0;
+  font-size: 1em;
+}
+
+.race-card .cup-art .cup-fruit {
+  flex: none;
+  max-width: none;
+}
+
+.lineup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
+  margin: 0.7em 0 0.5em;
+}
+
+.lineup .race-card {
+  width: 6.6em;
+  height: 7.2em;
+  font-size: 0.8em;
+}
+
+.lineup-arrow {
+  font-size: 1.3em;
+  color: #c0551a;
+}
+
+.lineup .race-card.done {
+  opacity: 0.55;
+}
+
+.lineup .race-card.done .race-card-n {
+  background: #3fa63a;
+}
+
+.lineup .race-card.next {
+  transform: scale(1.12);
+  box-shadow:
+    0 0 0 0.2em #ffd23f,
+    0 0 1em 0.3em rgba(255, 210, 63, 0.8),
+    0 0.4em 0 rgba(0, 0, 0, 0.22);
+  animation: bob 1.3s ease-in-out infinite;
+}
+
+.lineup .race-card.later {
+  opacity: 0.85;
+}
+
+.lineup-card {
+  min-width: 34em;
+}
+
+.lineup-ask {
+  margin-bottom: 0.4em;
+}
+
+.reel {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0.2em 0 0.4em;
+}
+
+.reel-track {
+  position: relative;
+  display: flex;
+  flex: 1;
+  gap: 0.1em;
+  padding: 1.1em calc(50% - 5.2em) 1em;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  touch-action: pan-x;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.reel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.reel-card {
+  flex: none;
+  padding: 0;
+  font: inherit;
+  background: none;
+  border: 0;
+  scroll-snap-align: center;
+  transition: opacity 0.12s;
+}
+
+.reel-card.on .race-card {
+  box-shadow:
+    0 0 0 0.2em #ffd23f,
+    0 0 1em 0.3em rgba(255, 210, 63, 0.75),
+    0 0.4em 0 rgba(0, 0, 0, 0.22);
+}
+
+.btn.reel-arrow {
+  flex: none;
+  padding: 0.5em 0.7em;
+}
+
+.party-card.wide {
+  width: 44em;
+  max-width: 94%;
+}
+
+.party-art {
+  display: flex;
+  justify-content: center;
+  margin: 0.6em 0 0.4em;
+}
+
+.party-races {
+  min-height: 6.6em;
+}
+
+.party-races .lineup {
+  margin: 0.1em 0 0.3em;
+}
+
+.btn.party-choice.locked {
+  filter: grayscale(0.8);
+  opacity: 0.7;
+}

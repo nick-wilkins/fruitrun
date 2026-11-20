@@ -267,3 +267,17 @@ Walked with real button presses, two tabs, sound off, saves not written:
 - NOT RUN in the browser: the last friend leaving mid-race sending the starter to the waiting room (it uses the same step as the case above).
 
 Tests: 1 new, shown failing first. 998 pass.
+
+## Picture pickers and the cup line-up, 2026-11-20
+
+Nick asked for a cup to show its four races as a graphic, Mario Kart style, alone or with friends, and for the starter's choosing to suit a six or seven year old: choose cup or single race, then swipe through cards.
+
+- `src/ui/cards.ts`: a race as a picture card (its fruit, number, name, weather, a sky for its mood), a cup as a card (trophy with its fruit), a cup's four races as a numbered row with arrows, and a row of cards to swipe through, the middle one forward and the others turned away. Arrows either side do the same as a swipe, and tapping a side card brings it to the middle.
+- With friends, the starter first chooses "One race" or "A cup" on two big buttons (the cup one is locked until a cup is open), then swipes through races or cups. Under the cups, the chosen cup's four races are shown. Back returns to the first choice.
+- "Get ready!" and "Sam picked a cup" show the race as its card, or the cup's four races with this one glowing and those already run ticked. The table between cup races shows the same row.
+- Alone, choosing a cup shows its four races above the speeds; carrying on with a cup shows them with the next one glowing.
+
+No new tests: these are screens over tested rules. 998 pass; `tsc` and the build are clean.
+
+Seen in the browser, 2026-11-20: the two big buttons; the race row with Strawberry Fields in the middle and its neighbours turned away, moved on by the arrow; the cup row with the Grapes Cup's four races beneath, changing with the cup; the joiner's "Sam picked a cup" with race 1 glowing; the solo cup dialog with the four races.
+NOT RUN: swiping with a finger (the row scrolls natively; only the arrows were pressed).

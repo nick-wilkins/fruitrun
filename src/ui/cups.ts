@@ -4,6 +4,7 @@ import { DIFFICULTIES, type Difficulty } from '../core/race';
 import { ingredient } from '../data/ingredients';
 import { levelById, WORLDS } from '../data/levels';
 import type { App } from './app';
+import { cupLineup, trophySvg } from './cards';
 import { asset, el, onTap } from './dom';
 import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
@@ -12,7 +13,6 @@ const TROPHY = ['', '🥇', '🥈', '🥉'];
 const METAL = ['none', 'gold', 'silver', 'bronze'];
 
 /** A two-handled trophy cup, in whatever colour it is given. */
-const trophySvg = `<svg viewBox="0 0 64 64"><path d="M14 10h36v12c0 12-7 20-18 20S14 34 14 22z" fill="currentColor"/><path d="M14 14H6c0 10 4 16 12 17M50 14h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><rect x="28" y="40" width="8" height="10" fill="currentColor"/><rect x="18" y="49" width="28" height="8" rx="3" fill="currentColor"/><path d="M20 13h8v14c-5-2-8-7-8-14z" fill="#fff" opacity=".35"/></svg>`;
 const BASE = '<rect x="28" y="40" width="8" height="10" fill="currentColor"/><rect x="18" y="49" width="28" height="8" rx="3" fill="currentColor"/>';
 const HANDLES = '<path d="M14 14H6c0 10 4 16 12 17M50 14h8c0 10-4 16-12 17" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>';
 const STAR = '<path class="mark" d="M32 13l3.4 7 7.6 1-5.5 5.3 1.3 7.6L32 30.3l-6.8 3.6 1.3-7.6L21 21l7.6-1z"/>';
@@ -51,11 +51,12 @@ export function cupsScreen(app: App): HTMLElement {
       'div.modal',
       { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() },
       el(
-        'div.card.small',
+        'div.card.small.lineup-card',
         {},
-        el('h2', {}, cup.name),
-        el('p', {}, `${CUP_RACES} races: ${cup.levels.map((id) => levelById(id).name).join(', ')}.`),
+        el('h2', {}, `🏆 ${cup.name}`),
+        cupLineup(cup),
         el('div.kicker.small', {}, `Points each race: ${CUP_POINTS.join(', ')}. Most points takes the trophy!`),
+        el('p.lineup-ask', {}, 'How fast shall they be?'),
         el(
           'div.row',
           {},
@@ -110,11 +111,12 @@ export function cupsScreen(app: App): HTMLElement {
       'div.modal',
       { onclick: (e: MouseEvent) => e.target === e.currentTarget && dialog.remove() },
       el(
-        'div.card.small',
+        'div.card.small.lineup-card',
         {},
         el('div.kicker', {}, `${cup.name} · ${hardness(run.difficulty)}`),
         el('h2', {}, `Race ${run.race + 1} of ${CUP_RACES} is next`),
-        run.race ? table(standings(save)) : el('p', {}, `First up: ${levelById(cup.levels[0]).name}.`),
+        cupLineup(cup, run.race),
+        run.race ? table(standings(save)) : null,
         el('div.row', {}, button('Give up', 'orange', () => (giveUp(), app.show('cups'))), button('Carry on ▶', 'green.big', () => app.playCup())),
       ),
     );

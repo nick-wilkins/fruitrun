@@ -6,6 +6,7 @@ import { SEATS } from '../core/race';
 import { LEVELS } from '../data/levels';
 import { toldStore } from '../platform';
 import type { App } from './app';
+import { carousel, cupCard, cupLineup, raceCard } from './cards';
 import { asset, el } from './dom';
 import { ORDINAL } from './hud';
 import { setBackdrop } from './screen';
@@ -22,6 +23,8 @@ const WHY = {
 /** The level and the cup the host last picked, kept while the game stays open. */
 let picked: string | null = null;
 let pickedCup: string | null = null;
+/** Where the starter is in choosing: what kind of game, then which race or which cup. */
+let choosing: 'kind' | 'race' | 'cup' = 'kind';
 
 /** A question about leaving that is up. The screen is drawn afresh whenever the game changes, and the question with it. */
 let asking: { label: string; ask: string; race: number } | null = null;
@@ -41,9 +44,17 @@ export function partyScreen(app: App): HTMLElement {
   setBackdrop(asset('assets/stall.webp'));
   const button = (label: string, color: string, onclick: () => void) => el(`button.btn.${color}`, { onclick: () => (sfx.tap(), onclick()) }, label);
   const card = (...children: (Node | string | null)[]) => stage.append(el('div.card.unlock-card.party-card', {}, ...children));
+  const wide = (...children: (Node | string | null)[]) => stage.append(el('div.card.unlock-card.party-card.wide', {}, ...children));
+  /** A big button with a picture on it, for a choice between two things. */
+  const bigChoice = (icon: string, label: string, color: string, then: () => void) => el(`button.btn.${color}.party-choice`, { onclick: () => (sfx.tap(), then()) }, el('span', {}, icon), label);
+  const step = (to: typeof choosing) => () => {
+    choosing = to;
+    app.show('party');
+  };
   const called = (id: string, name: string) => (id === party.me ? `${name} (you)` : name);
   const go = () => {
     asking = null;
+    choosing = 'kind';
     party.leave();
     app.show('map');
   };
@@ -66,7 +77,15 @@ export function partyScreen(app: App): HTMLElement {
   const CLOSE = 'Close the game for everyone?';
   const LEAVE = 'Leave the game with your friends?';
   const offer = party.offer;
-  const offered = offer ? `${offer.cup ? `🏆 ${cupById(offer.cup)?.name ?? 'Cup'}: ` : ''}${LEVELS.find((level) => level.id === offer.level)?.name ?? 'the next race'}` : '';
+  /** What has been picked, as a picture: the race, or the cup's four races with this one standing out. */
+  const offered = (): (Node | null)[] => {
+    const level = offer && LEVELS.find((each) => each.id === offer.level);
+    const inCup = offer?.cup ? cupById(offer.cup) : undefined;
+    if (!offer || !level) return [];
+    if (!inCup) return [el('div.party-art', {}, raceCard(level))];
+    const race = inCup.levels.indexOf(level.id);
+    return [el('p.party-next', {}, `🏆 ${inCup.name} · race ${race + 1} of ${inCup.levels.length}`), cupLineup(inCup, race)];
+  };
   /** Everyone in, each with a tick once they are ready. */
   const readying = () => players((id, seat) => (party.readyIds.includes(id) || seat === 0 ? '✅' : '⏳'));
   // Everyone has their seat's colour, here and on the road, the same on every device.
@@ -92,11 +111,12 @@ export function partyScreen(app: App): HTMLElement {
     } else if (!party.canStart()) {
       card(el('h2', {}, 'Your game'), players(), el('p', {}, 'Waiting for everyone to finish…'), el('div.row', {}, leave('Close game', CLOSE)));
     } else if (offer) {
-      card(el('h2', {}, 'Get ready!'), el('p.party-next', {}, offered), readying(), el('p', {}, 'The race starts when everyone has tapped Ready.'), el('div.row', {}, leave('Close game', CLOSE), button('Pick again', 'orange', () => party.unpick())));
+      wide(el('h2', {}, 'Get ready!'), ...offered(), readying(), el('p', {}, 'The race starts when everyone has tapped Ready.'), el('div.row', {}, leave('Close game', CLOSE), button('Pick again', 'orange', () => party.unpick())));
     } else if (cup && cup.race > 0) {
       card(
         el('h2', {}, cupHeading),
         table(),
+        cupOver || !cupById(cup.id) ? null : cupLineup(cupById(cup.id)!, cup.race),
         el(
           'div.row',
           {},
@@ -106,28 +126,46 @@ export function partyScreen(app: App): HTMLElement {
         ),
       );
     } else {
-      // Whoever started the game chooses, from what they have opened themselves.
-      const picker = <T extends { id: string }>(open: T[], first: string | null, label: (each: T) => string, keep: (id: string) => void, go: string, start: (each: T) => void) => {
-        let at = Math.max(0, open.findIndex((each) => each.id === first));
-        const name = el('b.party-level');
-        const turn = (step: number) => {
-          at = (at + step + open.length) % open.length;
-          keep(open[at].id);
-          name.textContent = label(open[at]);
-        };
-        turn(0);
-        return el('div.row.party-pick', {}, button('◀', 'blue', () => turn(-1)), name, button('▶', 'blue', () => turn(1)), button(go, 'green', () => start(open[at])));
-      };
+      // Whoever started the game chooses, from what they have opened themselves: first what kind of game, then which.
       const levels = LEVELS.filter((level) => isUnlocked(app.save, level));
       const cups = CUPS.filter((each) => cupOpen(app.save, each));
-      card(
-        el('h2', {}, 'Your game'),
-        players(),
-        el('p', {}, 'Pick a race or a cup!'),
-        picker(levels, picked ?? app.save.last ?? null, (level) => `${level.n}. ${level.name}`, (id) => (picked = id), 'Race ▶', (level) => party.pick({ level: level.id })),
-        cups.length ? picker(cups, pickedCup, (each) => `🏆 ${each.name}`, (id) => (pickedCup = id), 'Cup ▶', (each) => party.pick({ cup: each.id, levels: each.levels })) : null,
-        el('div.row', {}, leave('Close game', CLOSE)),
-      );
+      if (choosing === 'cup' && !cups.length) choosing = 'kind';
+      const back = button('Back', 'purple', step('kind'));
+      if (choosing === 'race') {
+        let chosen = levels[0];
+        const start = Math.max(0, levels.findIndex((level) => level.id === (picked ?? app.save.last)));
+        wide(
+          el('h2', {}, 'Pick a race'),
+          carousel(levels, (level) => raceCard(level), start, (level) => {
+            chosen = level;
+            picked = level.id;
+          }),
+          el('div.row', {}, back, button('Race! ▶', 'green.big', () => party.pick({ level: chosen.id }))),
+        );
+      } else if (choosing === 'cup') {
+        let chosen = cups[0];
+        const races = el('div.party-races');
+        const start = Math.max(0, cups.findIndex((each) => each.id === pickedCup));
+        wide(
+          el('h2', {}, 'Pick a cup'),
+          carousel(cups, cupCard, start, (each) => {
+            chosen = each;
+            pickedCup = each.id;
+            races.replaceChildren(cupLineup(each));
+          }),
+          races,
+          el('div.row', {}, back, button('Start cup ▶', 'green.big', () => party.pick({ cup: chosen.id, levels: chosen.levels }))),
+        );
+      } else {
+        const noCups = () => app.toast('Finish four levels in a row to open a cup!');
+        card(
+          el('h2', {}, 'Your game'),
+          players(),
+          el('p', {}, 'What shall we play?'),
+          el('div.row.party-choices', {}, bigChoice('🏁', 'One race', 'green', step('race')), cups.length ? bigChoice('🏆', 'A cup', 'orange', step('cup')) : bigChoice('🔒', 'A cup', 'orange.locked', noCups)),
+          el('div.row', {}, leave('Close game', CLOSE)),
+        );
+      }
     }
   } else if (party.phase === 'browsing') {
     card(
@@ -141,15 +179,15 @@ export function partyScreen(app: App): HTMLElement {
     // Home before the others, or out of the race: the table and the choosing wait for them.
     if (offer) {
       const ready = party.readyIds.includes(party.me);
-      card(
-        el('h2', {}, ready ? 'Ready!' : `${host} picked a race`),
-        el('p.party-next', {}, offered),
+      wide(
+        el('h2', {}, ready ? 'Ready!' : offer.cup ? `${host} picked a cup` : `${host} picked a race`),
+        ...offered(),
         readying(),
         ready ? el('p', {}, 'Waiting for the others…') : null,
         el('div.row', {}, leave('Leave', LEAVE), ready ? null : button("I'm ready! ▶", 'green.big', () => party.ready())),
       );
     } else if (party.racing()) card(el('h2', {}, `${host}'s game`), players(), el('p', {}, 'The others are still racing…'), el('div.row', {}, leave('Leave', LEAVE)));
-    else if (cup && cup.race > 0) card(el('h2', {}, cupHeading), table(), el('p', {}, cupOver ? `Waiting for ${host} to choose what is next…` : `Waiting for ${host} to start the next race…`), el('div.row', {}, leave('Leave', LEAVE)));
+    else if (cup && cup.race > 0) card(el('h2', {}, cupHeading), table(), cupOver || !cupById(cup.id) ? null : cupLineup(cupById(cup.id)!, cup.race), el('p', {}, cupOver ? `Waiting for ${host} to choose what is next…` : `Waiting for ${host} to start the next race…`), el('div.row', {}, leave('Leave', LEAVE)));
     else card(el('h2', {}, `${host}'s game`), players(), el('p', {}, `Waiting for ${host} to choose a map…`), el('div.row', {}, leave('Leave', LEAVE)));
   } else if (party.phase === 'closed' && party.why === 'ended') {
     card(el('h2', {}, 'Game over'), el('p', {}, party.closedBy ? `The game with ${party.closedBy} has ended.` : 'The game has ended.'), el('div.row', {}, leave('Back to map')));
@@ -169,7 +207,7 @@ export function partyScreen(app: App): HTMLElement {
       dialog.append(el('div.card.small.wordy', {}, el('h2', {}, '📡 One thing first'), el('p', {}, 'To find your friends, the game looks for other iPads and iPhones close by. If you are asked to let it, tap Allow.'), el('p.unlock-note', {}, 'It works without the internet and needs no account. Devices close by can see your player name.'), el('div.row', {}, el('button.btn.purple', { onclick: () => dialog.remove() }, 'Back'), ok)));
       stage.append(dialog);
     };
-    const choice = (icon: string, label: string, color: string, then: () => void) => el(`button.btn.${color}.party-choice`, { onclick: () => (sfx.tap(), go(then)) }, el('span', {}, icon), label);
+    const choice = (icon: string, label: string, color: string, then: () => void) => bigChoice(icon, label, color, () => go(then));
     card(
       el('h2', {}, '👫 Play together'),
       party.why ? el('p.unlock-wait', {}, WHY[party.why]) : el('p', {}, 'Race friends who are close by, each on their own iPad or iPhone.'),
