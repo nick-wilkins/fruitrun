@@ -38,7 +38,7 @@ Up to four can play.
 
 **How do I remove a player?**
 
-On the first screen tap Carry On, then the ✕ next to the player's name. Their stars, fruit and best times are removed for good.
+On the first screen tap "Playing as" at the bottom, then the ✕ next to the player's name. Their stars, fruit and best times are removed for good.
 
 **Will I lose my progress if I delete the game?**
 

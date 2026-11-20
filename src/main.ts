@@ -359,7 +359,9 @@ function owns(owned: boolean): void {
   if (owned === shopNow().owned) return;
   stock({ ...shopNow(), owned, pending: owned ? false : shopNow().pending });
   if (owned) askedStore.clear();
-  if (!run && ['map', 'cups', 'cuptable', 'unlock', 'party'].includes(showing)) app.show(showing);
+  // A game with friends cannot be kept open from behind the lock.
+  else party.leave();
+  if (!run && (['map', 'unlock', ...PAID] as Screen[]).includes(showing)) app.show(showing);
 }
 // A grown-up's yes, a purchase on another device or a refund can arrive at any time.
 store.onChange(owns);

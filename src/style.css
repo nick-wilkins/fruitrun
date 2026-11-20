@@ -3212,10 +3212,10 @@ input.name {
 
 .menu-grownups {
   position: absolute;
-  left: 1.6cqw;
-  top: 1.6cqw;
-  padding: 0.25em 1em;
+  left: 2.4cqw;
+  top: 2.4cqw;
+  padding: 0.8em 1.3em;
   font: inherit;
-  font-size: 0.8em;
+  font-size: 1em;
   cursor: pointer;
 }

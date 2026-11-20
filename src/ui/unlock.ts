@@ -4,6 +4,9 @@ import { asset, el } from './dom';
 import { grownUpGate } from './gate';
 import { setBackdrop } from './screen';
 
+/** What to tell a grown-up after asking the store what the account owns: yes, no, or no answer. */
+export const restoreNote = (owned: boolean | null) => (owned ? 'Races, cups and playing together are unlocked.' : owned === null ? 'The store could not be reached. Please try again.' : 'No purchase was found for this Apple account.');
+
 /** Where races, cups and playing together are offered. The child sees what they are; the buying sits behind a sum for a grown-up. */
 export function unlockScreen(app: App): HTMLElement {
   const stage = el('div.stage.book-stage');
@@ -50,7 +53,7 @@ export function unlockScreen(app: App): HTMLElement {
       if (!dialog.isConnected) return;
       if (owned) return app.show('unlock');
       busy(false);
-      note.textContent = owned === null ? 'The store could not be reached. Please try again.' : 'No purchase was found for this Apple account.';
+      note.textContent = restoreNote(owned);
     };
     return el('div.card.small.wordy', {}, el('h2', {}, 'Unlock races and cups'), el('p', {}, 'Races, cups and playing together with friends nearby. One payment. No adverts and nothing else to buy.'), note, el('div.row', {}, back, restore, buy));
   };

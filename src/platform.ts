@@ -40,6 +40,14 @@ export const askedStore = {
   clear: () => void Preferences.remove({ key: ASKED_KEY }).catch(() => {}),
 };
 
+const TOLD_KEY = 'fruitrun.nearby.told';
+
+/** Whether this device has been told what the system's question about nearby devices is for. */
+export const toldStore = {
+  get: async () => (await Preferences.get({ key: TOLD_KEY })).value === '1',
+  set: () => void Preferences.set({ key: TOLD_KEY, value: '1' }).catch(() => {}),
+};
+
 /** Call `handler` each time the app comes back to the front. */
 export function onResume(handler: () => void): void {
   void NativeApp.addListener('resume', handler);

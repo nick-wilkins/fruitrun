@@ -59,3 +59,22 @@ Run 2026-11-20 on `ios`, dev server, sound off, stand-in shop and transport.
 ## Seen and left
 
 - Two devices whose players are both called "Player 1" read alike in the waiting room; only the colour tells them apart.
+
+## Review (`/code-review medium` on f654b6d) and fixes
+
+Nine findings, all fixed:
+
+- The wording said nothing leaves the room. A game is announced under the player's name to devices close by or on the same Wi-Fi, so the explainer, the grown-ups section and the privacy draft now say that.
+- A refund while a game was open left it open with no screen to close it: losing the unlock now closes the game.
+- The told-once note was kept where the device can clear it: it is now in the app's settings store.
+- Restore in the grown-ups section could be missing for an owner whose answer from the store had not arrived, and was a second copy of the wording: it is always offered and the wording is shared.
+- "Waiting for X to press Start" was untrue while X was racing: now "to start a race".
+- The Grown-ups chip was too small to tap on a phone: 44 points tall at iPhone width.
+- The help draft's way to remove a player did not work with one player.
+- Two small tidies in the play together screen.
+
+Re-verified 2026-11-20: `tsc` clean, 956 tests. Browser: the note shows once and is remembered in the settings store; the unlock going while hosting closes the game and shows the unlock screen; the chip measures 118 by 44 at 844 wide.
+
+## For Nick
+
+- A game is announced under the player's typed name. The alternative is a made-up name such as "Blue marble's game" until friends have joined. Kept as is, and disclosed.

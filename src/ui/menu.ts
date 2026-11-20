@@ -6,6 +6,7 @@ import { asset, el, onTap } from './dom';
 import { grownUpGate } from './gate';
 import { pipSvg } from './pip';
 import { setBackdrop } from './screen';
+import { restoreNote } from './unlock';
 
 export function menuScreen(app: App): HTMLElement {
   const stage = el('div.stage.menu-stage');
@@ -132,19 +133,19 @@ export function menuScreen(app: App): HTMLElement {
       restore.disabled = back.disabled = true;
       note.textContent = 'Asking the store…';
       const owned = await app.restore();
+      if (!dialog.isConnected) return;
       dialog.classList.remove('busy');
-      back.disabled = false;
-      restore.disabled = owned === true;
-      note.textContent = owned ? 'Races, cups and playing together are unlocked.' : owned === null ? 'The store could not be reached. Please try again.' : 'No purchase was found for this Apple account.';
+      restore.disabled = back.disabled = false;
+      note.textContent = restoreNote(owned);
     };
     return el(
       'div.card.small.wordy',
       {},
       el('h2', {}, 'For grown-ups'),
-      el('p', {}, 'Smoothie Scramble has no adverts, no accounts and no tracking. Nothing your child does is collected or sent anywhere: it all stays on this device.'),
-      el('p', {}, 'Playing together talks only to the iPads and iPhones in the same room.'),
+      el('p', {}, 'Smoothie Scramble has no adverts, no accounts and no tracking. We collect nothing: progress stays on this device.'),
+      el('p', {}, 'Playing together connects straight to iPads and iPhones close by, without the internet. While a game is open, those devices can see the player name.'),
       note,
-      el('div.row', {}, back, page('Privacy', PRIVACY_PAGE), page('Help', HELP_PAGE), app.shop.owned ? null : restore),
+      el('div.row', {}, back, page('Privacy', PRIVACY_PAGE), page('Help', HELP_PAGE), restore),
     );
   };
   const grownUps = el('button.chip.menu-grownups', {}, 'Grown-ups');
