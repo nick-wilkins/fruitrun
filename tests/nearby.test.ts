@@ -51,6 +51,13 @@ describe('messages between devices', () => {
     expect(decode(encode({ t: 'start', n: 2, level: 'level-3' }))).toEqual({ t: 'start', n: 2, level: 'level-3' });
   });
 
+  it('carry a cup table', () => {
+    const table = { t: 'cup' as const, id: 'cup-0-1', race: 1, of: 4, points: [{ id: 'host', p: 10 }, { id: 'd2', p: 7 }] };
+    expect(decode(encode(table))).toEqual(table);
+    expect(decode('{"t":"cup","id":"cup-0-1","race":1,"of":4,"points":[{"id":"host","p":"lots"}]}')).toBeNull();
+    expect(decode(encode({ t: 'nocup' }))).toEqual({ t: 'nocup' });
+  });
+
   it('are dropped when they are not what they claim', () => {
     expect(decode('not json')).toBeNull();
     expect(decode('{"t":"pos","lane":"x"}')).toBeNull();
@@ -262,5 +269,79 @@ describe('a party', () => {
     kit.join(kit.hosts[0].id);
     expect(kit.why).toBe('racing');
     expect(sam.players).toHaveLength(2);
+  });
+
+  it('races a cup: points for each place by the host\'s count, the same on every device', () => {
+    const { sam, ada, kit } = gather();
+    const started: string[] = [];
+    for (const party of [sam, ada, kit]) party.onStart = (level) => (started.push(level), true);
+    sam.startCup('cup-0-1', ['level-1', 'level-2']);
+    expect(started).toEqual(['level-1', 'level-1', 'level-1']);
+    expect(kit.cup).toEqual({ id: 'cup-0-1', race: 0, of: 2, points: {} });
+    sam.finished(30);
+    ada.finished(25);
+    // Nothing is counted until everyone is home or out.
+    expect(sam.cup!.race).toBe(0);
+    kit.out();
+    const [, adaId, kitId] = sam.players.map((p) => p.id);
+    for (const party of [sam, ada, kit]) expect(party.cup).toEqual({ id: 'cup-0-1', race: 1, of: 2, points: { [adaId]: 10, host: 7, [kitId]: 0 } });
+    sam.nextRace();
+    expect(started.slice(3)).toEqual(['level-2', 'level-2', 'level-2']);
+    kit.finished(20);
+    ada.finished(21);
+    sam.finished(22);
+    for (const party of [sam, ada, kit]) expect(party.cup).toMatchObject({ race: 2, points: { [adaId]: 17, host: 12, [kitId]: 10 } });
+    // The cup is over: there is no next race.
+    sam.nextRace();
+    expect(started).toHaveLength(6);
+  });
+
+  it('only lets the host start a cup', () => {
+    const { ada, sam } = gather();
+    ada.startCup('cup-0-1', ['level-1']);
+    expect(ada.cup).toBeNull();
+    expect(sam.cup).toBeNull();
+  });
+
+  it('drops the cup for everyone when the host picks a single race instead', () => {
+    const { sam, ada, kit } = gather();
+    sam.startCup('cup-0-1', ['level-1', 'level-2']);
+    for (const party of [sam, ada, kit]) party.finished(30);
+    sam.start('level-5');
+    for (const party of [sam, ada, kit]) expect(party.cup).toBeNull();
+  });
+
+  it('clears a finished cup away for everyone when the host goes to choose again', () => {
+    const { sam, ada, kit } = gather();
+    sam.startCup('cup-0-1', ['level-1']);
+    for (const party of [sam, ada, kit]) party.finished(30);
+    expect(kit.cup!.race).toBe(1);
+    ada.dropCup();
+    expect(ada.cup).not.toBeNull();
+    sam.dropCup();
+    for (const party of [sam, ada, kit]) expect(party.cup).toBeNull();
+  });
+
+  it('shows a newcomer the cup as it stands', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    sam.host();
+    ada.browse();
+    ada.join(ada.hosts[0].id);
+    sam.startCup('cup-0-1', ['level-1', 'level-2']);
+    sam.finished(30);
+    ada.finished(31);
+    kit.browse();
+    kit.join(kit.hosts[0].id);
+    expect(kit.cup).toMatchObject({ race: 1, points: { host: 10 } });
+  });
+
+  it('remembers whose game it was once it has closed', () => {
+    const { sam, ada } = gather();
+    sam.leave();
+    expect(ada.phase).toBe('closed');
+    expect(ada.closedBy).toBe('Sam');
   });
 });

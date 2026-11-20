@@ -12,6 +12,8 @@ export interface HudHandlers {
   restart(): void;
   quit(): void;
   blend(): void;
+  /** With friends: back to where the game is got together. */
+  done?(): void;
   /** In a cup: keep the result and go on to the points table. */
   next?(): void;
   muted(): boolean;
@@ -27,6 +29,8 @@ export interface Hud {
   finished(): void;
   /** `order` is everyone in finishing order, for a race. */
   results(result: RunResult, order?: Finisher[]): void;
+  /** A race with friends is over for this player: the time and the order, with nothing to keep. `on` words the way on. */
+  raced(time: number, order: Finisher[], on: string): void;
   /** The finishing order has moved on since the results went up: a friend still out has come home. */
   standings(order: Finisher[]): void;
 }
@@ -51,7 +55,7 @@ function orderTable(order: Finisher[]): HTMLElement {
   );
 }
 
-export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string, passed = false): Hud {
+export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] = [], cup?: string, passed = false, friends?: string): Hud {
   const fruit = ingredient(level.fruit);
   const root = el('div.hud');
 
@@ -79,7 +83,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
   const count = el('div.countdown');
   const touch = window.matchMedia('(pointer: coarse)').matches;
   const warning = { sunny: '', night: 'Night run! ', midnight: 'Midnight run: follow the lights! ', rain: 'Rain: the road is slippery! ', snow: 'Ice: the road is very slippery! ' }[level.mood];
-  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
+  const hint = el('div.hint', {}, (cup ? `${cup}. ` : '') + (friends ? `${friends} ` : '') + warning + (touch ? 'Swipe left and right to steer' : 'Hold the mouse and slide, or use the arrow keys'));
   const pauseButton = el('button.round.pause', { ariaLabel: 'Pause' }, 'Ⅱ');
 
   const soundButton = el('button.btn.blue', {}, handlers.muted() ? '🔇 Sound off' : '🔊 Sound on');
@@ -99,9 +103,9 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
         {},
         el('button.btn.green', { onclick: () => setPaused(false) }, '▶ Carry on'),
         // A cup race is run once: no starting it again when it is going badly.
-        cup ? null : el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Start level again'),
+        cup || friends ? null : el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Start level again'),
         soundButton,
-        el('button.btn.purple', { onclick: () => handlers.quit() }, cup ? '← Leave the cup for now' : '← Back to map'),
+        el('button.btn.purple', { onclick: () => handlers.quit() }, friends ? '← Leave this race' : cup ? '← Leave the cup for now' : '← Back to map'),
       ),
     ),
   );
@@ -176,6 +180,24 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
     },
     finished() {
       pauseButton.classList.add('hidden');
+    },
+    raced(time, order, on) {
+      root.querySelectorAll('.hud-top, .speed, .bag, .pause, .hint, .countdown').forEach((node) => node.classList.add('hidden'));
+      root.append(
+        el(
+          'div.modal.clear',
+          {},
+          el(
+            'div.card.results.raced',
+            {},
+            el('img.banner', { src: asset('assets/ui/level-complete.png'), alt: 'Level complete!' }),
+            el('div.pip-cheer', { innerHTML: pipSvg('cheer') }),
+            el('div.time', {}, formatTime(time)),
+            orderTable(order),
+            el('div.row', {}, el('button.btn.green.big', { onclick: () => handlers.done?.() }, on)),
+          ),
+        ),
+      );
     },
     standings(order) {
       root.querySelector('.race-order')?.replaceWith(orderTable(order));

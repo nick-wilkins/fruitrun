@@ -39,6 +39,17 @@ export function rivalsFor(difficulty: Difficulty): Rival[] {
 /** The player's own colour in race displays: Pip's green. */
 export const YOUR_COLOR = '#8fe04a';
 
+/**
+ * The marbles of a game with friends, by seat: whoever started it has Pip's green, then the others in the order
+ * they joined. A player is the same colour on every device, their own included.
+ */
+export const SEATS: (Rival & { called: string })[] = [
+  { name: 'Pip', called: 'green', color: YOUR_COLOR, pale: '#d8f7a0', deep: '#2fa23a' },
+  { ...RIVALS[0], called: 'blue' },
+  { ...RIVALS[1], called: 'orange' },
+  { ...RIVALS[2], called: 'pink' },
+];
+
 export interface Finisher {
   name: string;
   color: string;

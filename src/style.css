@@ -3219,3 +3219,15 @@ input.name {
   font-size: 1em;
   cursor: pointer;
 }
+
+.party-card .cup-table {
+  min-width: 18em;
+}
+
+.party-card .cup-table .race-row em {
+  margin-left: auto;
+}
+
+.party-pick .btn.green {
+  min-width: 5.6em;
+}

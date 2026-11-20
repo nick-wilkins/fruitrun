@@ -1,7 +1,8 @@
 import { sfx } from '../audio';
+import { CUPS, cupById, cupOpen } from '../core/cups';
 import { PARTY_SIZE } from '../core/nearby';
 import { isUnlocked } from '../core/progress';
-import { RIVALS, YOUR_COLOR } from '../core/race';
+import { SEATS } from '../core/race';
 import { LEVELS } from '../data/levels';
 import { toldStore } from '../platform';
 import type { App } from './app';
@@ -17,8 +18,9 @@ const WHY = {
   error: 'Something went wrong finding friends. Check Wi-Fi is switched on and try again.',
 };
 
-/** The level the host last picked, kept while the game stays open. */
+/** The level and the cup the host last picked, kept while the game stays open. */
 let picked: string | null = null;
+let pickedCup: string | null = null;
 
 /** Whether this device has been told about the question the system asks the first time. Until that is known, it is told. */
 let told = false;
@@ -40,29 +42,62 @@ export function partyScreen(app: App): HTMLElement {
       party.leave();
       app.show('map');
     });
-  const players = () => {
-    let friend = 0;
-    return el('div.race-order', {}, ...party.players.map((player) => el(`div.race-row${player.id === party.me ? '.you' : ''}`, {}, el('i', { style: `background:${player.id === party.me ? YOUR_COLOR : RIVALS[friend++ % RIVALS.length].color}` }), el('span', {}, player.id === party.me ? `${player.name} (you)` : player.name))));
+  const called = (id: string, name: string) => (id === party.me ? `${name} (you)` : name);
+  // Everyone has their seat's colour, here and on the road, the same on every device.
+  const players = () => el('div.race-order', {}, ...party.players.map((player, seat) => el(`div.race-row${player.id === party.me ? '.you' : ''}`, {}, el('i', { style: `background:${SEATS[seat].color}` }), el('span', {}, called(player.id, player.name)))));
+  const host = party.players[0]?.name ?? 'your friend';
+  const cup = party.cup;
+  const cupName = (cup && cupById(cup.id)?.name) || 'Cup';
+  const cupOver = cup !== null && cup.race >= cup.of;
+  /** The cup's points, most first. Level on points, whoever sits nearer the host is ahead. */
+  const ranked = () => party.players.map((player, seat) => ({ ...player, seat, points: cup?.points[player.id] ?? 0 })).sort((a, b) => b.points - a.points || a.seat - b.seat);
+  const table = () => el('div.race-order.cup-table', {}, ...ranked().map((row, i) => el(`div.race-row${row.id === party.me ? '.you' : ''}`, {}, el('b', {}, ['1st', '2nd', '3rd', '4th'][i]), el('i', { style: `background:${SEATS[row.seat].color}` }), el('span', {}, called(row.id, row.name)), el('em', {}, `${row.points} pts`))));
+  const winner = () => {
+    const top = ranked()[0];
+    return top ? `🏆 ${top.id === party.me ? 'You win' : `${top.name} wins`} the ${cupName}!` : '';
   };
 
   if (party.phase === 'hosting') {
-    const open = LEVELS.filter((level) => isUnlocked(app.save, level));
-    let at = Math.max(0, open.findIndex((level) => level.id === (picked ?? app.save.last)));
-    const name = el('b.party-level');
-    const turn = (step: number) => {
-      at = (at + step + open.length) % open.length;
-      picked = open[at].id;
-      name.textContent = `${open[at].n}. ${open[at].name}`;
-    };
-    turn(0);
-    const ready = party.canStart();
-    card(
-      el('h2', {}, 'Your game'),
-      players(),
-      el('p', {}, ready ? 'Pick a level and press Start!' : party.players.length > 1 ? 'Waiting for everyone to finish…' : 'Waiting for friends. They tap Together, then Join a game.'),
-      el('div.row.party-pick', {}, button('◀', 'blue', () => turn(-1)), name, button('▶', 'blue', () => turn(1))),
-      el('div.row', {}, leave('Close game'), ready ? button('Start ▶', 'green.big', () => party.start(open[at].id)) : null),
-    );
+    if (party.players.length < 2) {
+      card(el('h2', {}, 'Your game'), players(), el('p', {}, 'Waiting for other players…'), el('p.unlock-note', {}, 'They tap Together, then Join a game.'), el('div.row', {}, leave('Cancel')));
+    } else if (!party.canStart()) {
+      card(el('h2', {}, 'Your game'), players(), el('p', {}, 'Waiting for everyone to finish…'), el('div.row', {}, leave('Close game')));
+    } else if (cup && cup.race > 0) {
+      card(
+        el('h2', {}, cupOver ? winner() : `${cupName}: race ${cup.race} of ${cup.of} done`),
+        table(),
+        el(
+          'div.row',
+          {},
+          leave('Close game'),
+          cupOver ? button('Choose again ▶', 'green.big', () => party.dropCup()) : button('Stop the cup', 'orange', () => party.dropCup()),
+          cupOver ? null : button('Next race ▶', 'green.big', () => party.nextRace()),
+        ),
+      );
+    } else {
+      // Whoever started the game chooses, from what they have opened themselves.
+      const picker = <T extends { id: string }>(open: T[], first: string | null, label: (each: T) => string, keep: (id: string) => void, go: string, start: (each: T) => void) => {
+        let at = Math.max(0, open.findIndex((each) => each.id === first));
+        const name = el('b.party-level');
+        const turn = (step: number) => {
+          at = (at + step + open.length) % open.length;
+          keep(open[at].id);
+          name.textContent = label(open[at]);
+        };
+        turn(0);
+        return el('div.row.party-pick', {}, button('◀', 'blue', () => turn(-1)), name, button('▶', 'blue', () => turn(1)), button(go, 'green', () => start(open[at])));
+      };
+      const levels = LEVELS.filter((level) => isUnlocked(app.save, level));
+      const cups = CUPS.filter((each) => cupOpen(app.save, each));
+      card(
+        el('h2', {}, 'Your game'),
+        players(),
+        el('p', {}, 'Pick a race or a cup!'),
+        picker(levels, picked ?? app.save.last ?? null, (level) => `${level.n}. ${level.name}`, (id) => (picked = id), 'Race ▶', (level) => party.start(level.id)),
+        cups.length ? picker(cups, pickedCup, (each) => `🏆 ${each.name}`, (id) => (pickedCup = id), 'Cup ▶', (each) => party.startCup(each.id, each.levels)) : null,
+        el('div.row', {}, leave('Close game')),
+      );
+    }
   } else if (party.phase === 'browsing') {
     card(
       el('h2', {}, 'Join a game'),
@@ -72,7 +107,10 @@ export function partyScreen(app: App): HTMLElement {
   } else if (party.phase === 'joining') {
     card(el('h2', {}, 'Joining…'), el('div.row', {}, leave('Back')));
   } else if (party.phase === 'joined') {
-    card(el('h2', {}, `${party.players[0]?.name ?? 'A friend'}'s game`), players(), el('p', {}, `Waiting for ${party.players[0]?.name ?? 'your friend'} to start a race…`), el('div.row', {}, leave('Leave')));
+    if (cup && cup.race > 0) card(el('h2', {}, cupOver ? winner() : `${cupName}: race ${cup.race} of ${cup.of} done`), table(), el('p', {}, cupOver ? `Waiting for ${host} to choose what is next…` : `Waiting for ${host} to start the next race…`), el('div.row', {}, leave('Leave')));
+    else card(el('h2', {}, `${host}'s game`), players(), el('p', {}, `Waiting for ${host} to choose a map…`), el('div.row', {}, leave('Leave')));
+  } else if (party.phase === 'closed' && party.why === 'ended') {
+    card(el('h2', {}, 'Game over'), el('p', {}, `${party.closedBy || 'Your friend'} closed the game.`), el('div.row', {}, leave('Back to map')));
   } else {
     party.name = app.player?.name ?? 'Player';
     // The system asks its own question the first time a game is started or looked for. Saying what it is for,

@@ -5,7 +5,7 @@ import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cup
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
 import { Party } from './core/nearby';
-import { racesUnlocked, RIVALS, rivalsFor, type Difficulty, type Finisher } from './core/race';
+import { racesUnlocked, rivalsFor, SEATS, type Difficulty, type Finisher } from './core/race';
 import { CLOSED, settle, shopNow, stock } from './core/shop';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
@@ -183,11 +183,13 @@ const app: App = {
     sessionStorage.removeItem(RELOADED);
     endRun();
     app.world = level.world;
-    // Friends take Pip's friends' colours, in the order they joined.
-    const friends = together ? party.friends().flatMap((member, i) => {
+    // Everyone has the colour of their seat, the same on every device.
+    const friends = together ? party.friends().flatMap((member) => {
       const marble = party.marbles.get(member.id);
-      return marble ? [{ rival: { ...RIVALS[i % RIVALS.length], name: member.name }, marble }] : [];
+      return marble ? [{ rival: { ...SEATS[party.players.indexOf(member)], name: member.name }, marble }] : [];
     }) : [];
+    const partyCup = together && party.cup ? cupById(party.cup.id) : undefined;
+    if (together && partyCup && party.cup) cup = `${partyCup.name}, race ${party.cup.race + 1} of ${party.cup.of}`;
     const hud = createHud(
       level,
       {
@@ -196,6 +198,7 @@ const app: App = {
         // friends cannot be started again by one of them: it is back to the waiting room.
         restart: () => (together ? app.show('party') : app.play(level, race, cup)),
         quit: () => app.show(together ? 'party' : cup ? 'cups' : 'map'),
+        done: () => app.show('party'),
         blend: () => {
           if (draft) {
             app.save = draft;
@@ -223,7 +226,9 @@ const app: App = {
       },
       together ? friends.map((friend) => friend.rival) : race ? rivalsFor(race) : [],
       cup,
-      (app.save.levels[level.id]?.stars ?? 0) >= level.need || !LEVELS.some((l) => l.after.includes(level.n)),
+      // With friends nothing is kept, so there is no goal to show.
+      together || (app.save.levels[level.id]?.stars ?? 0) >= level.need || !LEVELS.some((l) => l.after.includes(level.n)),
+      together ? `You are the ${SEATS[party.slot()].called} marble!` : undefined,
     );
     ui.replaceChildren(hud.root);
     canvas.classList.remove('hidden');
@@ -231,6 +236,7 @@ const app: App = {
     let draft: Save | null = null;
     let order: Finisher[] | undefined;
     let trace: string | null = null;
+    let raced = 0;
     // Marble Roll plays in the dark and on the hardest levels; everywhere else the playlist carries on.
     const dark = level.mood === 'night' || level.mood === 'midnight';
     musicFor(dark || level.difficulty >= 0.85 ? asset('assets/audio/track9.m4a') : null);
@@ -242,18 +248,23 @@ const app: App = {
         hud: (state) => hud.update(state),
         pickup: (id) => hud.pickup(id),
         finish: (time, bonuses, feats, place) => {
+          // A race with friends is for the fun of it: nothing is won, kept or opened by it, on any device.
+          if (together) {
+            raced = time;
+            party.finished(time);
+            return hud.finished();
+          }
           // Work the result out on a copy of the save. Nothing is kept unless the player chooses to blend:
           // retrying throws the whole run away, fruit, stars, podium place and all.
           draft = structuredClone(app.save);
-          // With friends the run counts as one of your own: the place is for the glory.
-          result = completeLevel(draft, level, time, bonuses, feats, together ? undefined : (place ?? undefined), race);
-          if (together) party.finished(time);
+          result = completeLevel(draft, level, time, bonuses, feats, place ?? undefined, race);
           trace = result.newBest ? (run?.trace() ?? null) : null;
           hud.finished();
         },
         results: (finished) => {
           order = finished ?? undefined;
-          if (result) hud.results(result, order);
+          if (together && order) hud.raced(raced, order, party.cup ? 'Cup points ▶' : 'Done ▶');
+          else if (result) hud.results(result, order);
         },
       },
       race ? { rivals: rivalsFor(race), drivers: rivalDrivers(level, race) } : null,
@@ -340,11 +351,12 @@ party.onChange = () => {
     if (party.phase === 'closed') app.toast('The game with friends has ended.');
   } else if (showing === 'party') app.show('party');
 };
-// Only someone in the waiting room is taken into a race: anyone blending, or looking at a result they have not
-// kept yet, sits it out. So does a device that cannot draw the track just now.
+// Only someone in the waiting room, or still looking at the last race's finishing order, is taken into a race:
+// anyone who has wandered off elsewhere sits it out. So does a device that cannot draw the track just now.
 party.onStart = (id) => {
   const level = LEVELS.find((each) => each.id === id);
-  if (!level || run || showing !== 'party') return false;
+  const waiting = run ? racingTogether && run.sim.finished : showing === 'party';
+  if (!level || !waiting) return false;
   app.play(level, undefined, undefined, true);
   return run !== null;
 };

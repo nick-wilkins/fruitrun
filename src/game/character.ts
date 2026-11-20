@@ -33,7 +33,7 @@ export interface PipLook {
   mean?: boolean;
 }
 
-const PIP: PipLook = { skin: '#8fe04a', belly: '#d8f7a0', leaf: '#2fa23a', bands: ['#ff7a1a', '#ffffff', '#ffd23f'] };
+export const PIP: PipLook = { skin: '#8fe04a', belly: '#d8f7a0', leaf: '#2fa23a', bands: ['#ff7a1a', '#ffffff', '#ffd23f'] };
 
 /** Pip the sprout: a round green seedling with a two-leaf quiff, riding inside a striped bubble. */
 export function buildPip(look: PipLook = PIP): Pip {

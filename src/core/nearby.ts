@@ -1,7 +1,8 @@
+import { CUP_POINTS } from './cups';
 import { COURSES } from './progress';
 
 /** Raised whenever the messages change, so devices that would misread each other refuse to race. */
-export const PROTOCOL = 1;
+export const PROTOCOL = 2;
 /** How many can race together. */
 export const PARTY_SIZE = 4;
 
@@ -31,7 +32,17 @@ export type Message =
   | { t: 'start'; n: number; level: string }
   | ({ t: 'pos'; n: number; from?: string } & Report)
   | { t: 'done'; n: number; time: number; from?: string }
-  | { t: 'out'; n: number; from?: string };
+  | { t: 'out'; n: number; from?: string }
+  | { t: 'cup'; id: string; race: number; of: number; points: { id: string; p: number }[] }
+  | { t: 'nocup' };
+
+/** A cup being raced by the party: which one, how many of its races are run, and everyone's points so far. */
+export interface PartyCup {
+  id: string;
+  race: number;
+  of: number;
+  points: Record<string, number>;
+}
 
 const round = (value: number, to: number) => Math.round(value * to) / to;
 
@@ -72,6 +83,13 @@ export function decode(raw: string): Message | null {
       return num(m.n) && num(m.time) && m.time > 0 ? { t: 'done', n: m.n, time: m.time, ...from } : null;
     case 'out':
       return num(m.n) ? { t: 'out', n: m.n, ...from } : null;
+    case 'cup': {
+      if (!text(m.id) || !num(m.race) || !num(m.of) || !Array.isArray(m.points) || m.points.length > PARTY_SIZE) return null;
+      const points = (m.points as Record<string, unknown>[]).filter((row) => row && text(row.id) && num(row.p)).map((row) => ({ id: row.id as string, p: row.p as number }));
+      return points.length === m.points.length ? { t: 'cup', id: m.id, race: m.race, of: m.of, points } : null;
+    }
+    case 'nocup':
+      return { t: 'nocup' };
     default:
       return null;
   }
@@ -149,8 +167,15 @@ export class Party {
   me = '';
   /** Every other player's marble, by player. */
   readonly marbles = new Map<string, Marble>();
+  /** The cup being raced, if the host chose one. */
+  cup: PartyCup | null = null;
+  /** Whose game it was, once it has closed. */
+  closedBy = '';
   /** Which race this is, counted by the host. News from any other race is ignored. */
   private race = 0;
+  /** The host's list of the cup's levels, and of who has finished the race under way and when. */
+  private cupLevels: string[] = [];
+  private readonly times = new Map<string, number>();
   /** The host's list of who is still out on the course. */
   private readonly busy = new Set<string>();
   /** Something on show has changed. */
@@ -188,13 +213,61 @@ export class Party {
     this.onChange();
   }
 
-  /** The host sets everyone off on a level. */
+  /** The host sets everyone off on a single level. A cup under way is given up. */
   start(level: string): void {
     if (!this.canStart()) return;
+    if (this.cup) {
+      this.cup = null;
+      this.tell(encode({ t: 'nocup' }));
+    }
+    this.launch(level);
+  }
+
+  /** The host enters everyone in a cup and sets off its first race. */
+  startCup(id: string, levels: string[]): void {
+    if (!this.canStart() || !levels.length) return;
+    this.cup = { id, race: 0, of: levels.length, points: {} };
+    this.cupLevels = levels;
+    this.tellCup();
+    this.launch(levels[0]);
+  }
+
+  /** The host calls the cup off, or clears away one that is over, to choose something new. */
+  dropCup(): void {
+    if (this.phase !== 'hosting' || !this.cup || this.busy.size) return;
+    this.cup = null;
+    this.tell(encode({ t: 'nocup' }));
+    this.onChange();
+  }
+
+  /** The host sets off the cup's next race, if it has one. */
+  nextRace(): void {
+    if (!this.canStart() || !this.cup || this.cup.race >= this.cup.of) return;
+    this.launch(this.cupLevels[this.cup.race]);
+  }
+
+  private launch(level: string): void {
     this.race++;
     this.busy.clear();
+    this.times.clear();
     for (const player of this.players) this.busy.add(player.id);
     this.begin(level, () => this.tell(encode({ t: 'start', n: this.race, level })));
+  }
+
+  private tellCup(): void {
+    const { cup } = this;
+    if (cup) this.tell(encode({ t: 'cup', id: cup.id, race: cup.race, of: cup.of, points: Object.entries(cup.points).map(([id, p]) => ({ id, p })) }));
+  }
+
+  /** Everyone is home or out: the host counts the cup race, quickest first by each player's own clock. Not finishing scores nothing. */
+  private score(): void {
+    const { cup } = this;
+    if (!cup || cup.race >= cup.of) return;
+    const home = [...this.times].sort((a, b) => a[1] - b[1]).map(([id]) => id);
+    const points: Record<string, number> = {};
+    for (const { id } of this.players) points[id] = (cup.points[id] ?? 0) + (CUP_POINTS[home.indexOf(id)] ?? 0);
+    this.cup = { ...cup, race: cup.race + 1, points };
+    this.tellCup();
   }
 
   /** Whether the host may set a race off: somebody to race, and nobody still out from the last one. */
@@ -230,7 +303,9 @@ export class Party {
   finished(time: number, race = this.race): void {
     if (!this.live()) return;
     this.tell(encode({ t: 'done', n: race, time, ...this.asMe() }));
-    if (race === this.race) this.home(HOST);
+    if (race !== this.race) return;
+    if (this.phase === 'hosting') this.times.set(HOST, time);
+    this.home(HOST);
   }
 
   /** Tell the others this player has given the race up, or could not start it. */
@@ -252,7 +327,9 @@ export class Party {
 
   /** The host notes that a player is no longer out on the course. */
   private home(id: string): void {
-    if (this.phase === 'hosting' && this.busy.delete(id)) this.onChange();
+    if (this.phase !== 'hosting' || !this.busy.delete(id)) return;
+    if (!this.busy.size) this.score();
+    this.onChange();
   }
 
   private live(): boolean {
@@ -266,6 +343,10 @@ export class Party {
     this.players = [];
     this.me = '';
     this.race = 0;
+    this.cup = null;
+    this.closedBy = '';
+    this.cupLevels = [];
+    this.times.clear();
     this.busy.clear();
     for (const marble of this.marbles.values()) marble.gone = true;
     this.marbles.clear();
@@ -274,7 +355,9 @@ export class Party {
   private close(why: NonNullable<Party['why']>): void {
     if (this.phase === 'idle' || this.phase === 'closed') return;
     this.net.leave();
+    const by = this.players[0]?.name ?? '';
     this.reset('closed');
+    this.closedBy = by;
     this.why = why;
     this.onChange();
   }
@@ -300,6 +383,7 @@ export class Party {
 
   private announce(): void {
     for (const player of this.players) if (player.id !== HOST) this.net.send(encode({ t: 'roster', players: this.players, you: player.id }), player.id);
+    this.tellCup();
     this.onChange();
   }
 
@@ -338,6 +422,7 @@ export class Party {
     }
     if (!known || (message.t !== 'pos' && message.t !== 'done' && message.t !== 'out') || message.n !== this.race) return;
     this.note({ ...message, from });
+    if (message.t === 'done') this.times.set(from, message.time);
     // Pass it on to everyone else, saying whose it is.
     this.tell(encode({ ...message, from }), from);
     if (message.t !== 'pos') this.home(from);
@@ -352,6 +437,10 @@ export class Party {
       return this.onChange();
     }
     if (this.phase !== 'joined') return;
+    if (message.t === 'cup' || message.t === 'nocup') {
+      this.cup = message.t === 'cup' ? { id: message.id, race: message.race, of: message.of, points: Object.fromEntries(message.points.map((row) => [row.id, row.p])) } : null;
+      return this.onChange();
+    }
     if (message.t === 'start') {
       this.race = message.n;
       return this.begin(message.level);

@@ -78,3 +78,35 @@ Re-verified 2026-11-20: `tsc` clean, 956 tests. Browser: the note shows once and
 ## For Nick
 
 - A game is announced under the player's typed name. The alternative is a made-up name such as "Blue marble's game" until friends have joined. Kept as is, and disclosed.
+
+## Round two: Nick's notes from two iPads, 2026-11-20
+
+Build 4 connected and raced on two iPads. Nick's notes, and what was done:
+
+- **Starting a game**: until somebody joins, the starter sees only "Waiting for other players…" and Cancel.
+- **Colours**: each player has one colour, by seat, the same on every device and on their own marble: the starter green, then blue, orange, pink. The waiting room shows it and the race opens with "You are the blue marble!".
+- **After a race nothing is blended or kept.** The card shows the time and the finishing order and one button back to the waiting room. This replaces the earlier decision that a friend race counts like a run of your own.
+- **A joiner's game no longer changes**: racing a level with friends opens nothing, and saves no stars, fruit or times, on any device. This is what had opened level 13 on the second iPad.
+- **Choosing again**: the starter picks the next race or closes the game; the others see "Waiting for Sam to choose a map…". When the starter closes it they see "Sam closed the game." and Back to map.
+- **Cups with friends**: the starter can pick any cup they have open themselves. Four races, 10, 7, 5 and 3 points by finishing order, none for not finishing. The starter's device keeps the count and tells the rest, and a table is shown between races. No trophy is kept.
+- Someone still looking at the last finishing order is taken into the next race; before, they sat it out.
+- The messages changed, so builds 4 and 5 will not race each other: both devices need the new build.
+
+Tests: 7 new in `tests/nearby.test.ts`. Six were shown failing first (cup table message, cup scoring, host only, single race drops the cup, newcomer sees the cup, whose game closed). The seventh, clearing a finished cup, was written after its code.
+
+Run 2026-11-20, two tabs of the dev server, sound off, saves not written:
+
+- PASS `tsc --noEmit`; 963 tests.
+- PASS alone: "Waiting for other players…" and Cancel only.
+- PASS colours: the waiting room shows green for the starter and blue for the joiner on both; the hints read "You are the green marble!" and "You are the blue marble!"; on the joiner's card their own row is blue and the starter's green.
+- PASS cup: the starter, with the Peach Cup open, starts it; both race level 13, which the joiner has not opened. After everyone is home both show "Peach Cup: race 1 of 4 done" with 10 and 7 points. Next race starts level 14 on both, taking the joiner straight from the finishing order.
+- PASS not finishing: the joiner leaves race 2; the table reads 17 and 10.
+- PASS Stop the cup returns the starter to the choice of race or cup and the joiner to "Waiting for Sam to choose a map…".
+- PASS nothing kept: after a cup race and a single race the joiner's save is identical, byte for byte, to before; the starter's has no new levels.
+- PASS closing: the joiner sees "Sam closed the game." and Back to map leads to the map.
+- NOT SEEN: the joiner's own marble painted blue on the road (the screenshot was taken after the finish). It uses the same painting as the friends' marbles.
+- NOT RUN: any of this on devices.
+
+Left as they are: the finishing card still carries the "Level complete!" banner and a green Pip; an exact dead heat shows each player first on their own card while the cup table goes by the starter's count.
+
+The second iPad's save still has what the earlier builds wrongly gave it (level 13 and anything after). Nothing in the save says which records came from friend races, so it is not undone here.

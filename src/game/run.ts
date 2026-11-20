@@ -24,10 +24,10 @@ import {
 import { sfx } from '../audio';
 import { starsForTime, type Feats } from '../core/progress';
 import type { Marble } from '../core/nearby';
-import { finishingOrder, YOUR_COLOR, type Finisher, type Rival } from '../core/race';
+import { finishingOrder, SEATS, YOUR_COLOR, type Finisher, type Rival } from '../core/race';
 import type { Level } from '../data/levels';
 import { Rig } from './camera';
-import { buildPip, type Pip } from './character';
+import { buildPip, PIP, type Pip, type PipLook } from './character';
 import { jostle } from './contact';
 import { ghostAt, Recorder, type Ghost } from './ghost';
 import type { Course } from './course';
@@ -58,6 +58,9 @@ export interface Field {
   rivals: Rival[];
   drivers: Driver[];
 }
+
+/** How a marble in a game with friends is painted: the green one is Pip as ever, the rest in their seat's colours. */
+const seatLook = (seat: Rival): PipLook => (seat.color === YOUR_COLOR ? PIP : { skin: seat.color, belly: seat.pale, leaf: seat.deep, bands: [seat.deep, '#ffffff', seat.color] });
 
 /** Somebody racing on another device: how to draw them, and the marble their reports move. */
 export interface Friend {
@@ -323,6 +326,8 @@ export class Run {
   private readonly q = new Quaternion();
   private readonly axisX = new Vector3(1, 0, 0);
   private readonly axisZ = new Vector3(0, 0, 1);
+  /** The player's colour in the finishing order: Pip's green, or their seat's in a game with friends. */
+  private readonly color: string;
 
   constructor(
     private readonly renderer: WebGLRenderer,
@@ -336,7 +341,8 @@ export class Run {
     this.sim = new Sim(course, level, (event) => this.react(event));
     this.world = buildWorld(course, this.sim.items, level.fruit);
 
-    this.pip = buildPip();
+    this.color = together ? SEATS[together.slot].color : YOUR_COLOR;
+    this.pip = buildPip(together ? seatLook(SEATS[together.slot]) : undefined);
     this.pip.root.matrixAutoUpdate = false;
     this.world.scene.add(this.pip.root);
     // In the dark the ball carries a lamp that lights the road just around it.
@@ -372,7 +378,7 @@ export class Run {
     together?.friends.forEach((friend) => {
       const { rival } = friend;
       const dark = course.mood === 'night' || course.mood === 'midnight';
-      const pip = buildPip({ skin: rival.color, belly: rival.pale, leaf: rival.deep, bands: [rival.deep, '#ffffff', rival.color], glow: dark ? 0.55 : 0 });
+      const pip = buildPip({ ...seatLook(rival), glow: dark ? 0.55 : 0 });
       pip.root.matrixAutoUpdate = false;
       pip.root.visible = false;
       const shadow = this.makeShadow();
@@ -634,7 +640,7 @@ export class Run {
   standings(): Finisher[] {
     const sim = this.sim;
     const rows = [
-      { name: 'You', color: YOUR_COLOR, time: sim.finished ? sim.time : Infinity, you: true, progress: sim.progress() },
+      { name: 'You', color: this.color, time: sim.finished ? sim.time : Infinity, you: true, progress: sim.progress() },
       ...this.friends.filter(({ marble }) => marble.time !== null || !marble.gone).map(({ rival, marble }) => ({ name: rival.name, color: rival.color, time: marble.time ?? Infinity, you: false, progress: marble.progress })),
     ];
     rows.sort((a, b) => (a.time === b.time ? (Number.isFinite(a.time) ? Number(b.you) - Number(a.you) : b.progress - a.progress) : a.time - b.time));
