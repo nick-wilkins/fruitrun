@@ -137,7 +137,7 @@ Tried and dropped: letting a ball hop to the other road just after they part. Th
 
 As built: nothing within 35 units of the leader, growing evenly to 6% more road covered for the same speed at 150 units behind. None in the first 4 seconds. It fades to nothing as the leader covers the last fifth of the course. It eases in and out over about a second. In the air and on escalators it does nothing. It applies only in races with friends.
 
-Tests: 9 new (4 for splits, 4 for the helping hand, 2 for the review), each shown failing first. 972 pass.
+Tests: 9 new (3 for splits, 4 for the helping hand, 2 for the review), each shown failing first. 972 pass.
 
 Run 2026-11-20, dev server, sound off:
 
