@@ -23,6 +23,9 @@ const WHY = {
 let picked: string | null = null;
 let pickedCup: string | null = null;
 
+/** A question about leaving that is up. The screen is drawn afresh whenever the game changes, and the question with it. */
+let asking: { label: string; ask: string; race: number } | null = null;
+
 /** Whether this device has been told about the question the system asks the first time. Until that is known, it is told. */
 let told = false;
 void toldStore
@@ -40,25 +43,35 @@ export function partyScreen(app: App): HTMLElement {
   const card = (...children: (Node | string | null)[]) => stage.append(el('div.card.unlock-card.party-card', {}, ...children));
   const called = (id: string, name: string) => (id === party.me ? `${name} (you)` : name);
   const go = () => {
+    asking = null;
     party.leave();
     app.show('map');
   };
   /** The way out of the game. With friends in it, it asks first: a slip of the finger would end it for everyone. */
+  const sure = (label: string, ask: string) => {
+    const dialog = el('div.modal');
+    const stay = () => {
+      asking = null;
+      dialog.remove();
+    };
+    dialog.append(el('div.card.small.wordy', {}, el('h2', {}, ask), el('div.row', {}, el('button.btn.green.big', { onclick: stay }, 'Stay'), el('button.btn.purple', { onclick: go }, label))));
+    stage.append(dialog);
+  };
   const leave = (label: string, ask = '') =>
     button(label, 'purple', () => {
       if (!ask) return go();
-      const dialog = el('div.modal');
-      dialog.append(el('div.card.small.wordy', {}, el('h2', {}, ask), el('div.row', {}, el('button.btn.green.big', { onclick: () => dialog.remove() }, 'Stay'), el('button.btn.purple', { onclick: go }, label))));
-      stage.append(dialog);
+      asking = { label, ask, race: party.raceNow() };
+      sure(label, ask);
     });
   const CLOSE = 'Close the game for everyone?';
   const LEAVE = 'Leave the game with your friends?';
   const offer = party.offer;
   const offered = offer ? `${offer.cup ? `🏆 ${cupById(offer.cup)?.name ?? 'Cup'}: ` : ''}${LEVELS.find((level) => level.id === offer.level)?.name ?? 'the next race'}` : '';
   /** Everyone in, each with a tick once they are ready. */
-  const readying = () => el('div.race-order', {}, ...party.players.map((player, seat) => el(`div.race-row${player.id === party.me ? '.you' : ''}`, {}, el('i', { style: `background:${SEATS[seat].color}` }), el('span', {}, called(player.id, player.name)), el('em', {}, party.readyIds.includes(player.id) || seat === 0 ? '✅' : '⏳'))));
+  const readying = () => players((id, seat) => (party.readyIds.includes(id) || seat === 0 ? '✅' : '⏳'));
   // Everyone has their seat's colour, here and on the road, the same on every device.
-  const players = () => el('div.race-order', {}, ...party.players.map((player, seat) => el(`div.race-row${player.id === party.me ? '.you' : ''}`, {}, el('i', { style: `background:${SEATS[seat].color}` }), el('span', {}, called(player.id, player.name)))));
+  const players = (mark?: (id: string, seat: number) => string) =>
+    el('div.race-order', {}, ...party.players.map((player, seat) => el(`div.race-row${player.id === party.me ? '.you' : ''}`, {}, el('i', { style: `background:${SEATS[seat].color}` }), el('span', {}, called(player.id, player.name)), mark ? el('em', {}, mark(player.id, seat)) : null)));
   const host = party.players[0]?.name ?? 'your friend';
   const cup = party.cup;
   const cupName = (cup && cupById(cup.id)?.name) || 'Cup';
@@ -165,5 +178,9 @@ export function partyScreen(app: App): HTMLElement {
       el('div.row', {}, button('Back', 'purple', () => app.show('map'))),
     );
   }
+  // A question asked before a race is not asked again after it.
+  const live = party.phase === 'hosting' || party.phase === 'joined';
+  if (asking && live && asking.race === party.raceNow()) sure(asking.label, asking.ask);
+  else asking = null;
   return stage;
 }

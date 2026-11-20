@@ -198,3 +198,20 @@ Run 2026-11-20, two tabs, sound off, saves not written:
 - PASS Stop the cup, then a single race: offered and readied the same way.
 - PASS rolling: given a report at speed 30, the friend's bubble turns over half a second of frames and its leaves lean.
 - NOT RUN on devices.
+
+## Review (`/code-review medium` on 06bec01) and fixes
+
+Ten findings. Fixed:
+
+- A starter who left the race early never brought the others in from the finishing card: now they are brought in when the last one comes home.
+- One stalled player locked everyone on the finishing card with no way out: anyone waiting there has a "Waiting room" button, where Leave and Close game are.
+- A Ready tapped for one pick could be counted for the next: picks are numbered and a ready is for one pick only.
+- The leave question vanished whenever the game changed, and a race could start under it: it is kept up across redraws, and dropped once a race has started.
+- A pick told again with the roster reset who was ready for a moment.
+- A pick that could not be started left the others waiting: such a pick is refused, and a start that fails calls it off for everyone.
+- A friend whose reports stopped went on spinning on the spot for two seconds: now a quarter of a second, as long as it is rolled on for.
+- Starting a race by any route clears the pick; the player list is built in one place.
+
+Left: each crate or pin knocked is its own message, so a rack of ten pins is ten small messages. `start`, `startCup` and `nextRace` stay public: the tests drive them.
+
+Re-verified 2026-11-20: `tsc` clean; 988 tests (3 new, shown failing first). Two tabs: the leave question stays up when the starter picks a race underneath it; a starter who leaves the race is in the waiting room, the joiner's card reads "Waiting for Sam…" with a "Waiting room" button, and the joiner is brought into the waiting room by itself on finishing.

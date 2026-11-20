@@ -2,7 +2,7 @@ import { CUP_POINTS } from './cups';
 import { COURSES } from './progress';
 
 /** Raised whenever the messages change, so devices that would misread each other refuse to race. */
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 /** How many can race together. */
 export const PARTY_SIZE = 4;
 
@@ -36,14 +36,16 @@ export type Message =
   | { t: 'hit'; n: number; i: number; from?: string }
   | { t: 'cup'; id: string; race: number; of: number; points: { id: string; p: number }[] }
   | { t: 'nocup' }
-  | { t: 'offer'; level: string; cup?: string }
+  | { t: 'offer'; k: number; level: string; cup?: string }
   | { t: 'nooffer' }
-  | { t: 'ready' }
+  | { t: 'ready'; k: number }
   | { t: 'readies'; ids: string[] }
   | { t: 'room' };
 
 /** What the starter has picked to race next: a level, and the cup it is part of if any. */
 export interface Offer {
+  /** Which pick this is, counted by the starter: a ready is for one pick and no other. */
+  k: number;
   level: string;
   cup?: string;
 }
@@ -108,9 +110,10 @@ export function decode(raw: string): Message | null {
     case 'nocup':
       return { t: 'nocup' };
     case 'offer':
-      return text(m.level) && (m.cup === undefined || text(m.cup)) ? { t: 'offer', level: m.level, ...(text(m.cup) ? { cup: m.cup } : {}) } : null;
-    case 'nooffer':
+      return num(m.k) && text(m.level) && (m.cup === undefined || text(m.cup)) ? { t: 'offer', k: m.k, level: m.level, ...(text(m.cup) ? { cup: m.cup } : {}) } : null;
     case 'ready':
+      return num(m.k) ? { t: 'ready', k: m.k } : null;
+    case 'nooffer':
     case 'room':
       return { t: m.t };
     case 'readies':
@@ -164,9 +167,10 @@ export class Marble {
     this.progress = report.p;
   }
 
-  /** How fast it is rolling along the road, as last reported; nothing once it has gone quiet. */
+  /** How fast it is rolling along the road, as last reported; nothing once the reports have stopped. */
   speed(now: number): number {
-    return this.last && !this.quiet(now) ? this.last.v : 0;
+    // No longer than it is rolled on for: a marble standing still does not spin.
+    return this.last && now - this.at <= AHEAD ? this.last.v : 0;
   }
 
   /** No report has come for a couple of seconds: its device is asleep or out of reach, and where it was says nothing of where it is. */
@@ -226,6 +230,7 @@ export class Party {
   readyIds: string[] = [];
   /** The starter's pick, kept to act on once everyone is ready. */
   private picked: Pick | null = null;
+  private picks = 0;
   /** The starter has moved on from the finishing order: everyone goes back to the waiting room together. */
   onRoom = (): void => {};
   /** Whose game it was, once it has closed: they closed it, or the way to them was lost. */
@@ -281,9 +286,10 @@ export class Party {
   pick(what: Pick): void {
     if (!this.canStart()) return;
     const { cup } = this;
-    if (what === 'next' && (!cup || cup.race >= cup.of)) return;
+    if (what === 'next' ? !cup || cup.race >= cup.of : 'cup' in what && !what.levels.length) return;
     this.picked = what;
-    this.offer = what === 'next' ? { level: this.cupLevels[cup!.race], cup: cup!.id } : 'cup' in what ? { level: what.levels[0], cup: what.cup } : { level: what.level };
+    const k = ++this.picks;
+    this.offer = what === 'next' ? { k, level: this.cupLevels[cup!.race], cup: cup!.id } : 'cup' in what ? { k, level: what.levels[0], cup: what.cup } : { k, level: what.level };
     this.readyIds = [HOST];
     this.tellOffer();
     this.onChange();
@@ -300,7 +306,7 @@ export class Party {
 
   /** A player says they are ready for what the starter picked. */
   ready(): void {
-    if (this.phase === 'joined' && this.offer) this.net.send(encode({ t: 'ready' }));
+    if (this.phase === 'joined' && this.offer) this.net.send(encode({ t: 'ready', k: this.offer.k }));
   }
 
   /** The starter moves on from the finishing order, taking everyone back to the waiting room. */
@@ -325,6 +331,8 @@ export class Party {
     if (what === 'next') this.nextRace();
     else if ('cup' in what) this.startCup(what.cup, what.levels);
     else this.start(what.level);
+    // Should it not have started after all, nobody is left waiting for it.
+    if (!this.busy.size) this.tell(encode({ t: 'nooffer' }));
   }
 
   /** The host sets everyone off on a single level. A cup under way is given up. */
@@ -361,6 +369,8 @@ export class Party {
   }
 
   private launch(level: string): void {
+    this.offer = this.picked = null;
+    this.readyIds = [];
     this.race++;
     this.busy.clear();
     this.times.clear();
@@ -556,7 +566,8 @@ export class Party {
       this.seat([...this.players, { id: from, name: message.name.slice(0, 12) }]);
       return this.announce();
     }
-    if (known && message.t === 'ready' && this.offer && !this.readyIds.includes(from)) {
+    if (message.t === 'ready') {
+      if (!known || message.k !== this.offer?.k || this.readyIds.includes(from)) return;
       this.readyIds = [...this.readyIds, from];
       this.tell(encode({ t: 'readies', ids: this.readyIds }));
       this.onChange();
@@ -589,7 +600,9 @@ export class Party {
     }
     if (message.t === 'room') return this.onRoom();
     if (message.t === 'offer') {
-      this.offer = message.cup ? { level: message.level, cup: message.cup } : { level: message.level };
+      // Told again with the roster when somebody comes or goes: nothing new.
+      if (message.k === this.offer?.k) return;
+      this.offer = message.cup ? { k: message.k, level: message.level, cup: message.cup } : { k: message.k, level: message.level };
       this.readyIds = [];
       // Whatever a player is looking at, the pick is made in the waiting room.
       this.onRoom();

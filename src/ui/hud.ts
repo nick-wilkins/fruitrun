@@ -190,7 +190,9 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       pauseButton.classList.add('hidden');
     },
     racedNext(on, note) {
-      racedFoot.replaceChildren(on ? el('button.btn.green.big', { onclick: () => handlers.quit() }, on) : el('p.raced-wait', {}, note));
+      // Whoever is waiting can always go and wait in the waiting room, where the way out of the game is.
+      if (on) racedFoot.replaceChildren(el('button.btn.green.big', { onclick: () => handlers.quit() }, on));
+      else racedFoot.replaceChildren(el('p.raced-wait', {}, note), el('button.btn.purple.small', { onclick: () => handlers.quit() }, 'Waiting room'));
     },
     raced(time, order) {
       // No banner here: nothing was completed or won, it is who came where.

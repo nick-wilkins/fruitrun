@@ -461,7 +461,7 @@ describe('getting everyone ready', () => {
   it('starts nothing until every player has said they are ready', () => {
     const { sam, ada, kit, started } = gather();
     sam.pick({ level: 'level-4' });
-    for (const party of [sam, ada, kit]) expect(party.offer).toEqual({ level: 'level-4' });
+    for (const party of [sam, ada, kit]) expect(party.offer).toMatchObject({ level: 'level-4' });
     expect(started).toEqual([]);
     ada.ready();
     expect(started).toEqual([]);
@@ -493,14 +493,14 @@ describe('getting everyone ready', () => {
   it('runs a cup the same way, a race at a time', () => {
     const { sam, ada, kit, started } = gather();
     sam.pick({ cup: 'cup-0-1', levels: ['level-1', 'level-2'] });
-    expect(kit.offer).toEqual({ level: 'level-1', cup: 'cup-0-1' });
+    expect(kit.offer).toMatchObject({ level: 'level-1', cup: 'cup-0-1' });
     ada.ready();
     kit.ready();
     expect(started).toEqual(['level-1', 'level-1', 'level-1']);
     for (const party of [sam, ada, kit]) party.finished(30);
     expect(kit.cup).toMatchObject({ race: 1 });
     sam.pick('next');
-    expect(ada.offer).toEqual({ level: 'level-2', cup: 'cup-0-1' });
+    expect(ada.offer).toMatchObject({ level: 'level-2', cup: 'cup-0-1' });
     expect(started).toHaveLength(3);
     ada.ready();
     kit.ready();
@@ -521,6 +521,59 @@ describe('getting everyone ready', () => {
     expect(started).toHaveLength(2);
   });
 
+  it('does not count a ready meant for an earlier pick', () => {
+    const device = air();
+    const net = device();
+    const sent: string[] = [];
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party({ ...net, send: (text, to) => (sent.push(text), net.send(text, to)) }, 'Ada', () => 0);
+    sam.host();
+    ada.browse();
+    ada.join(ada.hosts[0].id);
+    const started: string[] = [];
+    sam.onStart = ada.onStart = (level) => (started.push(level), true);
+    sam.pick({ level: 'level-4' });
+    const first = ada.offer;
+    sam.unpick();
+    sam.pick({ level: 'level-9' });
+    // The tap for the first pick arrives late, after the second is up.
+    net.send(JSON.stringify({ t: 'ready', k: first!.k }));
+    expect(started).toEqual([]);
+    ada.ready();
+    expect(started).toEqual(['level-9', 'level-9']);
+  });
+
+  it('does not start a player over when the same pick is told again', () => {
+    const device = air();
+    const sam = new Party(device(), 'Sam', () => 0);
+    const ada = new Party(device(), 'Ada', () => 0);
+    const kit = new Party(device(), 'Kit', () => 0);
+    const lee = new Party(device(), 'Lee', () => 0);
+    sam.host();
+    for (const guest of [ada, kit]) {
+      guest.browse();
+      guest.join(guest.hosts[0].id);
+    }
+    sam.pick({ level: 'level-4' });
+    ada.ready();
+    let moved = 0;
+    const seen: string[][] = [];
+    ada.onRoom = () => moved++;
+    ada.onChange = () => seen.push(ada.readyIds);
+    // A newcomer has everyone told the roster and the pick afresh.
+    lee.browse();
+    lee.join(lee.hosts[0].id);
+    expect(moved).toBe(0);
+    expect(seen.every((ids) => ids.includes(ada.me))).toBe(true);
+  });
+
+  it('will not offer a cup with no races in it', () => {
+    const { sam, ada } = gather();
+    sam.pick({ cup: 'cup-0-1', levels: [] });
+    expect(sam.offer).toBeNull();
+    expect(ada.offer).toBeNull();
+  });
+
   it('shows a newcomer what has been picked', () => {
     const device = air();
     const sam = new Party(device(), 'Sam', () => 0);
@@ -532,7 +585,7 @@ describe('getting everyone ready', () => {
     sam.pick({ level: 'level-4' });
     kit.browse();
     kit.join(kit.hosts[0].id);
-    expect(kit.offer).toEqual({ level: 'level-4' });
+    expect(kit.offer).toMatchObject({ level: 'level-4' });
     expect(kit.readyIds).toEqual(['host']);
     // And the race now waits for them too.
     const started: string[] = [];

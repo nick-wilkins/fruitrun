@@ -67,6 +67,8 @@ const worldOf = (save: Save) => (save.last ? levelById(save.last).world : 0);
 
 /** The run on now is a race with friends. */
 let racingTogether = false;
+/** Whether anyone was still out racing the last time the game with friends changed. */
+let wasRacing = false;
 /** Something about the game with friends has changed while a finishing order is up. */
 let partyMoved: (() => void) | null = null;
 
@@ -204,7 +206,7 @@ const app: App = {
         restart: () => app.play(level, race, cup),
         quit: () => {
           // Whoever started the game takes everyone back to the waiting room with them.
-          if (together && run?.sim.finished) party.toRoom();
+          if (together) party.toRoom();
           app.show(together ? 'party' : cup ? 'cups' : 'map');
         },
         blend: () => {
@@ -377,6 +379,10 @@ document.addEventListener('visibilitychange', () => {
 });
 
 party.onChange = () => {
+  // The starter, already in the waiting room when the last of the others comes home, brings them in too.
+  const racing = party.racing();
+  if (wasRacing && !racing && !run) party.toRoom();
+  wasRacing = racing;
   if (run) {
     partyMoved?.();
     if (party.phase === 'closed') app.toast('The game with friends has ended.');
