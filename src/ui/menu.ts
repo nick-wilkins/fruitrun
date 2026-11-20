@@ -5,13 +5,13 @@ import type { App } from './app';
 import { asset, el, onTap } from './dom';
 import { grownUpGate } from './gate';
 import { pipSvg } from './pip';
-import { setBackdrop } from './screen';
+import { tallStage } from './screen';
 import { restoreNote } from './unlock';
 
 export function menuScreen(app: App): HTMLElement {
-  const stage = el('div.stage.menu-stage');
+  // The first screen's taller painting, and where the old picture sits in it.
+  const stage = tallStage('menu-stage', { art: 'assets/ui/menu-tall.webp', top: 14.55, height: 70.9 });
   stage.append(
-    el('img.bg', { src: asset('assets/ui/menu-bg.webp'), alt: '', draggable: false }),
     el('img.menu-logo', { src: asset('assets/ui/menu-logo.webp'), alt: 'Smoothie Scramble', draggable: false }),
   );
 
@@ -73,7 +73,6 @@ export function menuScreen(app: App): HTMLElement {
   };
 
   const carryOn = el('button.menu-btn.menu-carry', { ariaLabel: 'Carry on' }, el('img', { src: asset('assets/ui/menu-carry.webp'), alt: '', draggable: false }));
-  setBackdrop(asset('assets/ui/menu-bg.webp'));
   onTap(carryOn, () => {
     if (!app.hasSave) {
       sfx.nope();

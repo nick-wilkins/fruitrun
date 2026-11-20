@@ -350,3 +350,19 @@ The two maps use the mechanism built for Tropical Falls. The stall is behind fiv
 Seen in the browser at 1100 by 620 and 1100 by 825: the blender's ingredient squares, power button and Blend button sit on their painted places at both shapes, with the stall's roof and shelf showing at 4:3; the meadow's stones and Super Blender pad, and the village's spots and stall, are under their buttons at 4:3; the cups screen sits in its window with the stall filling the rest, and its dialog dims all of it. 998 tests pass; `tsc` and the build are clean.
 
 Still in a 16:9 window: the first screen (its taller picture is ready, not wired), and races themselves fill the screen already. On the book, cups and waiting rooms the card is still 16:9-sized in the middle of a taller screen.
+
+## The 2732 by 2048 pictures, and build 6, 2026-11-20
+
+Nick's zip of five (`smoothie_scramble_all_5_2732x2048.zip`), checked before use:
+
+| File | What it is | Used |
+|---|---|---|
+| `adventure_map` | The Sunny Meadow map, properly extended. Same painting as the smaller one already in (difference 2 in 255). | Yes, as the meadow map. |
+| `village_map` | Blossom Village, the same painting as the smaller one (difference 2.7). | Yes. |
+| `original_home_page` | The first screen, extended. Old picture at 14.55% from the top, 70.9% of the height. | Yes: the first screen now fills squarer devices. |
+| `original_main_map` | The old meadow map with a blur above and below, not painted. | No. |
+| `smoothie_stall` | The stall, but the file is cut short: the bottom quarter is missing. | No. |
+
+Missing from the zip: Tropical Falls. So Tropical Falls and the stall stay on the 1448 wide pictures for now.
+
+Seen in the browser at both shapes: the first screen with its logo, buttons and Pip in place, filling the screen at 4:3. 998 tests pass; `tsc` and the build are clean.
