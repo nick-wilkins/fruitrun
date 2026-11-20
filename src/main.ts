@@ -247,6 +247,7 @@ const app: App = {
     let order: Finisher[] | undefined;
     let trace: string | null = null;
     let raced = 0;
+    const struck: number[] = [];
     // Marble Roll plays in the dark and on the hardest levels; everywhere else the playlist carries on.
     const dark = level.mood === 'night' || level.mood === 'midnight';
     musicFor(dark || level.difficulty >= 0.85 ? asset('assets/audio/track9.m4a') : null);
@@ -272,7 +273,8 @@ const app: App = {
           hud.finished();
         },
         // What this player smashes is gone from friends' roads too.
-        smash: together ? (index) => party.hit(index) : undefined,
+        // Sent a few times a second, all together: a rack of pins is one message, not ten.
+        smash: together ? (index) => void struck.push(index) : undefined,
         results: (finished) => {
           order = finished ?? undefined;
           if (together && order) {
@@ -307,6 +309,7 @@ const app: App = {
         // A marble that has not moved since the last report is standing still, whatever speed it was doing: paused, say.
         if (!sim.finished) party.report({ lane: sim.lane, s: sim.s, x: sim.x, h: sim.h, v: sim.s === was ? 0 : sim.pace, p: sim.progress() });
         was = sim.s;
+        if (struck.length) party.hit(struck.splice(0));
         // Whoever is behind gets a little help, eased in and out over a second or so, so it is never felt as a shove.
         // A friend whose reports have stopped is not counted: where they were says nothing of where they are.
         const clock = performance.now() / 1000;

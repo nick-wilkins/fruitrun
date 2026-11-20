@@ -109,6 +109,8 @@ const SWIPE = 0.24;
 /** Holding back by drawing the finger down: this share of the screen's height is ignored, and this much more is all of it. */
 const PULL_SLIP = 0.08;
 const PULL_FULL = 0.14;
+/** A finger wandering down the screen no faster than this, in screen heights a second, is not pulling back. */
+const PULL_WANDER = 0.05;
 
 interface Flying {
   mesh: InstancedMesh;
@@ -311,10 +313,10 @@ export class Run {
    */
   private swipe: { target: number; across: number; shift: number } | null = null;
   private keySteer = 0;
-  private keyBack = false;
-  /** Where down the screen the steering finger landed, and how hard it is now pulling back, 0 to 1. */
-  private pointerDown = 0;
-  private pull = 0;
+  private readonly keysBack = new Set<string>();
+  /** How far down the screen the steering finger is, 0 to 1, and where its pull back is measured from. */
+  private pointerDown: number | null = null;
+  private pullFrom = 0;
   private shake = 0;
   private fov = 62;
   private raf = 0;
@@ -449,10 +451,10 @@ export class Run {
     }
     const rect = this.canvas.getBoundingClientRect();
     this.pointerAcross = (e.clientX - rect.left) / rect.width - 0.5;
-    // A finger drawn back down the screen holds the ball back: nothing for a small slip, all of it by a fifth of the way.
+    // A finger drawn back down the screen holds the ball back. Wherever it lands there is room below to pull all the way.
     const down = (e.clientY - rect.top) / rect.height;
-    if (e.type === 'pointerdown') this.pointerDown = down;
-    this.pull = e.pointerType === 'mouse' ? 0 : clamp((down - this.pointerDown - PULL_SLIP) / PULL_FULL, 0, 1);
+    this.pointerDown = e.pointerType === 'mouse' ? null : down;
+    if (e.type === 'pointerdown') this.pullFrom = Math.min(down, 1 - PULL_SLIP - PULL_FULL);
     // A finger steers by swiping from wherever it lands; a mouse steers by where it points.
     if (e.type === 'pointerdown') this.swipe = e.pointerType === 'mouse' ? null : { target: this.sim.x, across: this.pointerAcross, shift: this.sim.shift };
     e.preventDefault();
@@ -462,12 +464,12 @@ export class Run {
     if (e.pointerId !== this.pointerId) return;
     this.pointerId = null;
     this.pointerAcross = null;
+    this.pointerDown = null;
     this.swipe = null;
-    this.pull = 0;
   };
 
   private readonly onKey = (e: KeyboardEvent) => {
-    if (e.code === 'ArrowDown' || e.code === 'KeyS') this.keyBack = e.type === 'keydown';
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') e.type === 'keydown' ? this.keysBack.add(e.code) : this.keysBack.delete(e.code);
     const dir = e.code === 'ArrowLeft' || e.code === 'KeyA' ? -1 : e.code === 'ArrowRight' || e.code === 'KeyD' ? 1 : 0;
     if (!dir) return;
     if (e.type === 'keydown') this.keySteer = dir;
@@ -477,8 +479,8 @@ export class Run {
   /** Forget held keys and fingers: their release can be missed while paused or in another window. */
   private readonly dropInput = () => {
     this.keySteer = 0;
-    this.keyBack = false;
-    this.pull = 0;
+    this.keysBack.clear();
+    this.pointerDown = null;
     this.pointerId = null;
     this.pointerAcross = null;
     this.swipe = null;
@@ -492,6 +494,19 @@ export class Run {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   };
+
+  /**
+   * How hard the finger is pulling back, 0 to 1: nothing for a small slip, all of it by a fifth of the screen.
+   * It is measured from the highest the finger has been, and a finger that only wanders down slowly takes the
+   * mark with it, so steering for a whole run never turns into holding back.
+   */
+  private pull(dt: number): number {
+    if (this.pointerDown === null) return 0;
+    const drawn = this.pointerDown - this.pullFrom;
+    if (drawn < 0) this.pullFrom = this.pointerDown;
+    else if (drawn <= PULL_SLIP) this.pullFrom += Math.min(drawn, PULL_WANDER * dt);
+    return clamp((this.pointerDown - this.pullFrom - PULL_SLIP) / PULL_FULL, 0, 1);
+  }
 
   private steer(): number | null {
     // Worked out afresh every frame: the road narrows, widens, and spreads out at a fork.
@@ -553,7 +568,7 @@ export class Run {
     if (this.paused) return;
     // Fixed steps, however long the frame took: the same line earns the same time on any device.
     this.sim.steer = this.steer();
-    this.sim.brake = this.keyBack ? 1 : this.pull;
+    this.sim.brake = this.keysBack.size ? 1 : this.pull(dt);
     this.sim.swiping = this.pointerAcross !== null && this.swipe !== null;
     this.owed += dt;
     while (this.owed >= TICK) {

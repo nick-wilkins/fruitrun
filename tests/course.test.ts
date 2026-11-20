@@ -273,6 +273,61 @@ describe('holding back', () => {
     expect(held.time).toBeLessThan(free.time * 0.9);
   });
 
+  it('never makes the ball quicker than leaving it alone, however lightly it is held', () => {
+    const after = (brake: number) => {
+      const sim = fresh(86);
+      sim.turboT = 0.2;
+      sim.brake = brake;
+      return roll(sim, 5).s;
+    };
+    expect(after(0.02)).toBeLessThanOrEqual(after(0));
+  });
+
+  it('leaves a turbo alone for a light touch', () => {
+    const sim = fresh(86);
+    sim.turboT = 2;
+    sim.brake = 0.1;
+    roll(sim, 0.5);
+    expect(sim.turboT).toBeGreaterThan(1);
+    expect(sim.v).toBe(86);
+  });
+
+  it('still gives the boost of a pad landed on while holding back', () => {
+    const found = LEVELS.map((each) => ({ each, course: courseFor(each) })).find(({ course }) => course.objects.some((o) => o.kind === 'turbo' && o.lane === 0))!;
+    const pad = found.course.objects.find((o) => o.kind === 'turbo' && o.lane === 0)!;
+    const sim = new Sim(found.course, found.each);
+    sim.skipCountdown();
+    sim.s = pad.s - 3;
+    sim.x = pad.x;
+    sim.v = 20;
+    sim.brake = 1;
+    for (let i = 0; i < 120 && sim.v < 80; i++) sim.step(1 / 120);
+    // A moment's grace to let go: the pad is not thrown away by the pull that got the ball onto it.
+    for (let i = 0; i < 30; i++) sim.step(1 / 120);
+    expect(sim.v).toBeGreaterThan(80);
+  });
+
+  it('does nothing while the ball is being flung across a gap in the road', () => {
+    const found = LEVELS.map((each) => ({ each, course: courseFor(each) })).find(({ course }) => course.gaps.some((g) => g.lane === 0))!;
+    const gap = found.course.gaps.find((g) => g.lane === 0)!;
+    const cross = (brake: number) => {
+      const sim = new Sim(found.course, found.each);
+      sim.skipCountdown();
+      sim.s = gap.s0 - 2;
+      sim.v = 40;
+      let lands = 0;
+      for (let i = 0; i < 120 * 3 && sim.s < gap.s1 + 20; i++) {
+        const up = sim.h > 0;
+        if (up) sim.brake = brake;
+        sim.step(1 / 120);
+        if (up && sim.h === 0) lands++;
+        if (sim.h === 0 && sim.s > gap.s1) sim.brake = 0;
+      }
+      return lands;
+    };
+    expect(cross(1)).toBe(cross(0));
+  });
+
   it('ends a turbo', () => {
     const sim = fresh(80);
     sim.turboT = 2;

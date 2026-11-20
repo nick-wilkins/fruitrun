@@ -229,3 +229,19 @@ Run 2026-11-20, dev server, sound off:
 - PASS holding back, real touch events on level 1: a finger moved down 5% of the screen does nothing; 15% reads half; 30% reads full and the speed falls from 36 to 14 and holds there, still covering 14 units a second; lifting the finger, the speed is back to 26 in a second and a half.
 - PASS fruit, two tabs: the joiner takes 5 fruit; the starter's road loses the same 5.
 - NOT RUN: how far down a child's finger wanders while steering. If the ball slows when nobody means it to, the 8% is the number to raise.
+
+## Review (`/code-review medium` on 48255fd) and fixes
+
+Nine findings. Fixed:
+
+- A feather-light pull was quicker than no pull: it switched off the rules that bleed off speed over the limit. Holding back is now only ever speed taken off on top of the usual rules.
+- The lightest touch ended a turbo: now only a pull of half or more does.
+- A pad landed on while still pulling was wasted, which is the very thing holding back is for: after any pad, holding back does nothing for half a second.
+- Holding back across a gap dropped the ball into it to skip along thin air: it does nothing while the ball is flung across a gap.
+- The pull was measured from where the finger landed, so a thumb resting low could not pull all the way and a finger drifting down braked for good: it is measured from the highest the finger has been, there is always room below to pull fully, and a slow wander down (under 5% of the screen a second) takes the mark with it.
+- Letting go of one of two held keys released the brake.
+- Everything a player smashes, knocks over or takes is sent together a few times a second: a row of fruit is one message.
+
+Left: a fruit two friends reach at the same moment can be had by both, and on the taker's own road it does not come back while on the others' it does. Nothing is kept from a friend race, so neither changes a result.
+
+Re-verified 2026-11-20: `tsc` clean; 997 tests (4 new, shown failing first). Real touch events: a finger landing at 85% down the screen reads no pull, and 0.92 at the bottom edge; a finger wandering 18% down over five seconds never reads a pull; a quick pull reads full; lifting reads none.

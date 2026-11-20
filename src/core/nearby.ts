@@ -33,7 +33,7 @@ export type Message =
   | ({ t: 'pos'; n: number; from?: string } & Report)
   | { t: 'done'; n: number; time: number; from?: string }
   | { t: 'out'; n: number; from?: string }
-  | { t: 'hit'; n: number; i: number; from?: string }
+  | { t: 'hit'; n: number; is: number[]; from?: string }
   | { t: 'cup'; id: string; race: number; of: number; points: { id: string; p: number }[] }
   | { t: 'nocup' }
   | { t: 'offer'; k: number; level: string; cup?: string }
@@ -101,7 +101,7 @@ export function decode(raw: string): Message | null {
     case 'out':
       return num(m.n) ? { t: 'out', n: m.n, ...from } : null;
     case 'hit':
-      return num(m.n) && num(m.i) && Number.isInteger(m.i) && m.i >= 0 ? { t: 'hit', n: m.n, i: m.i, ...from } : null;
+      return num(m.n) && Array.isArray(m.is) && m.is.length > 0 && m.is.length <= 64 && m.is.every((i) => num(i) && Number.isInteger(i) && i >= 0) ? { t: 'hit', n: m.n, is: m.is as number[], ...from } : null;
     case 'cup': {
       if (!text(m.id) || !num(m.race) || !num(m.of) || !Array.isArray(m.points) || m.points.length > PARTY_SIZE) return null;
       const points = (m.points as Record<string, unknown>[]).filter((row) => row && text(row.id) && num(row.p)).map((row) => ({ id: row.id as string, p: row.p as number }));
@@ -244,7 +244,7 @@ export class Party {
   private readonly busy = new Set<string>();
   /** Something on show has changed. */
   onChange = (): void => {};
-  /** Another player has smashed or knocked over the thing at `index` on the course: it is gone for everyone. */
+  /** Another player has smashed, knocked over or taken the thing at `index` on the course: it goes for everyone. */
   onHit = (_from: string, _index: number): void => {};
   /** A race is starting. Answer false if this player cannot take part just now: they sit this one out. */
   onStart = (_level: string): boolean => true;
@@ -430,9 +430,9 @@ export class Party {
     if (this.live()) this.tell(encode({ t: 'pos', n: this.race, ...spot, ...this.asMe() }));
   }
 
-  /** Tell the others this player has smashed or knocked over something on the course. */
-  hit(index: number): void {
-    if (this.live()) this.tell(encode({ t: 'hit', n: this.race, i: index, ...this.asMe() }));
+  /** Tell the others what this player has just smashed, knocked over or taken on the course. */
+  hit(indices: number[]): void {
+    if (this.live() && indices.length) this.tell(encode({ t: 'hit', n: this.race, is: indices.slice(0, 64), ...this.asMe() }));
   }
 
   /** Tell the others this player has crossed the line. */
@@ -575,7 +575,7 @@ export class Party {
     }
     if (!known || (message.t !== 'pos' && message.t !== 'done' && message.t !== 'out' && message.t !== 'hit') || message.n !== this.race) return;
     if (message.t === 'hit') {
-      this.onHit(from, message.i);
+      for (const index of message.is) this.onHit(from, index);
       return this.tell(encode({ ...message, from }), from);
     }
     this.note({ ...message, from });
@@ -621,7 +621,10 @@ export class Party {
       for (const friend of this.friends()) this.busy.add(friend.id);
       return this.begin(message.level);
     }
-    if (message.t === 'hit' && message.n === this.race && message.from) return this.onHit(message.from, message.i);
+    if (message.t === 'hit' && message.n === this.race && message.from) {
+      for (const index of message.is) this.onHit(message.from, index);
+      return;
+    }
     if ((message.t === 'pos' || message.t === 'done' || message.t === 'out') && message.n === this.race) this.note(message);
   }
 

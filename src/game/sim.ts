@@ -17,6 +17,10 @@ export const COUNTDOWN = 3;
 /** Holding back takes this much speed off a second at its hardest, down to a gentle roll and no slower. */
 const HOLD_BACK = 45;
 const ROLL = 14;
+/** Holding back this hard or harder ends a turbo; a lighter touch only takes the edge off once it is over. */
+const ENDS_TURBO = 0.5;
+/** After a pad is touched, holding back does nothing for this long: time to let go of the pull that got the ball there. */
+const PAD_GRACE = 0.5;
 const START_S = 12;
 /** How far past the kerb a steering target may reach, so pressing into the wall registers as a scrape. */
 export const PUSH = 1.2;
@@ -137,6 +141,9 @@ export class Sim {
   autopilot: Autopilot = 'none';
   /** How hard the player is holding the ball back, 0 to 1. It works in the air too, where it also brings the ball down sooner. */
   brake = 0;
+  /** Seconds for which holding back does nothing: just after a pad, and while being flung across a gap. */
+  private freeT = 0;
+  private flung = false;
   /** A helping hand for a player behind in a race with friends: the share further it rolls on the road for its speed. */
   help = 0;
   /** Set for a computer rival: it drives itself, held back as the driver says. */
@@ -975,6 +982,8 @@ export class Sim {
       }
     }
 
+    this.freeT -= dt;
+    const held = this.freeT > 0 || this.flung ? 0 : this.brake;
     // Speed: always rolling, quicker downhill, and boosts fade slowly so chaining them pays off.
     this.turboT -= dt;
     if (this.finished) {
@@ -984,19 +993,17 @@ export class Sim {
       this.turboT = 0;
       this.v += (LIFT_SPEED - this.v) * Math.min(1, dt * 6);
       this.time += dt;
-    } else if (this.brake > 0) {
-      // Held back: the speed comes off, a turbo with it, but the ball never stops rolling.
-      this.turboT = 0;
-      this.v = this.v > ROLL ? Math.max(ROLL, this.v - HOLD_BACK * this.brake * dt) : Math.min(ROLL, this.v + 10 * dt);
-      this.v = clamp(this.v, MIN_SPEED, TURBO_SPEED);
-      this.time += dt;
     } else {
+      // Held back hard, a turbo ends. Whatever the road does to the speed still happens: holding back only ever
+      // takes speed off, down to a roll, so no touch of it is quicker than none.
+      if (held >= ENDS_TURBO) this.turboT = 0;
       if (this.v < CRUISE) this.v += 10 * dt;
       else this.v -= (this.v - CRUISE) * 0.24 * dt;
       this.v -= GRAVITY * f.t.y * dt;
       // Turbo holds a speed far above the usual limit, then it bleeds off quickly.
       if (this.turboT > 0) this.v = Math.max(this.v, TURBO_SPEED);
       else if (this.v > MAX_SPEED) this.v -= (this.v - MAX_SPEED) * 2.5 * dt;
+      if (held > 0 && this.turboT <= 0 && this.v > ROLL) this.v = Math.max(ROLL, this.v - HOLD_BACK * held * dt);
       this.v = clamp(this.v, MIN_SPEED, TURBO_SPEED);
       this.time += dt;
     }
@@ -1058,6 +1065,8 @@ export class Sim {
         this.v = Math.max(this.v, 30);
         this.vh = (13 * (gap.s1 - gap.s0 + 4)) / 43;
         this.h = Math.max(this.h, 0.01);
+        // The arc is made to clear the gap: there is no cutting it short.
+        this.flung = true;
         this.tally.launches++;
         this.emit({ type: 'launch' });
       } else if (this.h === 0 && this.s > gap.s0 && this.s < gap.s1 - 1) {
@@ -1070,11 +1079,12 @@ export class Sim {
     if (this.h > 0 || this.vh > 0) {
       // Held back in the air the ball drops sooner as well as travelling less far: a jump can be cut short to
       // come down on something worth landing on.
-      this.vh -= 26 * (1 + this.brake) * dt;
+      this.vh -= 26 * (1 + held) * dt;
       this.h += this.vh * dt;
       if (this.h <= 0) {
         this.h = 0;
         this.vh = 0;
+        this.flung = false;
         this.emit({ type: 'land' });
       }
     }
@@ -1114,6 +1124,7 @@ export class Sim {
         if (Math.abs(ds) < 3 && dx < 1.9 && this.h < 0.6 && ready) {
           this.readyAt[index] = Infinity;
           this.v = Math.max(this.v, Math.min(MAX_SPEED, Math.max(this.v, CRUISE) + 13));
+          this.freeT = PAD_GRACE;
           this.boostT = Math.max(this.boostT, 1.1);
           this.emit({ type: 'boost', index });
         }
@@ -1122,6 +1133,7 @@ export class Sim {
         if (Math.abs(ds) < 4 && dx < 2.6 && this.h < 0.6 && ready) {
           this.readyAt[index] = Infinity;
           this.turboT = TURBO_TIME;
+          this.freeT = PAD_GRACE;
           this.v = TURBO_SPEED;
           this.boostT = TURBO_TIME;
           this.tally.turbos++;

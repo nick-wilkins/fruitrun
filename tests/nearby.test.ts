@@ -52,9 +52,10 @@ describe('messages between devices', () => {
   });
 
   it('carry word of a smash, and only of a thing that can be on a course', () => {
-    expect(decode(encode({ t: 'hit', n: 2, i: 14 }))).toEqual({ t: 'hit', n: 2, i: 14 });
-    expect(decode('{"t":"hit","n":2,"i":-1}')).toBeNull();
-    expect(decode('{"t":"hit","n":2,"i":1.5}')).toBeNull();
+    expect(decode(encode({ t: 'hit', n: 2, is: [14, 3] }))).toEqual({ t: 'hit', n: 2, is: [14, 3] });
+    expect(decode('{"t":"hit","n":2,"is":[-1]}')).toBeNull();
+    expect(decode('{"t":"hit","n":2,"is":[1.5]}')).toBeNull();
+    expect(decode('{"t":"hit","n":2,"is":[]}')).toBeNull();
   });
 
   it('carry a cup table', () => {
@@ -384,10 +385,10 @@ describe('a party', () => {
     kit.onHit = (from, index) => seen.push(`kit:${from}:${index}`);
     sam.start('level-1');
     const [, adaId, kitId] = sam.players.map((p) => p.id);
-    ada.hit(7);
-    expect(seen).toEqual([`sam:${adaId}:7`, `kit:${adaId}:7`]);
+    ada.hit([7, 9]);
+    expect(seen).toEqual([`sam:${adaId}:7`, `sam:${adaId}:9`, `kit:${adaId}:7`, `kit:${adaId}:9`]);
     seen.length = 0;
-    sam.hit(3);
+    sam.hit([3]);
     expect(seen).toEqual(['ada:host:3', 'kit:host:3']);
     void kitId;
   });
