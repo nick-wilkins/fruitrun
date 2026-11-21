@@ -23,13 +23,17 @@ const wholes = new WeakMap<HTMLElement, HTMLElement>();
 export const wholeOf = (built: HTMLElement): HTMLElement => wholes.get(built) ?? built;
 
 /**
- * A screen that fills squarer devices with a taller painting. What comes back is the 16:9 window over the place
- * the old picture has in the painting: a screen is built in it exactly as it was in a 16:9 stage, and stays in
- * step with the painting at every shape of device.
+ * A screen with a taller painting behind it. What comes back is a 16:9 window to build the screen in, exactly as
+ * in a 16:9 stage.
+ *
+ * Usually the painting is only a setting: it fills the whole device, phone or tablet, and the window sits in the
+ * middle of it as big as will fit, clear of a phone's notch and home bar. With `painted`, the screen's own
+ * buttons are painted into the picture (the blender's squares), so the window is fixed over the old picture's
+ * place in the painting and the two keep in step at every shape of device.
  */
-export function tallStage(classes: string, tall: Tall): HTMLElement {
+export function tallStage(classes: string, tall: Tall, painted = false): HTMLElement {
   const stage = document.createElement('div');
-  stage.className = `stage tall ${classes}`;
+  stage.className = `stage tall ${painted ? 'painted' : 'cover'} ${classes}`;
   const art = document.createElement('div');
   art.className = 'tall-art';
   art.style.setProperty('--lift', (tall.top / (100 - tall.height)).toFixed(4));
@@ -39,10 +43,18 @@ export function tallStage(classes: string, tall: Tall): HTMLElement {
   picture.alt = '';
   picture.draggable = false;
   const window = document.createElement('div');
-  window.className = 'tall-window';
-  window.style.cssText = `left:${tall.left ?? 0}%;top:${tall.top}%;width:${tall.width ?? 100}%;height:${tall.height}%`;
-  art.append(picture, window);
+  art.append(picture);
   stage.append(art);
+  if (painted) {
+    window.className = 'tall-window';
+    window.style.cssText = `left:${tall.left ?? 0}%;top:${tall.top}%;width:${tall.width ?? 100}%;height:${tall.height}%`;
+    art.append(window);
+  } else {
+    // The window keeps the shape the old picture had, so everything placed in it sits as it always did.
+    window.className = 'tall-window free';
+    window.style.setProperty('--aspect', ((tall.width ?? 100) / (tall.height * 0.75)).toFixed(4));
+    stage.append(window);
+  }
   setBackdrop(asset(tall.art));
   wholes.set(window, stage);
   return window;

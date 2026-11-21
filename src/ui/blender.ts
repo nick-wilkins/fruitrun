@@ -30,7 +30,7 @@ function pile(index: number, capacity: number): [number, number] {
 export function blenderScreen(app: App, capacity = MAX_JUG): HTMLElement {
   const { save } = app;
   const big = capacity > MAX_JUG;
-  const stage = tallStage(`blend-stage${big ? ' big' : ''}`, STALL);
+  const stage = tallStage(`blend-stage${big ? ' big' : ''}`, STALL, true);
 
   const jug: string[] = [];
   let page = 0;

@@ -3863,14 +3863,42 @@ input.name {
 
 /* ---------- a screen with a taller painting fills squarer devices ---------- */
 
-/* As tall as the device allows, from 16:9 up to the painting's own 4:3. */
-.stage.tall {
-  width: min(100vw, calc(100dvh * 16 / 9));
-  height: min(100dvh, calc(100vw * 3 / 4));
-  aspect-ratio: auto;
+/* Room a phone needs kept clear: its notch at one end, and the home bar along the bottom. */
+:root {
+  --sl: env(safe-area-inset-left, 0px);
+  --sr: env(safe-area-inset-right, 0px);
+  --st: env(safe-area-inset-top, 0px);
+  --sb: env(safe-area-inset-bottom, 0px);
 }
 
-/* The painting, always 4:3. At 4:3 it is all on show; on a wider screen it rides up so the 16:9 picture inside it is what shows. */
+/* A screen with a taller painting fills the device edge to edge: there is nothing behind it to fade into. */
+.stage.tall {
+  width: 100vw;
+  height: min(100dvh, calc(100vw * 3 / 4));
+  aspect-ratio: auto;
+  font-size: 1.7vw;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/*
+ * Where the screen's own buttons are painted into the picture, it cannot be wider than the picture's 16:9 middle.
+ * On a phone that leaves bands at the sides, which it fades into.
+ */
+.stage.tall.painted {
+  --wide: min(100vw, calc(100dvh * 16 / 9));
+  width: var(--wide);
+  font-size: calc(var(--wide) * 0.017);
+}
+
+@media (min-aspect-ratio: 16/9) {
+  .stage.tall.painted {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 1.6%, #000 98.4%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 1.6%, #000 98.4%, transparent);
+  }
+}
+
+/* The painting, always 4:3. At 4:3 it is all on show; on a wider screen it rides up so the middle of it is what shows. */
 .tall-art {
   position: absolute;
   left: 0;
@@ -3887,7 +3915,7 @@ input.name {
   object-fit: cover;
 }
 
-/* The 16:9 window over the old picture's place in a taller painting: a screen is built in here. */
+/* The window over the old picture's place in a taller painting: a screen is built in here. */
 .tall-window {
   position: absolute;
 }
@@ -3896,4 +3924,86 @@ input.name {
 .tall-window > .modal {
   top: -30cqw;
   bottom: -30cqw;
+}
+
+/*
+ * A window that is not tied to the painting: as big as fits the device, in the middle, clear of the notch and
+ * the home bar. Everything in it is sized by the window, as it was by the stage.
+ */
+.tall-window.free {
+  --win: min(calc(100vw - var(--sl) - var(--sr)), calc((min(100dvh, 75vw) - var(--sb)) * var(--aspect, 1.7778)));
+  left: 50%;
+  top: calc((100% - var(--sb) - var(--win) / var(--aspect, 1.7778)) / 2);
+  width: var(--win);
+  aspect-ratio: var(--aspect, 1.7778);
+  translate: -50% 0;
+  container-type: inline-size;
+  font-size: calc(var(--win) * 0.017);
+}
+
+.tall-window.free > .modal {
+  inset: -60vh -60vw;
+}
+
+/* ---------- the map, which can be drawn up and down where the screen is shorter than its painting ---------- */
+
+.map-pan {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  touch-action: pan-y;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.map-pan::-webkit-scrollbar {
+  display: none;
+}
+
+.map-pan > .tall-art {
+  position: relative;
+  top: 0;
+}
+
+/* The map's own buttons keep clear of a phone's notch and home bar. */
+.map-stage.tall .corner {
+  left: calc(1.4cqw + var(--sl));
+  top: calc(1.4cqw + var(--st));
+}
+
+.map-stage.tall .topbar {
+  right: calc(1.4cqw + var(--sr));
+  top: calc(1.4cqw + var(--st));
+}
+
+.map-stage.tall .way {
+  bottom: calc(1.4cqw + var(--sb));
+}
+
+.map-stage.tall .way.back {
+  left: calc(1.2cqw + var(--sl));
+}
+
+.map-stage.tall .way.on {
+  right: calc(1.2cqw + var(--sr));
+}
+
+/* A race keeps its gauges clear of them too. */
+.hud {
+  inset: var(--st) var(--sr) var(--sb) var(--sl);
+}
+
+/* On a phone the top row has no room for the world's name beside it: it goes under the home button. */
+@media (max-width: 950px) {
+  .map-stage.tall .corner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4cqw;
+  }
+
+  .map-stage.tall .world-name {
+    font-size: 0.95em;
+  }
 }

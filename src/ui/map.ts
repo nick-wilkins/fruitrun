@@ -198,7 +198,9 @@ export function mapScreen(app: App): HTMLElement {
   const art = tall ? el('div.tall-art', { style: `--lift:${(tall.top / (100 - tall.height)).toFixed(4)}` }) : stage;
   const down = (y: number) => (tall ? tall.top + (y * tall.height) / 100 : y);
   art.append(el('img.bg', { src: asset(tall?.art ?? world.art), alt: '', draggable: false }));
-  if (tall) stage.append(art);
+  // On a screen wider than the painting is tall, the map can be drawn up and down with a finger.
+  const pan = tall ? el('div.map-pan', {}, art) : null;
+  if (pan) stage.append(pan);
   setBackdrop(asset(tall?.art ?? world.art));
 
   const here = save.last ?? LEVELS[0].id;
@@ -317,5 +319,10 @@ export function mapScreen(app: App): HTMLElement {
   );
   art.append(blender);
   stage.append(el('div.corner', {}, home, el('div.chip.world-name', {}, world.name)), bar);
+  // Open on the level the player is at, as near the middle of the screen as the map allows.
+  if (pan) {
+    const at = LEVELS.find((level) => level.id === here && level.world === app.world) ?? LEVELS.find((level) => level.world === app.world);
+    setTimeout(() => (pan.scrollTop = ((at ? down(at.y) : 50) / 100) * art.offsetHeight - pan.clientHeight / 2));
+  }
   return stage;
 }
