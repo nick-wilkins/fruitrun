@@ -2,7 +2,7 @@ import { sfx } from '../audio';
 import { ingredient } from '../data/ingredients';
 import { CUPS, cupOpen } from '../core/cups';
 import { COURSES, isUnlocked, legendaryOpen, superBlenderOpen, swept } from '../core/progress';
-import { DIFFICULTIES, racesUnlocked } from '../core/race';
+import { canRace, DIFFICULTIES, racesUnlocked } from '../core/race';
 import { LEVELS, levelByNumber, WORLDS, type Level } from '../data/levels';
 import { newOn, starTimesFor } from '../game/courses';
 import { rivalDrivers } from '../game/rivals';
@@ -45,37 +45,34 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
     '▶ Play',
   );
   const starts = el('div.starts', {}, play);
-  if (!racesUnlocked()) {
-    starts.append(
-      el(
-        'button.btn.purple.big.locked',
-        {
-          onclick: () => {
-            sfx.tap();
-            app.wanted = 'race';
-            app.show('unlock');
-          },
-        },
-        '🔒 Race',
-      ),
-    );
-  } else {
+  /** Where a race that needs the unlock leads: to what the unlock is. */
+  const offer = () => {
+    sfx.tap();
+    app.wanted = 'race';
+    app.show('unlock');
+  };
+  const owned = racesUnlocked();
+  if (!DIFFICULTIES.some(({ id }) => canRace(level, id))) starts.append(el('button.btn.purple.big.locked', { onclick: offer }, '🔒 Race'));
+  else {
     // Race swaps the two buttons for the choice of how hard, with the one picked last time standing out.
     const race = el('button.btn.purple.big', {}, '🏁 Race');
     race.onclick = () => {
       sfx.tap();
       // Legendary is for whoever has already won here on Hard.
       const legend = legendaryOpen(app.save.levels[level.id]);
-      const last = app.save.race === 'legendary' && !legend ? 'hard' : (app.save.race ?? 'easy');
+      // Before the unlock there is the one race to try, and the rest are shown locked beside it.
+      const last = !owned ? 'easy' : app.save.race === 'legendary' && !legend ? 'hard' : (app.save.race ?? 'easy');
       const pick = el(
         'div.race-pick',
         {},
-        el('p', {}, legend ? 'Race three friends, or take on Chilli alone!' : 'Race three friends! How fast should they be?'),
+        el('p', {}, !owned ? 'Try a race for free! The faster ones come with the unlock.' : legend ? 'Race three friends, or take on Chilli alone!' : 'Race three friends! How fast should they be?'),
         el(
           'div.starts',
           {},
           ...DIFFICULTIES.map(({ id, name }) =>
-            id === 'legendary' && !legend
+            !canRace(level, id)
+              ? el('button.btn.blue.locked', { onclick: offer }, `🔒 ${name}`)
+              : id === 'legendary' && !legend
               ? el(
                   'button.btn.blue.locked',
                   {
@@ -104,7 +101,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       starts.replaceWith(pick);
       // Setting the rivals up takes a few trial runs of the course. Do it now, a difficulty at a time and the
       // likeliest first, so the race starts at once when one is picked.
-      const order = [last, ...DIFFICULTIES.map(({ id }) => id).filter((id) => id !== last && (id !== 'legendary' || legend))];
+      const order = [last, ...DIFFICULTIES.map(({ id }) => id).filter((id) => id !== last && canRace(level, id) && (id !== 'legendary' || legend))];
       const prepare = () => {
         const next = order.shift();
         if (!next || !pick.isConnected) return;
@@ -177,7 +174,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
       el('div.kicker', {}, `${WORLDS[level.world].name} · Level ${level.label}`),
       el('h2', {}, level.name),
       record ? el('div.best', {}, stars(record.stars), best, ghost) : el('p', {}, `Roll fast to win up to ${countOf(5, fruit.name)}!`),
-      record && racesUnlocked() ? raceMedals(record.races, DIFFICULTIES.filter(({ id }) => id !== 'legendary' || legendaryOpen(record))) : null,
+      record && (racesUnlocked() || record.races) ? raceMedals(record.races, DIFFICULTIES.filter(({ id }) => id !== 'legendary' || legendaryOpen(record))) : null,
       fresh.length ? el('p.new-here', {}, el('b', {}, 'New here: '), fresh.join(', ')) : null,
       leadsOn ? el('p.need', {}, `Get ${level.need} stars here to open the next level`, stars(level.need, level.need)) : null,
       targets,
@@ -315,7 +312,7 @@ export function mapScreen(app: App): HTMLElement {
     el('div.chip', {}, el('img', { src: asset('assets/smoothie-cup.png'), alt: 'Smoothie points' }), String(save.points)),
     go('Blend', 'green', 'blender'),
     go(racesUnlocked() ? 'Cups' : '🔒 Cups', 'purple', 'cups'),
-    go(racesUnlocked() ? 'Together' : '🔒 Together', 'blue', 'party'),
+    go('Together', 'blue', 'party'),
     go('Book', 'orange', 'book'),
   );
   art.append(blender);

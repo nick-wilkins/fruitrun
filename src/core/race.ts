@@ -75,3 +75,15 @@ export function podiumFruit(place: number): number {
 export function racesUnlocked(): boolean {
   return shopNow().owned;
 }
+
+/**
+ * Whether this race may be run. Before the purchase there is one to try: the first level, at the gentlest speed.
+ */
+export function canRace(level: { n: number }, difficulty: Difficulty): boolean {
+  return racesUnlocked() || (level.n === 1 && difficulty === 'easy');
+}
+
+/** Whether a game with friends may be started here. Joining one a friend has started is open to everyone. */
+export function canStartGame(): boolean {
+  return racesUnlocked();
+}

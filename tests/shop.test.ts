@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { racesUnlocked } from '../src/core/race';
+import { canRace, canStartGame, racesUnlocked } from '../src/core/race';
 import { CLOSED, grownUpSum, settle, stock } from '../src/core/shop';
 
 describe('the shop', () => {
@@ -29,6 +29,31 @@ describe('the shop', () => {
     const owned = { owned: true, pending: false, price: null };
     expect(settle(owned, 'cancelled')).toEqual(owned);
     expect(settle(owned, 'pending')).toEqual(owned);
+  });
+});
+
+describe('the taste of racing before the unlock', () => {
+  it('lets anyone race the first level on Easy, and nothing else', () => {
+    stock(CLOSED);
+    expect(canRace({ n: 1 }, 'easy')).toBe(true);
+    expect(canRace({ n: 1 }, 'medium')).toBe(false);
+    expect(canRace({ n: 1 }, 'legendary')).toBe(false);
+    expect(canRace({ n: 2 }, 'easy')).toBe(false);
+  });
+
+  it('opens every race once the unlock is owned', () => {
+    stock({ ...CLOSED, owned: true });
+    expect(canRace({ n: 2 }, 'easy')).toBe(true);
+    expect(canRace({ n: 40 }, 'hard')).toBe(true);
+    stock(CLOSED);
+  });
+
+  it('lets only an owner start a game with friends', () => {
+    stock(CLOSED);
+    expect(canStartGame()).toBe(false);
+    stock({ ...CLOSED, owned: true });
+    expect(canStartGame()).toBe(true);
+    stock(CLOSED);
   });
 });
 

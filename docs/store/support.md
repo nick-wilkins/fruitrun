@@ -8,7 +8,7 @@ Draft for Nick to check and host. Replace the item in square brackets before pub
 
 **How do I unlock races and cups?**
 
-Tap Race on any level, or Cups or Together on the map, then "Ask a grown-up". After a short sum for the grown-up, tap Unlock. It is one payment. There are no adverts and nothing else to buy.
+Tap a padlocked Race on a level, Cups on the map, or "Start a game" under Together, then "Ask a grown-up". After a short sum for the grown-up, tap Unlock. It is one payment. There are no adverts and nothing else to buy.
 
 **I already paid. How do I get races back?**
 
@@ -20,7 +20,7 @@ The device uses Ask to Buy. The family organiser gets a request on their own dev
 
 **How do we play together?**
 
-Each player needs their own iPad or iPhone with the game unlocked. Switch Wi-Fi on for every device. You do not need to be connected to a network or the internet.
+Each player needs their own iPad or iPhone. Only the player who starts the game needs it unlocked: joining is free. Switch Wi-Fi on for every device. You do not need to be connected to a network or the internet.
 
 1. On every device, open the map and tap Together.
 2. One player taps "Start a game".

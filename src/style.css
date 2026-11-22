@@ -2262,9 +2262,13 @@ button.mix-item {
   }
 }
 
+/*
+ * Reduce Motion: nothing bobs, spins or pulses for ever. Each such thing moves once and comes to rest. The lengths
+ * are left alone: cut short, anything that repeats would buzz, and a message that fades away would never be seen.
+ */
 @media (prefers-reduced-motion: reduce) {
   * {
-    animation-duration: 0.01s !important;
+    animation-iteration-count: 1 !important;
   }
 }
 
@@ -3119,6 +3123,75 @@ input.name {
   font-weight: 700;
   font-size: 1.15em;
   line-height: 1.7;
+}
+
+/* What is locked, shown and said: the films on the left, the words on the right, the ways on underneath. */
+.unlock-card.pitch {
+  display: grid;
+  grid-template-columns: 19em auto;
+  column-gap: 1.6em;
+  align-items: center;
+  padding: 1.1em 1.6em 1.2em;
+}
+
+.unlock-card.pitch .row {
+  grid-column: 1 / -1;
+  align-items: center;
+  margin-top: 0.7em;
+}
+
+.unlock-card.pitch h2 {
+  font-size: 1.6em;
+}
+
+.unlock-card.pitch .unlock-list {
+  font-size: 1em;
+  line-height: 1.55;
+  white-space: nowrap;
+}
+
+.unlock-card.pitch p {
+  margin: 0.35em 0 0;
+}
+
+.unlock-film {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #2b1d10;
+  border: 0.2em solid #b9772f;
+  border-radius: 0.9em;
+  pointer-events: none;
+}
+
+.unlock-say {
+  min-height: 2.5em;
+  font-weight: 700;
+}
+
+.unlock-tabs {
+  display: flex;
+  gap: 0.4em;
+  justify-content: center;
+  margin-top: 0.4em;
+}
+
+.unlock-tab {
+  padding: 0.3em 0.75em;
+  font: inherit;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: #7a4a1c;
+  background: #fff3d6;
+  border: 0.15em solid #d9a45e;
+  border-radius: 1em;
+}
+
+.unlock-tab.on {
+  color: #4a2a08;
+  background: #ffc35c;
+  border-color: #b9772f;
 }
 
 .unlock-lead {

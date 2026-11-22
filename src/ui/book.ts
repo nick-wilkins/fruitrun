@@ -201,7 +201,8 @@ function records(app: App): HTMLElement {
   const page = el('div.book-page');
   const played = LEVELS.filter((l) => save.levels[l.id]);
   if (!played.length) page.append(el('p', {}, 'No records yet. Play a level to set your first best time!'));
-  const racing = racesUnlocked();
+  // The one free race leaves a result to show, too.
+  const racing = racesUnlocked() || played.some((l) => save.levels[l.id].races);
   const won = (id: string) => played.filter((l) => save.levels[l.id].races?.[id as 'easy'] === 1).length;
   if (racing && played.length) {
     page.append(

@@ -5,7 +5,7 @@ import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cup
 import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
 import { catchUp, Party } from './core/nearby';
-import { racesUnlocked, rivalsFor, SEATS, type Difficulty, type Finisher } from './core/race';
+import { canRace, canStartGame, racesUnlocked, rivalsFor, SEATS, type Difficulty, type Finisher } from './core/race';
 import { CLOSED, settle, shopNow, stock } from './core/shop';
 import { LEVELS, levelById, type Level } from './data/levels';
 import { courseFor, warmCourses } from './game/courses';
@@ -84,8 +84,8 @@ function endRun(): void {
   canvas.classList.add('hidden');
 }
 
-/** The screens behind the unlock: cups are races, and so is a game with friends. */
-const PAID: Screen[] = ['cups', 'cuptable', 'party'];
+/** The screens behind the unlock. A game with friends is not one: anyone may join, and only starting one is paid for. */
+const PAID: Screen[] = ['cups', 'cuptable'];
 
 /** Anything with other marbles in it needs the unlock. Without it, shows where it is offered and answers true. */
 function shut(): boolean {
@@ -141,7 +141,7 @@ const app: App = {
   },
   show(screen: Screen) {
     if (PAID.includes(screen) && !racesUnlocked()) {
-      app.wanted = screen === 'party' ? 'party' : 'cups';
+      app.wanted = 'cups';
       screen = 'unlock';
     }
     showing = screen;
@@ -173,11 +173,16 @@ const app: App = {
   playCup() {
     const entered = app.save.cup;
     const cup = entered && cupById(entered.id);
+    if (shut()) return;
     if (!entered || !cup) return app.show('cups');
     app.play(levelById(cup.levels[entered.race]), entered.difficulty, `${cup.name}, race ${entered.race + 1} of ${CUP_RACES}`);
   },
   play(level: Level, race?: Difficulty, cup?: string, together = false) {
-    if ((race || together) && shut()) return;
+    // One race is free to try, and so is joining a friend's game. Anything else with other marbles in it is paid for.
+    if (together ? party.phase === 'hosting' && !canStartGame() : race && (cup ? !racesUnlocked() : !canRace(level, race))) {
+      app.wanted = together ? 'party' : 'race';
+      return app.show('unlock');
+    }
     if (!together && party.phase !== 'idle') party.leave();
     if (renderer.getContext().isContextLost()) {
       // The device usually hands the surface back by itself within moments; the ask below only helps where the
@@ -435,9 +440,9 @@ function owns(owned: boolean): void {
   if (owned === shopNow().owned) return;
   stock({ ...shopNow(), owned, pending: owned ? false : shopNow().pending });
   if (owned) askedStore.clear();
-  // A game with friends cannot be kept open from behind the lock.
-  else party.leave();
-  if (!run && (['map', 'unlock', ...PAID] as Screen[]).includes(showing)) app.show(showing);
+  // A game with friends cannot be kept open from behind the lock, though one a friend started can be stayed in.
+  else if (party.phase === 'hosting') party.leave();
+  if (!run && (['map', 'unlock', 'party', ...PAID] as Screen[]).includes(showing)) app.show(showing);
 }
 // A grown-up's yes, a purchase on another device or a refund can arrive at any time.
 store.onChange(owns);

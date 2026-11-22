@@ -2,7 +2,7 @@ import { sfx } from '../audio';
 import { CUPS, cupById, cupOpen } from '../core/cups';
 import { PARTY_SIZE } from '../core/nearby';
 import { isUnlocked } from '../core/progress';
-import { SEATS } from '../core/race';
+import { canStartGame, SEATS } from '../core/race';
 import { LEVELS } from '../data/levels';
 import { toldStore } from '../platform';
 import type { App } from './app';
@@ -209,8 +209,18 @@ export function partyScreen(app: App): HTMLElement {
     card(
       el('h2', {}, '👫 Play together'),
       party.why ? el('p.unlock-wait', {}, WHY[party.why]) : el('p', {}, 'Race friends who are close by, each on their own iPad or iPhone.'),
-      el('div.row.party-choices', {}, choice('🏠', 'Start a game', 'green', () => party.host()), choice('🔍', 'Join a game', 'blue', () => party.browse())),
-      el('p.unlock-note', {}, `Wi-Fi needs to be switched on. Up to ${PARTY_SIZE} can play.`),
+      el(
+        'div.row.party-choices',
+        {},
+        canStartGame()
+          ? choice('🏠', 'Start a game', 'green', () => party.host())
+          : bigChoice('🔒', 'Start a game', 'green.locked', () => {
+              app.wanted = 'party';
+              app.show('unlock');
+            }),
+        choice('🔍', 'Join a game', 'blue', () => party.browse()),
+      ),
+      el('p.unlock-note', {}, canStartGame() ? `Wi-Fi needs to be switched on. Up to ${PARTY_SIZE} can play.` : 'Joining a friend\'s game is free. Starting your own comes with the unlock.'),
       el('div.row', {}, button('Back', 'purple', () => app.show('map'))),
     );
   }
