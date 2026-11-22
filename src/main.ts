@@ -375,8 +375,7 @@ const app: App = {
 setMuted(app.save.muted);
 // Browsers hold sound back until the player does something, and differ on which event counts.
 for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) window.addEventListener(type, unlockAudio, { passive: true });
-// The four produced tunes lead; the synthesised ones only come round once those have all played.
-startMusic(['track1.mp3', 'track7.m4a', 'track2.mp3', 'track8.m4a', 'track3.m4a', 'track5.m4a', 'track6.m4a'].map((file) => asset(`assets/audio/${file}`)), 4);
+startMusic(['track1.mp3', 'track7.m4a', 'track2.mp3', 'track8.m4a'].map((file) => asset(`assets/audio/${file}`)));
 // A phone call or a trip to another app can leave the sound switched off when the game comes back.
 onResume(unlockAudio);
 document.addEventListener('contextmenu', (e) => e.preventDefault());
