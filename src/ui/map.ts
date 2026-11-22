@@ -52,6 +52,7 @@ function levelCard(app: App, level: Level, close: () => void): HTMLElement {
         {
           onclick: () => {
             sfx.tap();
+            app.wanted = 'race';
             app.show('unlock');
           },
         },

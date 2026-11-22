@@ -140,7 +140,10 @@ const app: App = {
     app.persist();
   },
   show(screen: Screen) {
-    if (PAID.includes(screen) && !racesUnlocked()) screen = 'unlock';
+    if (PAID.includes(screen) && !racesUnlocked()) {
+      app.wanted = screen === 'party' ? 'party' : 'cups';
+      screen = 'unlock';
+    }
     showing = screen;
     // Anywhere but the waiting room is out of the game with friends: nobody plays alone while still counted in.
     if (screen !== 'party' && party.phase !== 'idle') party.leave();
@@ -160,6 +163,7 @@ const app: App = {
     ui.replaceChildren(wholeOf(build(app)));
   },
   cupResult: null,
+  wanted: null,
   startCup(cup: Cup, difficulty: Difficulty) {
     if (shut()) return;
     startCup(app.save, cup, difficulty);

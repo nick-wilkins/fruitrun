@@ -3107,7 +3107,7 @@ input.name {
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  min-width: 26em;
+  min-width: 30em;
 }
 
 .unlock-list {
@@ -3119,6 +3119,15 @@ input.name {
   font-weight: 700;
   font-size: 1.15em;
   line-height: 1.7;
+}
+
+.unlock-lead {
+  margin-bottom: 0;
+}
+
+.unlock-cost {
+  margin: 0.3em 0 0;
+  font-weight: 700;
 }
 
 .unlock-wait {

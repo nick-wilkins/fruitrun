@@ -8,6 +8,9 @@ import type { Level } from '../data/levels';
 
 export type Screen = 'menu' | 'map' | 'blender' | 'superblender' | 'book' | 'cups' | 'cuptable' | 'unlock' | 'party';
 
+/** The things the unlock opens, as a player might ask for one. */
+export type Wanted = 'race' | 'cups' | 'party';
+
 export interface App {
   /** The save of whoever is playing. Before anyone has started, a blank one that is never kept. */
   save: Save;
@@ -39,6 +42,8 @@ export interface App {
   readonly party: Party;
   /** What is known of the unlock for races and cups. */
   readonly shop: Shop;
+  /** The locked thing last asked for, so the unlock screen can say which it was. */
+  wanted: Wanted | null;
   /** The unlock's price, asking the store if it is not yet known; null if the store cannot be reached. */
   price(): Promise<string | null>;
   /** Try to buy the unlock. Only ever called from behind the grown-up gate. */
