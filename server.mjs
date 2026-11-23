@@ -35,7 +35,7 @@ const types = {
 };
 
 // The pages, and the two files that clear away the playable version this address once served, are checked on
-// every visit. Pictures and styles are kept for an hour.
+// every visit. Pictures and styles are kept for an hour, so a changed stylesheet is linked under a new ?v= number.
 const entry = /^(sw\.js|registerSW\.js|.*\.html)$/;
 
 function cacheControl(path) {
