@@ -124,7 +124,7 @@ const app: App = {
   join(name: string) {
     const player = addPlayer(roster, name, app.save.muted);
     if (!player) return false;
-    ghostStore.clear(player.id, LEVELS.map((l) => l.id));
+    if (!unread) ghostStore.clear(player.id, LEVELS.map((l) => l.id));
     app.world = 0;
     app.persist();
     app.show('map');
@@ -132,7 +132,7 @@ const app: App = {
   },
   leave(id: string) {
     removePlayer(roster, id);
-    ghostStore.clear(id, LEVELS.map((l) => l.id));
+    if (!unread) ghostStore.clear(id, LEVELS.map((l) => l.id));
     setMuted(app.save.muted);
     app.world = worldOf(app.save);
     app.persist();
@@ -226,7 +226,7 @@ const app: App = {
             app.save = draft;
             app.persist();
             // A new best time is the run to chase from now on.
-            if (trace && app.player) ghostStore.set(app.player.id, level.id, trace);
+            if (trace && app.player && !unread) ghostStore.set(app.player.id, level.id, trace);
           }
           app.show('blender');
         },
@@ -235,7 +235,7 @@ const app: App = {
           app.save = draft;
           app.cupResult = scoreCupRace(app.save, order);
           app.persist();
-          if (trace && app.player) ghostStore.set(app.player.id, level.id, trace);
+          if (trace && app.player && !unread) ghostStore.set(app.player.id, level.id, trace);
           app.show('cuptable');
         },
         muted: () => app.save.muted,
