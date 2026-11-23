@@ -283,7 +283,8 @@ main > section > * {
     margin: 0;
   }
 
-  main > .split.flip > img {
+  main > .split.flip > img,
+  main > .split.flip > .snap {
     order: 2;
   }
 }
@@ -421,8 +422,164 @@ main > section > * {
   box-shadow: 0 0.3rem 0 rgba(59, 36, 18, 0.9);
 }
 
-.story .lead {
+/* The page about how it was made: photographs and pictures in white frames, a little askew. */
+.about h1 {
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+}
+
+.about .split .lead {
   margin-left: 0;
+}
+
+.kicker {
+  font-family: var(--font);
+  font-weight: 800;
+  color: #b3430a;
+  margin: 0 0 0.4rem;
+}
+
+.snap {
+  margin: 0;
+  padding: 0.7rem 0.7rem 0.2rem;
+  background: #fff;
+  border: 0.3rem solid var(--ink);
+  border-radius: 1.4rem;
+  box-shadow: 0 0.6rem 0 rgba(59, 36, 18, 0.9);
+  transform: rotate(-1.4deg);
+}
+
+.flip > .snap {
+  transform: rotate(1.4deg);
+}
+
+.snap img {
+  width: 100%;
+  border-radius: 0.8rem;
+}
+
+.snap figcaption {
+  padding: 0.55rem 0.4rem;
+  font-family: var(--font);
+  font-weight: 800;
+  text-align: center;
+}
+
+.stickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1.4rem 0 0;
+}
+
+.stickers img {
+  width: 3.4rem;
+}
+
+.noads {
+  background: linear-gradient(#7a3fd6, #4b23a0);
+  color: #fff;
+}
+
+.noads p,
+.noads blockquote {
+  max-width: 40rem;
+  text-align: left;
+}
+
+.noads blockquote {
+  margin-block: 1.5rem 2rem;
+  font-family: var(--font);
+  font-weight: 800;
+  font-size: clamp(1.5rem, 4vw, 2.3rem);
+  line-height: 1.2;
+  text-align: center;
+  color: #ffe08a;
+}
+
+.noads .pills {
+  margin-top: 2rem;
+  margin-bottom: 0;
+}
+
+.outside {
+  background: #e7f8d6;
+}
+
+.outside .snap {
+  max-width: 56rem;
+  transform: rotate(0.8deg);
+  margin: 0 auto 2.4rem;
+}
+
+.press {
+  background: #fff1c7;
+}
+
+.press dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.press dt {
+  font-family: var(--font);
+  font-weight: 800;
+}
+
+.press dd {
+  margin: 0;
+}
+
+.press .quote {
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin: 0 0 0.9rem;
+  padding-left: 0.9rem;
+  border-left: 0.3rem solid var(--orange);
+}
+
+.kit-title {
+  margin-top: 2.6rem;
+  font-size: 1.5rem;
+}
+
+.kit {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 1rem;
+}
+
+.kit a {
+  display: block;
+  padding: 0.4rem 0.4rem 0;
+  background: #fff;
+  border: 0.2rem solid var(--ink);
+  border-radius: 0.9rem;
+  box-shadow: 0 0.3rem 0 rgba(59, 36, 18, 0.9);
+  color: var(--ink);
+  text-decoration: none;
+  font-family: var(--font);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.kit img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: var(--sky);
+}
+
+.kit span {
+  display: block;
+  padding: 0.4rem 0.2rem;
+}
+
+.cta a {
+  color: #fff;
 }
 
 .sign {
