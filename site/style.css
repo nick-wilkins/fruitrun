@@ -85,7 +85,7 @@ h2 {
 }
 
 .logo {
-  width: min(30rem, 82vw);
+  width: min(26rem, 82vw);
   margin: 0 auto 0.6rem;
   filter: drop-shadow(0 0.5rem 0.6rem rgba(0, 0, 0, 0.35));
   animation: bob 3.2s ease-in-out infinite;
@@ -629,6 +629,27 @@ main > section > * {
 
 .cta a {
   color: #fff;
+}
+
+.try {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0.55rem 0.8rem 0.6rem;
+}
+
+.try .more {
+  font-size: 1.25rem;
+  background: var(--green);
+  transform: rotate(-2deg);
+  transition: transform 0.15s;
+}
+
+.try .more:hover {
+  transform: rotate(1.5deg) scale(1.05);
+}
+
+.try-line {
+  margin-top: 2rem;
 }
 
 .sign {

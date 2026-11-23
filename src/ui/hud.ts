@@ -17,6 +17,8 @@ export interface HudHandlers {
   muted(): boolean;
   /** Flip sound on or off and return whether it is now muted. */
   toggleSound(): boolean;
+  /** What the way out of a run of your own is called, where it is not the map. */
+  quitLabel?: string;
 }
 
 export interface Hud {
@@ -27,8 +29,8 @@ export interface Hud {
   finished(): void;
   /** `order` is everyone in finishing order, for a race. */
   results(result: RunResult, order?: Finisher[]): void;
-  /** A race with friends is over for this player: the time and the order, with nothing to keep. */
-  raced(time: number, order: Finisher[]): void;
+  /** A race with nothing to keep is over for this player: the time and the order, over whatever `foot` is given. */
+  raced(time: number, order: Finisher[], ...foot: Node[]): void;
   /** What is under that order: a button to move on, for whoever may, or word of who is being waited for. */
   racedNext(on: string | null, note: string): void;
   /** The finishing order has moved on since the results went up: a friend still out has come home. */
@@ -107,7 +109,7 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
         // A cup race is run once: no starting it again when it is going badly.
         cup || friends ? null : el('button.btn.orange', { onclick: () => handlers.restart() }, '↻ Start level again'),
         soundButton,
-        el('button.btn.purple', { onclick: () => handlers.quit() }, friends ? '← Leave this race' : cup ? '← Leave the cup for now' : '← Back to map'),
+        el('button.btn.purple', { onclick: () => handlers.quit() }, friends ? '← Leave this race' : cup ? '← Leave the cup for now' : (handlers.quitLabel ?? '← Back to map')),
       ),
     ),
   );
@@ -194,7 +196,8 @@ export function createHud(level: Level, handlers: HudHandlers, rivals: Rival[] =
       if (on) racedFoot.replaceChildren(el('button.btn.green.big', { onclick: () => handlers.quit() }, on));
       else racedFoot.replaceChildren(el('p.raced-wait', {}, note), el('button.btn.purple.small', { onclick: () => handlers.quit() }, 'Waiting room'));
     },
-    raced(time, order) {
+    raced(time, order, ...foot) {
+      if (foot.length) racedFoot.replaceChildren(...foot);
       // No banner here: nothing was completed or won, it is who came where.
       root.append(
         resultCard(

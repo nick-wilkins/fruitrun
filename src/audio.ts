@@ -69,6 +69,8 @@ export function startMusic(urls: string[]): void {
     const player = new Audio(urls[playing]);
     player.volume = MUSIC_VOLUME;
     player.preload = 'auto';
+    // A single tune goes round by itself, without being asked for again each time it ends.
+    player.loop = urls.length === 1;
     player.addEventListener('ended', () => {
       playing = (playing + 1) % urls.length;
       player.src = urls[playing];

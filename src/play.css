@@ -1,0 +1,84 @@
+/* The website's race of the day: the card it starts from. The race itself looks as it does in the app. */
+/* The card's own margins centre it, so on a short screen it can still be scrolled to its top. */
+.daily {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  padding: 1em;
+  overflow: auto;
+  touch-action: pan-y;
+  font-size: clamp(14px, 2.4vmin, 22px);
+}
+
+.daily-card {
+  width: 30em;
+  margin: auto;
+}
+
+.daily-wait {
+  color: #9a6a3a;
+}
+
+/* Only a phone or tablet can be turned sideways: a tall window on a computer is left to play as it is. */
+@media (orientation: portrait) and (pointer: fine) {
+  #rotate {
+    display: none;
+  }
+}
+
+.daily-card h1 {
+  margin: 0;
+  font-size: 2.3em;
+  line-height: 1.1;
+}
+
+.daily-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9em;
+  margin-bottom: 0.4em;
+  text-align: left;
+}
+
+.daily-top img {
+  width: 5em;
+  height: 5em;
+  filter: drop-shadow(0 0.25em 0.2em rgba(0, 0, 0, 0.25));
+}
+
+.daily-best {
+  color: #2f8f3f;
+  font-size: 1.15em;
+}
+
+.daily-card .daily-more {
+  margin: 1.1em 0 0;
+  font-size: 0.85em;
+  color: #9a6a3a;
+}
+
+.daily-card a {
+  color: #c0551a;
+}
+
+.daily-back {
+  position: absolute;
+  top: 0.8em;
+  left: 0.8em;
+  text-decoration: none;
+}
+
+/* The card a race ends on: the best time on a line of its own, and the buttons kept clear of Pip at the corner. */
+.row:has(> .daily-note) {
+  flex-wrap: wrap;
+}
+
+.daily-note {
+  flex-basis: 100%;
+}
+
+.card.results:has(.daily-note) {
+  min-width: 24em;
+  padding-right: 4.4em;
+}

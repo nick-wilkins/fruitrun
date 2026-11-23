@@ -4,8 +4,10 @@ import { createServer } from 'node:http';
 import { basename, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// The website: a page about the game, its privacy policy, terms and help. The game itself is only in the app.
+// The website: pages about the game, its privacy policy, terms and help, and one race a day to play at /play/.
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'site');
+const gameAssets = join(fileURLToPath(new URL('.', import.meta.url)), 'public', 'assets');
+const playCode = join(root, 'play', 'code');
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -39,11 +41,27 @@ const types = {
 const entry = /^(sw\.js|registerSW\.js|.*\.html)$/;
 
 function cacheControl(path) {
-  return entry.test(basename(path)) ? 'no-cache' : 'public, max-age=3600';
+  if (entry.test(basename(path))) return 'no-cache';
+  // The race of the day is played again and again. Its code is built under a new name whenever it changes, so a
+  // browser may keep it for good; the game's pictures and sounds are kept for a day.
+  if (path.startsWith(playCode + sep)) return 'public, max-age=31536000, immutable';
+  if (path.startsWith(gameAssets + sep)) return 'public, max-age=86400';
+  return 'public, max-age=3600';
 }
 
+// The race of the day at /play/ uses the game's own pictures and sounds, which are served from where the app
+// takes them rather than kept twice.
+const GAME_ASSETS = '/play/assets/';
+
 async function resolveFile(urlPath) {
-  const path = normalize(join(root, decodeURIComponent(urlPath)));
+  const decoded = decodeURIComponent(urlPath);
+  if (decoded.startsWith(GAME_ASSETS)) {
+    const path = normalize(join(gameAssets, decoded.slice(GAME_ASSETS.length)));
+    if (!path.startsWith(gameAssets + sep)) return null;
+    const info = await stat(path).catch(() => null);
+    return info?.isFile() ? { path, info } : null;
+  }
+  const path = normalize(join(root, decoded));
   if (path !== root && !path.startsWith(root + sep)) return null;
   const info = await stat(path).catch(() => null);
   if (info?.isFile()) return { path, info };
