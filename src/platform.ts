@@ -17,7 +17,11 @@ export const saveStore: SaveStore = {
 };
 
 /** A copy of a roster that could not be read in full, kept aside so that saving again does not destroy it. */
-export const keepLost = (raw: string) => Preferences.set({ key: `${ROSTER_KEY}.lost`, value: raw });
+export const keepLost = async (raw: string) => {
+  const key = `${ROSTER_KEY}.lost`;
+  // The first copy is the one with the most in it: a later loss never replaces it.
+  if (!(await Preferences.get({ key })).value) await Preferences.set({ key, value: raw });
+};
 
 /** The single save from before the game kept one per player. Read once, to become the first player; never written. */
 export const oldSave = async () => (await Preferences.get({ key: SAVE_KEY })).value;

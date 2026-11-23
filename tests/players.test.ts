@@ -142,6 +142,28 @@ describe('reading the players at launch', () => {
     expect(kept).toEqual([raw]);
   });
 
+  it('does not lose a good roster because the save from before there were players cannot be read', async () => {
+    const raw = JSON.stringify(stored());
+    const { roster, unread } = await loadRoster({ ...memoryStore(), get: async () => raw }, () => Promise.reject(new Error('gone')), async () => {}, 0);
+    expect(roster.players.map((p) => p.name)).toEqual(['Ada', 'Ben']);
+    expect(unread).toBe(false);
+  });
+
+  it('keeps a copy of a roster it does not understand, even when an old save stands in with as many players', async () => {
+    const one = readRoster(null, null);
+    addPlayer(one, 'Ada');
+    const raw = JSON.stringify({ ...one, version: 2 });
+    const kept: string[] = [];
+    const { roster } = await loadRoster({ ...memoryStore(), get: async () => raw }, async () => JSON.stringify(newSave()), async (lost) => void kept.push(lost), 0);
+    expect(roster.players.map((p) => p.name)).toEqual(['Player 1']);
+    expect(kept).toEqual([raw]);
+  });
+
+  it('will not save over a roster it could neither read in full nor copy aside', async () => {
+    const { unread } = await loadRoster({ ...memoryStore(), get: async () => '{"version":1,"pla' }, nothingOld, () => Promise.reject(new Error('full')), 0);
+    expect(unread).toBe(true);
+  });
+
   it('keeps a copy when what was stored cannot be read at all', async () => {
     const kept: string[] = [];
     await loadRoster({ ...memoryStore(), get: async () => '{"version":1,"pla' }, nothingOld, async (lost) => void kept.push(lost), 0);

@@ -24,53 +24,55 @@ export function cleanName(typed: string, number: number): string {
   return name || `Player ${number}`;
 }
 
+/** The roster `raw` holds, and whether every player in it could be read. Null when it holds no roster that can be. */
+function storedRoster(raw: string | null): { roster: Roster; whole: boolean } | null {
+  try {
+    const parsed = raw ? (JSON.parse(raw) as Roster) : null;
+    if (parsed?.version !== 1 || !Array.isArray(parsed.players)) return null;
+    const players: Player[] = [];
+    for (const player of parsed.players) {
+      const save = readSave(JSON.stringify(player.save));
+      if (save && typeof player.id === 'string') players.push({ id: player.id, name: cleanName(String(player.name ?? ''), players.length + 1), save });
+    }
+    const current = players.some((p) => p.id === parsed.current) ? parsed.current : (players[0]?.id ?? null);
+    return { roster: { version: 1, current, players }, whole: players.length === parsed.players.length };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The roster held in `raw`. Where there is none yet, the single save from before there were players (`old`)
  * becomes the first player, so nobody loses what they had.
  */
 export function readRoster(raw: string | null, old: string | null): Roster {
-  try {
-    const parsed = raw ? (JSON.parse(raw) as Roster) : null;
-    if (parsed?.version === 1 && Array.isArray(parsed.players)) {
-      const players: Player[] = [];
-      for (const player of parsed.players) {
-        const save = readSave(JSON.stringify(player.save));
-        if (save && typeof player.id === 'string') players.push({ id: player.id, name: cleanName(String(player.name ?? ''), players.length + 1), save });
-      }
-      return { version: 1, current: players.some((p) => p.id === parsed.current) ? parsed.current : (players[0]?.id ?? null), players };
-    }
-  } catch {
-    // Unreadable: fall through to whatever else there is.
-  }
+  const stored = storedRoster(raw);
+  if (stored) return stored.roster;
   const save = readSave(old);
   return save ? { version: 1, current: 'p1', players: [{ id: 'p1', name: 'Player 1', save }] } : { version: 1, current: null, players: [] };
 }
 
-/** How many players `raw` says it holds, or -1 when it cannot be read at all. */
-function storedPlayers(raw: string): number {
-  try {
-    const players = (JSON.parse(raw) as Partial<Roster> | null)?.players;
-    return Array.isArray(players) ? players.length : -1;
-  } catch {
-    return -1;
-  }
-}
-
 /**
- * The roster at launch. The store is asked up to three times, `wait` milliseconds apart. If it never answers,
- * `unread` is true: what it holds is unknown and must not be written over blind. If it holds players that cannot
- * be read, `keep` is handed everything that was stored, so the next save does not destroy it.
+ * The roster at launch. The store is asked up to five times, `wait` milliseconds apart.
+ *
+ * `unread` is true when what the store holds is not safely known: it never answered, or it holds something that
+ * could not be read in full and could not be copied aside with `keep`. Nothing may then be saved this session,
+ * because saving would destroy it. The game still plays; it just will not remember.
  */
-export async function loadRoster(store: SaveStore, old: () => Promise<string | null>, keep: (raw: string) => Promise<void>, wait = 200): Promise<{ roster: Roster; unread: boolean }> {
-  for (let tries = 0; tries < 3; tries++) {
+export async function loadRoster(store: SaveStore, old: () => Promise<string | null>, keep: (raw: string) => Promise<void>, wait = 300): Promise<{ roster: Roster; unread: boolean }> {
+  for (let tries = 0; tries < 5; tries++) {
+    let raw: string | null;
     try {
-      const raw = await store.get();
-      const roster = readRoster(raw, await old());
-      if (raw && storedPlayers(raw) !== roster.players.length) await keep(raw).catch(() => {});
-      return { roster, unread: false };
+      raw = await store.get();
     } catch {
       await new Promise((resolve) => setTimeout(resolve, wait));
+      continue;
     }
+    const stored = storedRoster(raw);
+    const kept = !raw || stored?.whole ? true : await keep(raw).then(() => true, () => false);
+    // The old save is only wanted when there is no roster, and is never written, so failing to read it loses nothing.
+    const roster = stored?.roster ?? readRoster(null, await old().catch(() => null));
+    return { roster, unread: !kept };
   }
   return { roster: readRoster(null, null), unread: true };
 }

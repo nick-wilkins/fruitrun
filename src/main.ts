@@ -55,8 +55,8 @@ document.body.append(toastEl);
 keepSavesIn(saveStore);
 const loaded = await loadRoster(saveStore, oldSave, keepLost);
 const roster: Roster = loaded.roster;
-/** The store never said what it holds. Before the first save, whatever is there is copied aside. */
-let unread: boolean | Promise<void> = loaded.unread;
+/** What the store holds is not safely known, so nothing is saved this session: saving would destroy it. */
+const unread = loaded.unread;
 stock(CLOSED);
 let showing: Screen = 'menu';
 /** An approval asked of a grown-up stays open for a day. After that the wait is no longer shown. */
@@ -112,16 +112,7 @@ const app: App = {
   },
   world: worldOf(playing(roster)?.save ?? nobody),
   persist() {
-    if (unread === false) return storeRoster(roster);
-    // One rescue, however many saves are asked for while it runs: it ends by saving everything as it then is.
-    unread ||= saveStore
-      .get()
-      .then((was) => (was ? keepLost(was) : undefined))
-      .catch(() => {})
-      .then(() => {
-        unread = false;
-        storeRoster(roster);
-      });
+    if (!unread) storeRoster(roster);
   },
   choose(id: string) {
     if (!roster.players.some((p) => p.id === id)) return;

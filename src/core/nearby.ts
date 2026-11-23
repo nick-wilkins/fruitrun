@@ -216,7 +216,7 @@ const JOIN_WAIT = 10_000;
 /** A game being got together or played: who is in it, where their marbles are, and the passing of news between them. */
 export class Party {
   phase: 'idle' | 'hosting' | 'browsing' | 'joining' | 'joined' | 'closed' = 'idle';
-  /** How many times a game has been joined, so that giving up on one try never ends a later one. */
+  /** Counts the waits begun while joining, so that only the latest can give up. */
   private attempts = 0;
   /** Why it closed. */
   why: Refusal | 'denied' | 'error' | 'ended' | null = null;
@@ -283,10 +283,17 @@ export class Party {
     if (this.phase !== 'browsing') return;
     this.phase = 'joining';
     void this.net.join(id).catch(() => this.close('error'));
-    // A game can still be listed after its starter has gone. The way to it is then never found, and nothing says so.
+    this.giveUpLater();
+    this.onChange();
+  }
+
+  /**
+   * A game can still be listed after its starter has gone. The way to it is then never found, and nothing says so:
+   * so each step of joining is given only so long. A later step, or a later try, starts the wait afresh.
+   */
+  private giveUpLater(): void {
     const attempt = ++this.attempts;
     setTimeout(() => attempt === this.attempts && this.phase === 'joining' && this.close('ended'), JOIN_WAIT);
-    this.onChange();
   }
 
   /**
@@ -557,6 +564,7 @@ export class Party {
         this.announce();
         this.go();
       } else if (this.phase === 'joining' && event.joined) {
+        this.giveUpLater();
         this.net.send(encode({ t: 'hello', ...this.version, name: this.name }));
       } else if ((this.phase === 'joining' || this.phase === 'joined') && !event.joined) {
         this.close('ended');
