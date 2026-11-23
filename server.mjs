@@ -1,7 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
-import { basename, extname, join, normalize, sep } from 'node:path';
+import { basename, extname, join, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createGoes, GOES } from './goes.mjs';
 
@@ -35,6 +35,7 @@ const types = {
   '.gltf': 'model/gltf+json',
   '.wasm': 'application/wasm',
   '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
 };
 
 // The pages, and the two files that clear away the playable version this address once served, are checked on
@@ -65,13 +66,21 @@ async function resolveFile(urlPath) {
   const path = normalize(join(root, decoded));
   if (path !== root && !path.startsWith(root + sep)) return null;
   const info = await stat(path).catch(() => null);
-  if (info?.isFile()) return { path, info };
+  // Each page has one address, its folder with a closing slash, so that a search engine does not find it twice.
+  // The way there is made from the folder found, never from what was asked for.
+  if (info?.isFile()) return basename(path) === 'index.html' ? { redirect: folderAddress(join(path, '..')) } : { path, info };
   if (info?.isDirectory()) {
     const index = join(path, 'index.html');
     const indexInfo = await stat(index).catch(() => null);
-    if (indexInfo?.isFile()) return { path: index, info: indexInfo };
+    if (!indexInfo?.isFile()) return null;
+    return urlPath === folderAddress(path) ? { path: index, info: indexInfo } : { redirect: folderAddress(path) };
   }
   return null;
+}
+
+function folderAddress(folder) {
+  const inside = relative(root, folder).split(sep).filter(Boolean).map(encodeURIComponent).join('/');
+  return inside ? `/${inside}/` : '/';
 }
 
 const goes = createGoes();
@@ -125,6 +134,11 @@ const server = createServer(async (req, res) => {
     file = await resolveFile(asked.pathname);
   } catch {
     res.writeHead(400).end();
+    return;
+  }
+
+  if (file?.redirect) {
+    res.writeHead(301, { Location: file.redirect + asked.search, 'Cache-Control': 'public, max-age=3600' }).end();
     return;
   }
 
