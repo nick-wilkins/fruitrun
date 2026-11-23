@@ -80,3 +80,12 @@ tap). NOT RUN: Safari.
 - On a short screen the top of the card could not be reached: the card centres by its margins and scrolls.
 
 After the fixes: 1014 tests pass, `tsc` and `npm run build:play` clean.
+
+## Live, 2026-11-23
+
+- PASS after the push (`18599a3`): https://smoothiescramble.com/play/ answers 200, shows "Cherry Hilltop", and Go
+  starts the race with nothing failing to load.
+- PASS the live headers match: code `immutable`, the game's pictures and tune `max-age=86400`. Code and styles
+  arrive gzipped.
+- NOTE `cf-cache-status: BYPASS` on every file: the network in front of the site is not keeping copies, so each new
+  visitor's files come from the server itself. Browsers keep their own copies, so racing again costs nothing.
