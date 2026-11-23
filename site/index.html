@@ -45,9 +45,10 @@
 
       <section class="watch">
         <h2>Watch a whole race</h2>
-        <p class="lead">Three, two, one, GO! Loops, jumps, crates and a photo finish, start to end.</p>
-        <video controls muted playsinline preload="none" poster="/assets/video/full-race.jpg" width="960" height="540">
-          <source src="/assets/video/full-race.mp4" type="video/mp4" />
+        <p class="lead">Three, two, one, GO! Loops, jumps, crates and first past the post, start to end.</p>
+        <!-- Nothing of the film is fetched until the page has finished loading. -->
+        <video controls muted playsinline preload="none" poster="/assets/video/race-full-hd.jpg" width="1920" height="1080">
+          <source src="/assets/video/race-full-hd.mp4" type="video/mp4" />
         </video>
       </section>
 
@@ -77,9 +78,9 @@
         <h2>Ready to race?</h2>
         <p class="lead">Line up against Berry, Mango and Plum. Then, if you dare, take on red-hot Chilli.</p>
         <div class="cards clips">
-          <article><video autoplay loop muted playsinline poster="/assets/video/race.jpg" width="480" height="270" aria-label="Pip racing three other marbles"><source src="/assets/video/race.mp4" type="video/mp4" /></video><h3>🏁 Race on every track</h3><p>Four speeds, from Easy all the way up to Legendary.</p></article>
-          <article><video autoplay loop muted playsinline poster="/assets/video/cup.jpg" width="480" height="270" aria-label="The shelf of cups and a cup being won"><source src="/assets/video/cup.mp4" type="video/mp4" /></video><h3>🏆 Win 19 shiny cups</h3><p>Four races in a row, points for every place. Fill the shelf!</p></article>
-          <article><video autoplay loop muted playsinline poster="/assets/video/together.jpg" width="480" height="270" aria-label="Two players racing each other on their own devices"><source src="/assets/video/together.mp4" type="video/mp4" /></video><h3>👫 Play with friends</h3><p>Up to four players in the same room, each on their own iPhone or iPad. No internet needed.</p></article>
+          <article><video class="clip" loop muted playsinline preload="none" poster="/assets/video/race.jpg" width="480" height="270" aria-label="Pip racing three other marbles"><source src="/assets/video/race.mp4" type="video/mp4" /></video><h3>🏁 Race on every track</h3><p>Four speeds, from Easy all the way up to Legendary.</p></article>
+          <article><video class="clip" loop muted playsinline preload="none" poster="/assets/video/cup.jpg" width="480" height="270" aria-label="The shelf of cups and a cup being won"><source src="/assets/video/cup.mp4" type="video/mp4" /></video><h3>🏆 Win 19 shiny cups</h3><p>Four races in a row, points for every place. Fill the shelf!</p></article>
+          <article><video class="clip" loop muted playsinline preload="none" poster="/assets/video/together.jpg" width="480" height="270" aria-label="Two players racing each other on their own devices"><source src="/assets/video/together.mp4" type="video/mp4" /></video><h3>👫 Play with friends</h3><p>Up to four players in the same room, each on their own iPhone or iPad. No internet needed.</p></article>
         </div>
         <p class="small">Try a race for free on the first track. One unlock, bought once by a grown-up, opens all the racing. Friends can join your game for free.</p>
       </section>
@@ -108,6 +109,18 @@
       </section>
     </main>
 
+    <script>
+      // The films wait for the page. Once it has loaded, the long one starts fetching so it is ready to play, and
+      // each short one plays while it is on screen.
+      addEventListener('load', () => {
+        const film = document.querySelector('.watch video');
+        if (film) film.preload = 'metadata';
+        const seen = new IntersectionObserver((entries) => {
+          for (const { target, isIntersecting } of entries) isIntersecting ? target.play().catch(() => {}) : target.pause();
+        });
+        document.querySelectorAll('video.clip').forEach((clip) => seen.observe(clip));
+      });
+    </script>
     <footer class="foot">
       <nav>
         <a href="/">Home</a>
