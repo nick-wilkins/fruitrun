@@ -397,6 +397,55 @@ main > section > * {
   background: #bfe6ff;
 }
 
+/* A sticker, stuck on a little crooked, that leads to how the game was made. */
+.sticker-row {
+  margin-top: 2.6rem;
+  margin-bottom: 0;
+}
+
+.sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.45rem 1.5rem 0.45rem 0.45rem;
+  border: 0.25rem solid var(--ink);
+  border-radius: 99rem;
+  background: #ffe08a;
+  color: var(--ink);
+  font-family: var(--font);
+  text-align: left;
+  text-decoration: none;
+  line-height: 1.2;
+  box-shadow: 0 0.4rem 0 rgba(59, 36, 18, 0.9);
+  transform: rotate(-2.5deg);
+  transition: transform 0.15s;
+}
+
+.sticker:hover {
+  transform: rotate(1.5deg) scale(1.05);
+}
+
+.sticker img {
+  width: 3.6rem;
+  height: 3.6rem;
+  border-radius: 50%;
+  border: 0.2rem solid var(--ink);
+}
+
+.sticker strong {
+  display: block;
+  font-size: 1.15rem;
+}
+
+.sticker span {
+  font-weight: 700;
+  color: #b3430a;
+}
+
+.sticker strong {
+  color: var(--ink);
+}
+
 /* A strip of road along the top of the journeys. */
 .away {
   background:
