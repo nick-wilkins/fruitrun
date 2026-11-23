@@ -97,9 +97,9 @@ platform :ios do
     build_ios
   end
 
-  desc 'Send the words and screenshots to the store listing. Nothing is built and nothing is submitted'
-  lane :listing do
-    upload_to_app_store(**listing, skip_binary_upload: true, overwrite_screenshots: true, submit_for_review: false)
+  desc 'Send the words and screenshots to the store listing. Nothing is built or submitted. words:false sends screenshots only'
+  lane :listing do |options|
+    upload_to_app_store(**listing, skip_binary_upload: true, skip_metadata: options[:words].to_s == 'false', overwrite_screenshots: true, submit_for_review: false)
   end
 
   desc 'Build, upload and submit for review. submit:false uploads without submitting'

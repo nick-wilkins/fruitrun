@@ -88,3 +88,16 @@ hello@smoothiescramble.com. The listing words and screenshots are approved.
 
 Checked in a browser against `PORT=3999 npm start`: every page answers 200, an unknown path and a path out of
 `site/` answer 404, no sideways scroll at 1280 or 390 wide, every picture loads.
+
+## Store steps done, 2026-11-23
+
+- PASS: smoothiescramble.com serves the new pages (`/`, `/privacy/`, `/terms/`, `/support/` all 200) after the push.
+- PASS: `fastlane ios listing` set the version to 1.0.0 and sent the description, keywords, promotional text,
+  copyright and the three addresses.
+- PASS: all ten screenshots are in App Store Connect (`fastlane ios listing words:false`). The first try stalled on
+  Apple's side with nine of ten; the retry sent all ten.
+- NOT DONE: the notes for the reviewer. Apple refuses them until the review contact (name, phone, email) is filled
+  in. Once Nick has entered those in App Store Connect, `fastlane ios listing` sends the notes.
+- PASS: build 10 (1.0.0) uploaded to TestFlight with `fastlane ios beta`. It has the fixes, the page links and no
+  tester's switch.
+- NOT RUN on a device: the Privacy and Help buttons opening Safari from the Grown-ups screen.
