@@ -19,12 +19,12 @@ public class StorePlugin: CAPPlugin, CAPBridgedPlugin {
     private static let productID = "races_unlock"
     private var updates: Task<Void, Never>?
 
-    /// A build from Xcode or TestFlight, never one from the App Store: those carry a sandbox receipt.
+    /// Only a build run from Xcode. Nothing sent to TestFlight or the App Store has the switch.
     private static let isTester: Bool = {
         #if DEBUG
         return true
         #else
-        return Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        return false
         #endif
     }()
     private static let lockedKey = "tester.locked"

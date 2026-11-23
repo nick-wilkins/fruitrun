@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { COURSES } from '../src/core/progress';
 import { catchUp, decode, encode, Marble, Party, PROTOCOL, type Nearby, type NearbyEvent } from '../src/core/nearby';
 
@@ -639,5 +639,48 @@ describe('a helping hand for whoever is behind', () => {
     expect(catchUp(150, 0.8, 20)).toBeCloseTo(0.06);
     expect(catchUp(150, 0.9, 20)).toBeCloseTo(0.03);
     expect(catchUp(150, 1, 20)).toBe(0);
+  });
+});
+
+describe('joining a game whose starter has gone', () => {
+  /** A device that sees one game and whose connection to it never gets through. */
+  const deaf = (): Nearby => {
+    let hear = (_: NearbyEvent) => {};
+    return { listen: (handler) => (hear = handler), host: async () => {}, browse: async () => hear({ type: 'hosts', hosts: [{ id: 'gone', name: 'Sam' }] }), join: async () => {}, send: () => {}, leave: () => {} };
+  };
+
+  it('gives up after ten seconds and says the game has closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const ada = new Party(deaf(), 'Ada', () => 0);
+      ada.browse();
+      await vi.advanceTimersByTimeAsync(0);
+      ada.join('gone');
+      await vi.advanceTimersByTimeAsync(9000);
+      expect(ada.phase).toBe('joining');
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(ada.phase).toBe('closed');
+      expect(ada.why).toBe('ended');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves a later try alone when the first was given up by hand', async () => {
+    vi.useFakeTimers();
+    try {
+      const ada = new Party(deaf(), 'Ada', () => 0);
+      ada.browse();
+      await vi.advanceTimersByTimeAsync(0);
+      ada.join('gone');
+      await vi.advanceTimersByTimeAsync(8000);
+      ada.browse();
+      await vi.advanceTimersByTimeAsync(0);
+      ada.join('gone');
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(ada.phase).toBe('joining');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

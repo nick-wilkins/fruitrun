@@ -210,9 +210,14 @@ export interface Nearby {
 
 const HOST = 'host';
 
+/** How long a friend's game is given to answer before the wait is given up, in milliseconds. */
+const JOIN_WAIT = 10_000;
+
 /** A game being got together or played: who is in it, where their marbles are, and the passing of news between them. */
 export class Party {
   phase: 'idle' | 'hosting' | 'browsing' | 'joining' | 'joined' | 'closed' = 'idle';
+  /** How many times a game has been joined, so that giving up on one try never ends a later one. */
+  private attempts = 0;
   /** Why it closed. */
   why: Refusal | 'denied' | 'error' | 'ended' | null = null;
   /** Games found nearby, while looking. */
@@ -278,6 +283,9 @@ export class Party {
     if (this.phase !== 'browsing') return;
     this.phase = 'joining';
     void this.net.join(id).catch(() => this.close('error'));
+    // A game can still be listed after its starter has gone. The way to it is then never found, and nothing says so.
+    const attempt = ++this.attempts;
+    setTimeout(() => attempt === this.attempts && this.phase === 'joining' && this.close('ended'), JOIN_WAIT);
     this.onChange();
   }
 

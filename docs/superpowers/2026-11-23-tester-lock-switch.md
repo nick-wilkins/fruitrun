@@ -40,3 +40,8 @@ a join that sits on "Joining…" when the host has gone, and a failed roster rea
 
 App Review also runs builds with a sandbox receipt, so a reviewer could in principle find the switch. It gives
 nothing away (it only locks), and it sits behind the grown-up gate and an unmarked 2 second hold.
+
+## Changed for release, 2026-11-23
+
+Nick chose to keep the switch out of anything Apple sees. From build 10 it exists only in a build run from Xcode
+(`#if DEBUG`); TestFlight and App Store builds do not have it. Build 9 on TestFlight still does.

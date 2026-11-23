@@ -1,4 +1,4 @@
-import { newSave, readSave, storeRaw, type Save } from './progress';
+import { newSave, readSave, storeRaw, type Save, type SaveStore } from './progress';
 
 /** One child's game on this device. */
 export interface Player {
@@ -44,6 +44,35 @@ export function readRoster(raw: string | null, old: string | null): Roster {
   }
   const save = readSave(old);
   return save ? { version: 1, current: 'p1', players: [{ id: 'p1', name: 'Player 1', save }] } : { version: 1, current: null, players: [] };
+}
+
+/** How many players `raw` says it holds, or -1 when it cannot be read at all. */
+function storedPlayers(raw: string): number {
+  try {
+    const players = (JSON.parse(raw) as Partial<Roster> | null)?.players;
+    return Array.isArray(players) ? players.length : -1;
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * The roster at launch. The store is asked up to three times, `wait` milliseconds apart. If it never answers,
+ * `unread` is true: what it holds is unknown and must not be written over blind. If it holds players that cannot
+ * be read, `keep` is handed everything that was stored, so the next save does not destroy it.
+ */
+export async function loadRoster(store: SaveStore, old: () => Promise<string | null>, keep: (raw: string) => Promise<void>, wait = 200): Promise<{ roster: Roster; unread: boolean }> {
+  for (let tries = 0; tries < 3; tries++) {
+    try {
+      const raw = await store.get();
+      const roster = readRoster(raw, await old());
+      if (raw && storedPlayers(raw) !== roster.players.length) await keep(raw).catch(() => {});
+      return { roster, unread: false };
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+  return { roster: readRoster(null, null), unread: true };
 }
 
 /** Whoever is playing now, or null before anyone has started. */

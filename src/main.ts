@@ -2,7 +2,7 @@ import { WebGLRenderer } from 'three';
 import { musicFor, setMuted, startMusic, unlockAudio } from './audio';
 import { asset } from './ui/dom';
 import { CUP_RACES, cupById, scoreCupRace, startCup, type Cup } from './core/cups';
-import { addPlayer, playing, readRoster, removePlayer, storeRoster, type Roster } from './core/players';
+import { addPlayer, loadRoster, playing, removePlayer, storeRoster, type Roster } from './core/players';
 import { completeLevel, isUnlocked, keepSavesIn, newSave, type RunResult, type Save } from './core/progress';
 import { catchUp, Party } from './core/nearby';
 import { canRace, canStartGame, racesUnlocked, rivalsFor, SEATS, type Difficulty, type Finisher } from './core/race';
@@ -13,7 +13,7 @@ import { rivalDrivers } from './game/rivals';
 import { Run } from './game/run';
 import { timeCourse, type Autopilot } from './game/sim';
 import { readGhost } from './game/ghost';
-import { askedStore, ghostStore, nearby, oldSave, onResume, saveStore, store } from './platform';
+import { askedStore, ghostStore, keepLost, nearby, oldSave, onResume, saveStore, store } from './platform';
 import type { App, Screen } from './ui/app';
 import { MAX_JUG, SUPER_JUG } from './core/smoothie';
 import { blenderScreen } from './ui/blender';
@@ -53,12 +53,10 @@ const toastEl = el('div.toast.hidden');
 document.body.append(toastEl);
 
 keepSavesIn(saveStore);
-let roster: Roster = readRoster(null, null);
-try {
-  roster = readRoster(await saveStore.get(), await oldSave());
-} catch {
-  // The store cannot be read: start with nobody.
-}
+const loaded = await loadRoster(saveStore, oldSave, keepLost);
+const roster: Roster = loaded.roster;
+/** The store never said what it holds. Before the first save, whatever is there is copied aside. */
+let unread: boolean | Promise<void> = loaded.unread;
 stock(CLOSED);
 let showing: Screen = 'menu';
 /** An approval asked of a grown-up stays open for a day. After that the wait is no longer shown. */
@@ -114,7 +112,16 @@ const app: App = {
   },
   world: worldOf(playing(roster)?.save ?? nobody),
   persist() {
-    storeRoster(roster);
+    if (unread === false) return storeRoster(roster);
+    // One rescue, however many saves are asked for while it runs: it ends by saving everything as it then is.
+    unread ||= saveStore
+      .get()
+      .then((was) => (was ? keepLost(was) : undefined))
+      .catch(() => {})
+      .then(() => {
+        unread = false;
+        storeRoster(roster);
+      });
   },
   choose(id: string) {
     if (!roster.players.some((p) => p.id === id)) return;

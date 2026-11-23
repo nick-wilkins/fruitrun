@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPlayer, cleanName, MAX_PLAYERS, playing, readRoster, removePlayer, storeRoster } from '../src/core/players';
+import { addPlayer, cleanName, loadRoster, MAX_PLAYERS, playing, readRoster, removePlayer, storeRoster } from '../src/core/players';
 import { completeLevel, keepSavesIn, newSave, type SaveStore } from '../src/core/progress';
 import { LEVELS } from '../src/data/levels';
 
@@ -102,5 +102,49 @@ describe('best times', () => {
     delete save.levels[level.id].times;
     completeLevel(save, level, 45, []);
     expect(save.levels[level.id].times?.map((t) => t.time)).toEqual([41, 45]);
+  });
+});
+
+describe('reading the players at launch', () => {
+  const stored = () => {
+    const roster = readRoster(null, null);
+    addPlayer(roster, 'Ada');
+    addPlayer(roster, 'Ben');
+    return roster;
+  };
+  const nothingOld = async () => null;
+
+  it('asks again when the store fails the first time, and finds everyone', async () => {
+    const raw = JSON.stringify(stored());
+    let asked = 0;
+    const store: SaveStore = { ...memoryStore(), get: async () => (++asked === 1 ? Promise.reject(new Error('busy')) : raw) };
+    const kept: string[] = [];
+    const { roster, unread } = await loadRoster(store, nothingOld, async (lost) => void kept.push(lost), 0);
+    expect(roster.players.map((p) => p.name)).toEqual(['Ada', 'Ben']);
+    expect(unread).toBe(false);
+    expect(kept).toEqual([]);
+  });
+
+  it('says so when the store never answers, so nothing is written over what it holds', async () => {
+    const store: SaveStore = { ...memoryStore(), get: () => Promise.reject(new Error('gone')) };
+    const { roster, unread } = await loadRoster(store, nothingOld, async () => {}, 0);
+    expect(roster.players).toEqual([]);
+    expect(unread).toBe(true);
+  });
+
+  it('keeps a copy of what was stored when a player in it cannot be read', async () => {
+    const broken = stored() as unknown as { players: { save: unknown }[] };
+    broken.players[1].save = 'nonsense';
+    const raw = JSON.stringify(broken);
+    const kept: string[] = [];
+    const { roster } = await loadRoster({ ...memoryStore(), get: async () => raw }, nothingOld, async (lost) => void kept.push(lost), 0);
+    expect(roster.players.map((p) => p.name)).toEqual(['Ada']);
+    expect(kept).toEqual([raw]);
+  });
+
+  it('keeps a copy when what was stored cannot be read at all', async () => {
+    const kept: string[] = [];
+    await loadRoster({ ...memoryStore(), get: async () => '{"version":1,"pla' }, nothingOld, async (lost) => void kept.push(lost), 0);
+    expect(kept).toEqual(['{"version":1,"pla']);
   });
 });
