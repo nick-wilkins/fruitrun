@@ -83,6 +83,12 @@ export function startMusic(urls: string[]): void {
   syncMusic();
 }
 
+/** Stop the soundtrack until it is started again. */
+export function stopMusic(): void {
+  wantMusic = false;
+  syncMusic();
+}
+
 /**
  * Play one tune on repeat instead of the playlist (a night level has its own), or pass null to go back to the
  * playlist where it left off. Asking for what is already playing changes nothing, so a retry does not restart it.

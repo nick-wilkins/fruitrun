@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { basename, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createGoes, GOES } from './goes.mjs';
 
 // The website: pages about the game, its privacy policy, terms and help, and one race a day to play at /play/.
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'site');
@@ -73,7 +74,47 @@ async function resolveFile(urlPath) {
   return null;
 }
 
+const goes = createGoes();
+const GO = '/play/go';
+
+// A day's counts go when the day is over everywhere, whether or not anyone is playing.
+setInterval(() => goes.tidy(), 60 * 60 * 1000).unref();
+
+/**
+ * Where a request really came from. The network in front of the site sets the first of these itself, whatever the
+ * visitor sent. Failing that, the last address in the forwarded list is the one the nearest proxy saw: the earlier
+ * ones are whatever the visitor claimed.
+ */
+function addressOf(req) {
+  const passed = req.headers['cf-connecting-ip'] ?? String(req.headers['x-forwarded-for'] ?? '').split(',').pop().trim();
+  return passed || req.socket.remoteAddress || 'unknown';
+}
+
+/** The race of the day: GET asks how many goes this address has left on the visitor's date, POST uses one. */
+function answerGo(req, res, day) {
+  if (req.method !== 'GET' && req.method !== 'POST') return res.writeHead(405, { Allow: 'GET, POST' }).end();
+  // Only the race's own page may use a go: another website cannot spend a visitor's for them.
+  const from = req.headers['sec-fetch-site'];
+  if (req.method === 'POST' && from && from !== 'same-origin') return res.writeHead(403).end();
+  const address = addressOf(req);
+  const taken = req.method === 'POST' ? goes.take(address, day) : null;
+  const left = taken ? taken.left : goes.left(address, day);
+  if (left === null) return res.writeHead(400).end();
+  const status = taken && !taken.ok ? 429 : 200;
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  res.end(JSON.stringify({ left, of: GOES }));
+}
+
 const server = createServer(async (req, res) => {
+  let asked = null;
+  try {
+    asked = new URL(req.url, 'http://localhost');
+  } catch {
+    res.writeHead(400).end();
+    return;
+  }
+  if (asked.pathname === GO) return answerGo(req, res, asked.searchParams.get('day') ?? '');
+
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { Allow: 'GET, HEAD' }).end();
     return;
@@ -81,7 +122,7 @@ const server = createServer(async (req, res) => {
 
   let file = null;
   try {
-    file = await resolveFile(new URL(req.url, 'http://localhost').pathname);
+    file = await resolveFile(asked.pathname);
   } catch {
     res.writeHead(400).end();
     return;

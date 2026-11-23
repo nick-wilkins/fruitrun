@@ -1,5 +1,5 @@
 import { WebGLRenderer } from 'three';
-import { setMuted, startMusic, unlockAudio } from './audio';
+import { setMuted, startMusic, stopMusic, unlockAudio } from './audio';
 import { dailyLevel } from './core/daily';
 import { rivalsFor, type Difficulty } from './core/race';
 import { ingredient } from './data/ingredients';
@@ -13,9 +13,11 @@ import './style.css';
 import './play.css';
 
 // The website's race of the day: one level of the first world, a new one each day, raced against Pip's three
-// friends as often as the visitor likes. Nothing is kept: no save, no stars, and the best time lasts only as
-// long as the page is open. Everything runs in the browser: once the page, its pictures and its tune have been
-// fetched, racing again asks the server for nothing.
+// friends, three goes a day. Nothing of the race is kept: no save, no stars, and the best time lasts only as long
+// as the page is open. Everything runs in the browser: once the page, its pictures and its tune have been fetched,
+// a race asks the server for one thing, a go.
+
+// The server keeps the count of goes, by address (`goes.mjs`).
 
 /** How quick the three friends are. */
 const SPEED: Difficulty = 'medium';
@@ -43,6 +45,103 @@ let muted = false;
 /** The quickest finish since the page was opened, and the level it was set on. */
 let best: { level: string; time: number } | null = null;
 
+/** Goes left today, as last heard from the server. Null until it has answered, or if it cannot be reached. */
+let left: number | null = null;
+/** The date `left` was heard for. */
+let leftOn = '';
+/** How many times the server has been asked, so that answers can be told apart. */
+let asked = 0;
+
+/** The visitor's own date, which is what a day is here. */
+function today(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Ask the server how many goes are left, or with `take` use one. Answers false only when the server says there are
+ * none: if it cannot be reached the race goes ahead, so a fault there never shuts the game.
+ */
+async function goes(take: boolean): Promise<boolean> {
+  const day = today();
+  const mine = ++asked;
+  try {
+    // A server that does not answer within a few seconds counts as one that cannot be reached.
+    const answer = await fetch(`${import.meta.env.BASE_URL}go?day=${day}`, { method: take ? 'POST' : 'GET', cache: 'no-store', signal: AbortSignal.timeout(4000) });
+    if (answer.status !== 200 && answer.status !== 429) return true;
+    const body = (await answer.json()) as { left?: unknown };
+    if (typeof body.left !== 'number') return true;
+    // An answer overtaken by a later question is out of date: the later one's count stands.
+    if (mine === asked) {
+      left = body.left;
+      leftOn = day;
+    }
+    return answer.status === 200;
+  } catch {
+    return true;
+  }
+}
+
+const TUNE = () => startMusic([asset('assets/audio/track1.mp3')]);
+/** A go is being asked for: further presses wait for the answer. */
+let asking = false;
+
+/** Goes left today if the server has said, or null. */
+const leftToday = () => (leftOn === today() ? left : null);
+/** Races started since the page was opened. */
+let started = 0;
+
+/** No go is left. A race under way is left to finish: it was the last, and asking to start again must not end it. */
+function refused(): void {
+  if (run && !run.sim.finished) return;
+  stopMusic();
+  home();
+}
+
+/** Use a go and race, or show that today's are gone. */
+async function go(): Promise<void> {
+  if (asking) return;
+  if (leftToday() === 0) return refused();
+  // A go is only used once the track can be drawn.
+  if (!ready()) return;
+  // Started at the press itself, where browsers allow sound to begin, not after the server's answer.
+  TUNE();
+  asking = true;
+  const from = run;
+  const ok = await goes(true);
+  asking = false;
+  if (!ok) return refused();
+  // The visitor has gone elsewhere while the server was answering: nothing starts over the top of where they are.
+  // The card being drawn again in the meantime is not going elsewhere.
+  if (run !== from) return;
+  started += 1;
+  race(dailyLevel(new Date()));
+}
+
+/** Whether the track can be drawn now. If not, says so on the card and sets about getting the surface back. */
+function ready(): boolean {
+  if (!renderer) {
+    home();
+    return false;
+  }
+  if (!renderer.getContext().isContextLost()) {
+    waitingSince = 0;
+    sessionStorage.removeItem(RELOADED);
+    return true;
+  }
+  // The browser can take the 3D drawing surface away. It usually hands it back within moments; if it is still
+  // gone a good while after the first press, load the page afresh, once, for a new one.
+  waitingSince ||= performance.now();
+  if (performance.now() - waitingSince > SURFACE_WAIT && !sessionStorage.getItem(RELOADED)) {
+    sessionStorage.setItem(RELOADED, '1');
+    location.reload();
+    return false;
+  }
+  surface?.restoreContext();
+  home('One moment, getting the track ready…');
+  return false;
+}
+
 function endRun(): void {
   run?.dispose();
   run = null;
@@ -56,6 +155,8 @@ function home(note = ''): void {
   const level = dailyLevel(new Date());
   const fruit = ingredient(level.fruit);
   const mine = best?.level === level.id ? best.time : null;
+  const known = leftToday();
+  const none = known === 0;
   if (!renderer) {
     ui.replaceChildren(
       el('div.daily', {}, el('div.card.daily-card', {}, el('h1', {}, 'Oh no!'), el('p', {}, 'This browser cannot draw the track, so the race cannot run here. Try another browser or another device.'), el('a.btn.purple', { href: '/' }, '← Smoothie Scramble'))),
@@ -71,10 +172,14 @@ function home(note = ''): void {
         'div.card.daily-card',
         {},
         el('div.daily-top', {}, el('img', { src: asset(fruit.img), alt: fruit.name, draggable: false }), el('div', {}, el('div.kicker', {}, "Today's race"), el('h1', {}, level.name))),
-        el('p', {}, 'Race Berry, Mango and Plum to the line. There is a new track every day, and you can race it as many times as you like.'),
+        el('p', {}, 'Race Berry, Mango and Plum to the line. There is a new track every day, and you get three goes at it.'),
         mine === null ? null : el('p.daily-best', {}, `Your best today: ${formatTime(mine)}`),
-        // The level is asked for again at the press: the card may have been sitting there since yesterday.
-        el('button.btn.green.big', { onclick: () => race(dailyLevel(new Date())) }, mine === null ? '▶ Go!' : '▶ Race again'),
+        none
+          ? // An address can be shared, so someone who has not raced here may find its goes already used.
+            el('p.daily-none', {}, started ? 'That is your three goes for today. Come back tomorrow for a new track!' : 'Today\'s three goes from this internet connection have been used. Come back tomorrow for a new track!')
+          : // The level is asked for again at the press: the card may have been sitting there since yesterday.
+            el('button.btn.green.big', { onclick: () => void go() }, mine === null ? '▶ Go!' : '▶ Race again'),
+        none || known === null ? null : el('p.daily-left', {}, known === 1 ? 'Last go today!' : `${known} goes left today`),
         note ? el('p.daily-wait', {}, note) : null,
         el('p.daily-more', {}, 'This is one of 68 tracks. The whole game is coming soon to iPhone and iPad. ', el('a', { href: '/' }, 'See what is in it')),
       ),
@@ -83,21 +188,7 @@ function home(note = ''): void {
 }
 
 function race(level: Level): void {
-  if (!renderer) return home();
-  if (renderer.getContext().isContextLost()) {
-    // The browser can take the 3D drawing surface away. It usually hands it back within moments; if it is still
-    // gone a good while after the first press, load the page afresh, once, for a new one.
-    waitingSince ||= performance.now();
-    if (performance.now() - waitingSince > SURFACE_WAIT && !sessionStorage.getItem(RELOADED)) {
-      sessionStorage.setItem(RELOADED, '1');
-      location.reload();
-      return;
-    }
-    surface?.restoreContext();
-    return home('One moment, getting the track ready…');
-  }
-  waitingSince = 0;
-  sessionStorage.removeItem(RELOADED);
+  if (!renderer || !ready()) return;
   endRun();
   const rivals = rivalsFor(SPEED);
   let time = 0;
@@ -105,8 +196,9 @@ function race(level: Level): void {
     level,
     {
       pause: (paused) => run?.setPaused(paused),
-      restart: () => race(level),
-      quit: home,
+      // Starting again is another go.
+      restart: () => void go(),
+      quit: () => home(),
       quitLabel: '← Leave the race',
       blend: () => {},
       muted: () => muted,
@@ -123,9 +215,8 @@ function race(level: Level): void {
   );
   ui.replaceChildren(hud.root);
   canvas.classList.remove('hidden');
-  // One tune, fetched when the first race starts and not before: a visitor who only looks costs the server no music,
-  // and one who races all day fetches it once.
-  startMusic([asset('assets/audio/track1.mp3')]);
+  // One tune, fetched when the first race starts and not before: a visitor who only looks costs the server no music.
+  TUNE();
   run = new Run(
     renderer,
     courseFor(level),
@@ -140,13 +231,20 @@ function race(level: Level): void {
       results: (order) => {
         if (!order) return;
         const quickest = best?.level !== level.id || time <= best.time;
+        const known = leftToday();
         if (quickest) best = { level: level.id, time };
         hud.raced(
           time,
           order,
-          el('p.raced-wait.daily-note', {}, quickest ? 'Your best today!' : `Your best today: ${formatTime(best?.time ?? time)}`),
-          el('button.btn.orange', { onclick: () => race(level) }, '↻ Race again'),
+          ...[
+          el(
+            'p.raced-wait.daily-note',
+            {},
+            (quickest ? 'Your best today! ' : `Your best today: ${formatTime(best?.time ?? time)}. `) + (known === null ? '' : known === 0 ? 'That was your last go today.' : known === 1 ? 'One go left.' : `${known} goes left.`),
+          ),
+          known === 0 ? null : el('button.btn.orange', { onclick: () => void go() }, '↻ Race again'),
           el('button.btn.green', { onclick: () => home() }, 'Done ▶'),
+          ].filter((node) => node !== null),
         );
       },
     },
@@ -183,3 +281,7 @@ upright.addEventListener('change', hold);
 document.body.style.setProperty('--backdrop', 'url(/assets/hero.webp)');
 
 home();
+// The card is up at once; the count of goes joins it when the server answers.
+void goes(false).then(() => {
+  if (!run) home();
+});

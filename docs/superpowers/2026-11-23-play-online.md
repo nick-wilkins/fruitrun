@@ -89,3 +89,46 @@ After the fixes: 1014 tests pass, `tsc` and `npm run build:play` clean.
   arrive gzipped.
 - NOTE `cf-cache-status: BYPASS` on every file: the network in front of the site is not keeping copies, so each new
   visitor's files come from the server itself. Browsers keep their own copies, so racing again costs nothing.
+
+## Three goes a day, by address (2026-11-23)
+
+Nick: limit them to three goes, by IP. This replaces "as many times as you like" and the aim that a race asks the
+server for nothing: a race now asks for one thing, a go.
+
+- `goes.mjs` counts race starts per address per day, three allowed. A day is the visitor's own date, which the page
+  sends and the server accepts a day either side of its own. Held in memory only; an address is kept as a hash with
+  a key made afresh each time the server starts; a day's counts are dropped once it is over everywhere (checked on
+  every request and hourly). Past 200,000 addresses in a day no more are recorded.
+- `server.mjs`: `GET /play/go?day=` says how many are left, `POST` uses one (429 when none are). The address is
+  `cf-connecting-ip`, failing that the last `x-forwarded-for` entry, failing that the socket's. A POST from another
+  website is refused (403 by `sec-fetch-site`).
+- `src/play.ts`: the card shows the goes left; Go, Race again and Start level again each use one. A start is a go,
+  finished or not. If the server cannot be reached within four seconds the race goes ahead.
+- Known and accepted: everyone behind one address shares the three (a household, a school); the counts start again
+  when the server restarts and are not shared between servers if there is ever more than one; and since the game
+  runs in the browser the limit stops ordinary play, not someone determined.
+- The privacy policy now says the address is counted, scrambled, in memory, and gone within three days. The words on
+  the site and the card say three goes.
+
+Tests: `tests/goes.test.mjs`, 5 new. RED: `Cannot find module '../goes.mjs'`. GREEN after. `npm test`: 1019 pass.
+
+Runtime, against `PORT=3999 npm start`:
+
+- PASS curl: GET 3 left; three POSTs 2, 1, 0; a fourth 429; another address unaffected; a date two days out 400;
+  DELETE 405; a POST marked cross-site 403; two forwarded lists ending in the same address share a count.
+- PASS browser: the card reads "3 goes left today", then "2 goes left today", "Last go today!", then "That is your
+  three goes for today. Come back tomorrow for a new track!" with no Go button, and still so after a reload. One
+  request to `/play/go` per start, plus one on arrival.
+- PASS on the last go, Start level again leaves the race running.
+
+Review: `/code-review medium`, ten findings. Folded in: a go was spent before knowing the track could be drawn;
+Start level again on the last go ended it; the first forwarded address was trusted; a stalled request froze Go;
+another website could spend a visitor's goes; a race could start over a screen the visitor had moved to; the tally
+could outlive what the policy said; the tune played on a refusal; the results card could show yesterday's count.
+Softened, not changed: a shared address finding its goes already used is told so in those words.
+
+Re-review of the fold: one more, fixed. Go pressed before the arrival count had come back spent a go and started no
+race, because the card being drawn again was mistaken for the visitor going elsewhere; an answer overtaken by a
+later question could also leave an old count showing. PASS: Go pressed at once on arrival starts the race and the
+card afterwards reads "2 goes left today". Left as it is: `cf-connecting-ip` is believed whenever it is present,
+which is right only while the site can be reached through Cloudflare alone.
