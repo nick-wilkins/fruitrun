@@ -643,14 +643,15 @@ body::before {
   opacity: 0.8;
 }
 
-/* Home button and the world's name, side by side and centred on each other. */
+/* Home button with the world's name under it, out of the way of the top row however long its numbers get. */
 .corner {
   position: absolute;
   left: 1.4cqw;
   top: 1.4cqw;
   display: flex;
-  align-items: center;
-  gap: 0.7cqw;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4cqw;
 }
 
 .corner .round {
@@ -4077,14 +4078,7 @@ input.name {
   inset: var(--st) var(--sr) var(--sb) var(--sl);
 }
 
-/* On a phone the top row has no room for the world's name beside it: it goes under the home button. */
 @media (max-width: 950px) {
-  .map-stage.tall .corner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.4cqw;
-  }
-
   .map-stage.tall .world-name {
     font-size: 0.95em;
   }
