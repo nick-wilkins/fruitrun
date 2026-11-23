@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { basename, extname, join, normalize, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -143,7 +143,10 @@ const server = createServer(async (req, res) => {
   }
 
   if (!file) {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
+    // A visitor who asked for a page is shown the ways back. Anything else gets two words.
+    const page = (req.headers.accept ?? '').includes('text/html') ? await readFile(join(root, '404.html')).catch(() => null) : null;
+    if (page) res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }).end(req.method === 'HEAD' ? undefined : page);
+    else res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
     return;
   }
 

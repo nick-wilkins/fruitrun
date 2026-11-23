@@ -63,3 +63,20 @@ describe('the sitemap', () => {
     expect(await readFile('site/robots.txt', 'utf8')).toContain('Sitemap: https://smoothiescramble.com/sitemap.xml');
   });
 });
+
+describe('an address with nothing at it', () => {
+  it('shows a visitor a page with the ways back, still as a 404', async () => {
+    const res = await fetch(at('/wp-login.php'), { headers: { Accept: 'text/html,application/xhtml+xml' } });
+    expect(res.status).toBe(404);
+    expect(res.headers.get('content-type')).toContain('text/html');
+    const page = await res.text();
+    expect(page).toContain('<a href="/play/">');
+    expect(page).toContain('noindex');
+  });
+
+  it('answers anything that did not ask for a page in two words', async () => {
+    const res = await fetch(at('/assets/missing.png'), { headers: { Accept: 'image/*' } });
+    expect(res.status).toBe(404);
+    expect(await res.text()).toBe('Not found');
+  });
+});
