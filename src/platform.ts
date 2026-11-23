@@ -63,6 +63,10 @@ export interface Store {
   restore(): Promise<boolean>;
   /** Hear of a purchase approved later, made on another device, or refunded. */
   onChange(handler: (owned: boolean) => void): void;
+  /** In a tester's build, whether the tester has shut the unlock to play without it; null in any other build. */
+  tester(): Promise<{ locked: boolean } | null>;
+  /** For testers: play as if the unlock were not owned, or go back to what the store says. Answers what is owned now. */
+  lock(locked: boolean): Promise<boolean>;
 }
 
 interface StorePlugin {
@@ -70,6 +74,8 @@ interface StorePlugin {
   owned(): Promise<{ owned: boolean }>;
   purchase(): Promise<{ outcome: Outcome }>;
   restore(): Promise<{ owned: boolean }>;
+  tester(): Promise<{ tester: boolean; locked: boolean }>;
+  lock(options: { locked: boolean }): Promise<{ owned: boolean }>;
   addListener(event: 'change', handler: (state: { owned: boolean }) => void): Promise<PluginListenerHandle>;
 }
 
@@ -81,6 +87,11 @@ function appStore(): Store {
     buy: async () => (await plugin.purchase()).outcome,
     restore: async () => (await plugin.restore()).owned,
     onChange: (handler) => void plugin.addListener('change', ({ owned }) => handler(owned)),
+    tester: async () => {
+      const { tester, locked } = await plugin.tester();
+      return tester ? { locked } : null;
+    },
+    lock: async (locked) => (await plugin.lock({ locked })).owned,
   };
 }
 
@@ -107,6 +118,13 @@ function devStore(): Store {
     },
     restore: async () => owned(),
     onChange: () => {},
+    // The stand-in has no store behind it, so the tester's switch simply forgets or remembers the purchase.
+    tester: async () => ({ locked: !owned() }),
+    lock: async (locked) => {
+      if (locked) localStorage.removeItem(DEV_OWNED);
+      else localStorage.setItem(DEV_OWNED, '1');
+      return owned();
+    },
   };
 }
 
@@ -117,6 +135,8 @@ const noStore: Store = {
   buy: async () => 'failed',
   restore: () => Promise.reject(new Error('No store here')),
   onChange: () => {},
+  tester: async () => null,
+  lock: async () => false,
 };
 
 export const store: Store = Capacitor.isNativePlatform() ? appStore() : import.meta.env.DEV ? devStore() : noStore;

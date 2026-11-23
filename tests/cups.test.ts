@@ -18,7 +18,8 @@ const played = () => {
   return save;
 };
 
-describe('cups', () => {
+// The first test to play every level lays out every course, which is slow on a busy machine.
+describe('cups', { timeout: 20_000 }, () => {
   it('are four levels each, cover every level, and every world has some', () => {
     for (const each of CUPS) expect(each.levels).toHaveLength(4);
     expect(new Set(CUPS.flatMap((each) => each.levels)).size).toBe(LEVELS.length);

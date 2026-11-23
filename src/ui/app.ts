@@ -50,4 +50,6 @@ export interface App {
   buy(): Promise<Outcome>;
   /** Ask the store whether this account already owns the unlock; null if the store cannot be reached. */
   restore(): Promise<boolean | null>;
+  /** In a tester's build, flip between playing without the unlock and what the store says. Answers whether it is now shut, or null in any other build. */
+  testerSwitch(): Promise<boolean | null>;
 }

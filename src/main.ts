@@ -373,6 +373,12 @@ const app: App = {
     if (owned) owns(true);
     return owned;
   },
+  async testerSwitch() {
+    const tester = await store.tester().catch(() => null);
+    if (!tester) return null;
+    owns(await store.lock(!tester.locked));
+    return !tester.locked;
+  },
   toast(text: string) {
     toastEl.textContent = text;
     toastEl.classList.remove('hidden');

@@ -137,10 +137,22 @@ export function menuScreen(app: App): HTMLElement {
       restore.disabled = back.disabled = false;
       note.textContent = restoreNote(owned);
     };
+    // For testers only: holding the title flips between playing without the unlock and what the store says.
+    const title = el('h2', {}, 'For grown-ups');
+    let held = 0;
+    title.onpointerdown = () => {
+      clearTimeout(held);
+      held = window.setTimeout(async () => {
+        if (!dialog.isConnected || dialog.classList.contains('busy')) return;
+        const locked = await app.testerSwitch();
+        if (locked !== null && dialog.isConnected) note.textContent = locked ? 'Tester: playing without the unlock. Hold the title again to undo.' : 'Tester: back to what the store says.';
+      }, 2000);
+    };
+    title.onpointerup = title.onpointerleave = title.onpointercancel = () => clearTimeout(held);
     return el(
       'div.card.small.wordy',
       {},
-      el('h2', {}, 'For grown-ups'),
+      title,
       el('p', {}, 'Smoothie Scramble has no adverts, no accounts and no tracking. We collect nothing: progress stays on this device.'),
       el('p', {}, 'Playing together connects straight to iPads and iPhones close by, without the internet. While a game is open, those devices can see the player name.'),
       note,
