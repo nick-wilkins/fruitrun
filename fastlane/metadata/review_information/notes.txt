@@ -1,0 +1,16 @@
+Smoothie Scramble is a marble run game for children aged 6 to 8, submitted to the Kids Category. No account or sign-in is needed.
+
+THE IN-APP PURCHASE (races_unlock, non-consumable)
+Everything except racing is free. To find the purchase: start a new player, open the map, tap a level, tap Race and choose Medium (Easy on level 1 is a free taster), or tap "Cups" in the top bar. The unlock screen appears. Tap "Ask a grown-up", answer the multiplication sum, then tap Unlock. "Restore purchase" is on the same screen and also on the first screen under "Grown-ups".
+
+PARENTAL GATE
+Buying, restoring and the links to the privacy policy and help page are all behind the same gate: a multiplication sum answered on a number pad. There are no other links out of the app.
+
+LOCAL NETWORK PERMISSION
+"Together" on the map lets up to four children in the same room race, each on their own device. It uses Bonjour and a direct connection between the devices (service _smoothierace._tcp). Nothing goes through the internet or a server. The permission is asked for only when a child taps "Start a game" or "Join a game", after a screen explaining why. Two devices are needed to try it; the rest of the game does not use the network at all.
+
+DATA
+The app collects no data. It contains no advertising, no analytics and no third-party SDKs. Progress is stored only on the device.
+
+MUSIC
+The music is licensed from a royalty-free library for use in the app.

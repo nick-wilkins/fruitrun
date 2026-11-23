@@ -24,7 +24,7 @@ Players in the same room can race each other, each on their own iPad or iPhone. 
 
 **Purchases**
 
-The game is free to play. One optional purchase unlocks races, cups and playing together. It can only be reached after a question meant for a grown-up. The purchase is handled entirely by Apple. We never see your name, your Apple account or your payment details. Apple tells the game only whether the unlock is owned.
+The game is free to play. One optional purchase unlocks races against the computer, cups and starting a game with friends. Joining a game a friend has started is free. It can only be reached after a question meant for a grown-up. The purchase is handled entirely by Apple. We never see your name, your Apple account or your payment details. Apple tells the game only whether the unlock is owned.
 
 **Children**
 
