@@ -132,3 +132,11 @@ race, because the card being drawn again was mistaken for the visitor going else
 later question could also leave an old count showing. PASS: Go pressed at once on arrival starts the race and the
 card afterwards reads "2 goes left today". Left as it is: `cf-connecting-ip` is believed whenever it is present,
 which is right only while the site can be reached through Cloudflare alone.
+
+Live after the push (`0c7325d`), asked with yesterday's date so that nobody's goes for today were used:
+
+- PASS three POSTs answer 2, 1, 0 left and a fourth 429. Six reads afterwards all say 0, so one server holds the count.
+- PASS a made-up `X-Forwarded-For` changes nothing, and Cloudflare itself refuses a request carrying a made-up
+  `CF-Connecting-IP` (its error 1000): the address counted cannot be chosen by the visitor.
+- PASS a POST marked cross-site answers 403. The live page serves the new code and the privacy page the new words.
+- NOTE every deploy starts the server afresh, and with it the counts.
