@@ -1,0 +1,396 @@
+:root {
+  --font: ui-rounded, 'Arial Rounded MT Bold', 'Nunito', 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
+  --ink: #3b2412;
+  --cream: #fff6e3;
+  --sky: #4cc0ff;
+  --green: #6cc72f;
+  --purple: #8a4be0;
+  --orange: #ff9a1f;
+  --pink: #ff5fa2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+  font-size: 18px;
+  line-height: 1.55;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+a {
+  color: #b3430a;
+}
+
+h1,
+h2,
+h3,
+.lead,
+.soon,
+.num,
+.ages,
+.foot nav {
+  font-family: var(--font);
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.12;
+  margin: 0 0 0.5em;
+}
+
+h2 {
+  font-size: clamp(1.7rem, 4.2vw, 2.7rem);
+}
+
+.lead {
+  font-size: clamp(1.1rem, 2.3vw, 1.4rem);
+  max-width: 34em;
+  margin: 0 auto 1.2em;
+}
+
+/* The first screen: the game's own painting, with the title over it. */
+.hero {
+  min-height: min(100vh, 900px);
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.2rem 5rem;
+  text-align: center;
+  color: #fff;
+  background:
+    linear-gradient(rgba(20, 60, 110, 0.2), rgba(20, 60, 110, 0.6)),
+    url('/assets/hero.webp') center / cover no-repeat,
+    var(--sky);
+}
+
+.hero-in {
+  max-width: 46rem;
+}
+
+.logo {
+  width: min(30rem, 82vw);
+  margin: 0 auto 0.6rem;
+  filter: drop-shadow(0 0.5rem 0.6rem rgba(0, 0, 0, 0.35));
+  animation: bob 3.2s ease-in-out infinite;
+}
+
+.hero h1 {
+  font-size: clamp(2.6rem, 9vw, 5rem);
+  text-shadow:
+    0 0.06em 0 #c2540a,
+    0 0.14em 0.2em rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.01em;
+}
+
+.hero .lead,
+.ages {
+  text-shadow: 0 0.08em 0.3em rgba(0, 0, 0, 0.7);
+  font-weight: 700;
+}
+
+.ages {
+  margin: 1rem 0 0;
+}
+
+.get {
+  display: inline-block;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 0.8rem;
+  transition: transform 0.15s;
+  filter: drop-shadow(0 0.3rem 0.4rem rgba(0, 0, 0, 0.35));
+}
+
+.badge img {
+  width: 13rem;
+}
+
+a.badge:hover {
+  transform: scale(1.06) rotate(-1.5deg);
+}
+
+.soon {
+  margin: 0.5rem 0 0;
+  display: inline-block;
+  padding: 0.2em 0.9em;
+  border-radius: 99rem;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 0.2rem 0 #c2540a;
+}
+
+.get .soon {
+  display: block;
+  width: fit-content;
+  margin-inline: auto;
+}
+
+main > section {
+  padding: clamp(3rem, 8vw, 5.5rem) 1.2rem;
+  text-align: center;
+}
+
+main > section > * {
+  max-width: 68rem;
+  margin-inline: auto;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1.2rem;
+  margin-top: 2rem;
+}
+
+.cards article {
+  position: relative;
+  background: #fff;
+  border: 0.25rem solid var(--ink);
+  border-radius: 1.6rem;
+  padding: 1.6rem 1.3rem 1.2rem;
+  box-shadow: 0 0.5rem 0 rgba(59, 36, 18, 0.9);
+  text-align: left;
+}
+
+.cards h3 {
+  font-size: 1.5rem;
+}
+
+.cards p {
+  margin: 0;
+}
+
+.num {
+  position: absolute;
+  top: -1.3rem;
+  left: 1.1rem;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0.22rem solid var(--ink);
+  background: var(--orange);
+  color: #fff;
+  font-weight: 900;
+  font-size: 1.3rem;
+}
+
+.steps article:nth-child(2) .num {
+  background: var(--pink);
+}
+
+.steps article:nth-child(3) .num {
+  background: var(--purple);
+}
+
+.split {
+  background: #dff4ff;
+}
+
+.split.flip {
+  background: #ffe9c9;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 68rem);
+  justify-content: center;
+}
+
+.split > img,
+.shots img {
+  width: 100%;
+  max-width: 100%;
+  border: 0.3rem solid var(--ink);
+  border-radius: 1.4rem;
+  box-shadow: 0 0.6rem 0 rgba(59, 36, 18, 0.9);
+  transform: rotate(-1.2deg);
+}
+
+.split.flip > img {
+  transform: rotate(1.2deg);
+}
+
+.split > div {
+  text-align: left;
+  margin-top: 2rem;
+}
+
+.split ul {
+  padding: 0;
+  list-style: none;
+  margin: 1rem 0 0;
+}
+
+.split li {
+  padding: 0.25em 0 0.25em 1.9em;
+  background: no-repeat 0 0.3em / 1.3em url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23ffb400' stroke='%233b2412' stroke-width='1.6' stroke-linejoin='round' d='m12 2 3 6.6 7 .8-5.2 4.8 1.5 7L12 17.6 5.7 21.2l1.5-7L2 9.4l7-.8z'/%3E%3C/svg%3E");
+  font-weight: 700;
+}
+
+@media (min-width: 860px) {
+  main > .split {
+    grid-template-columns: minmax(0, 34rem) minmax(0, 30rem);
+    gap: 3.5rem;
+    align-items: center;
+  }
+
+  main > .split > * {
+    margin: 0;
+  }
+
+  main > .split.flip > img {
+    order: 2;
+  }
+}
+
+.race {
+  background: linear-gradient(#7a3fd6, #4b23a0);
+  color: #fff;
+}
+
+.race .cards article {
+  color: var(--ink);
+}
+
+.shots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1.6rem;
+  margin-top: 1.5rem;
+}
+
+.shots img:nth-child(2) {
+  transform: rotate(1.2deg);
+}
+
+.small {
+  font-size: 1rem;
+  margin-top: 2rem;
+  opacity: 0.95;
+}
+
+.parents {
+  background: #e7f8d6;
+}
+
+.ticks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.6rem 2rem;
+  text-align: left;
+  margin-top: 1.5rem;
+}
+
+.ticks p {
+  margin: 0;
+  padding: 0.5em 0 0.5em 2.2em;
+  background: no-repeat 0 0.55em / 1.5em url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='11' fill='%236cc72f' stroke='%233b2412' stroke-width='1.6'/%3E%3Cpath fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='m7 12.5 3.3 3.3L17 9'/%3E%3C/svg%3E");
+}
+
+.cta {
+  background:
+    linear-gradient(rgba(255, 154, 31, 0.9), rgba(255, 95, 162, 0.9)),
+    url('/assets/hero.webp') center 70% / cover;
+  color: #fff;
+}
+
+.cta h2 {
+  font-size: clamp(2.2rem, 7vw, 3.8rem);
+  text-shadow: 0 0.07em 0 rgba(120, 40, 10, 0.6);
+}
+
+.foot {
+  background: var(--ink);
+  color: #f3e3c8;
+  text-align: center;
+  padding: 2rem 1.2rem 2.4rem;
+  font-size: 0.9rem;
+}
+
+.foot nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 1.6rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.foot a {
+  color: #ffd27a;
+}
+
+.foot p {
+  max-width: 46rem;
+  margin: 0 auto;
+  opacity: 0.8;
+}
+
+/* The pages of words. */
+.bar {
+  background: var(--sky);
+  padding: 0.8rem 1.2rem;
+  border-bottom: 0.3rem solid var(--ink);
+}
+
+.bar img {
+  width: 9rem;
+  margin: 0 auto;
+}
+
+.doc {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.2rem 4rem;
+}
+
+.doc h1 {
+  font-size: clamp(2rem, 6vw, 3rem);
+}
+
+.doc h2 {
+  font-size: 1.35rem;
+  margin-top: 1.8em;
+}
+
+.date {
+  opacity: 0.7;
+}
+
+@keyframes bob {
+  50% {
+    transform: translateY(-0.5rem) rotate(-1deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo {
+    animation: none;
+  }
+
+  html {
+    scroll-behavior: auto;
+  }
+}

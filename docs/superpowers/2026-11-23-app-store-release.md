@@ -68,3 +68,23 @@ For Nick:
 - Approve the words and screenshots.
 
 Then: `fastlane ios listing`, build 10, `fastlane ios release`.
+
+## The website, 2026-11-23
+
+Nick's decisions: `ios` is merged into `main`, which is the branch from now on. smoothiescramble.com (Laravel Cloud,
+deploys on a push to `main`) stops serving the game and becomes a page about it, with a privacy policy, terms and
+help. The game stays playable in a browser on this machine with `npm run dev`. Contact address:
+hello@smoothiescramble.com. The listing words and screenshots are approved.
+
+- `site/`: plain pages, no build. `/`, `/privacy/`, `/terms/`, `/support/`. The privacy and help words are the old
+  `docs/store` drafts (removed; `site/` is now the only copy). The terms are new and have not been read by a lawyer.
+- `server.mjs` (from the old `main`) serves `site/` only, with `npm start`. `dist` is never served, so the game is
+  not on the web whatever the deploy builds.
+- `site/sw.js` and `site/registerSW.js` remove the service worker the old playable version left in visitors'
+  browsers, which would otherwise keep showing them the cached game.
+- The App Store badge is Apple's own artwork. It is not a link until the game is on sale: a note in
+  `site/index.html` says what to swap in (`https://apps.apple.com/app/id6836531016`).
+- The game's Grown-ups screen now links to `/privacy/` and `/support/`, and the listing has the three addresses.
+
+Checked in a browser against `PORT=3999 npm start`: every page answers 200, an unknown path and a path out of
+`site/` answer 404, no sideways scroll at 1280 or 390 wide, every picture loads.

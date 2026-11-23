@@ -14,6 +14,10 @@ npm run ios      # build the game and copy it into the iPhone and iPad app
 npx cap open ios # open the app in Xcode to run it in a simulator or on a device
 ```
 
+The game is only played in the app. `npm run dev` is for working on it in a browser on this machine; nothing serves it on the web.
+
+The website at smoothiescramble.com is the plain pages in `site/` (a page about the game, privacy policy, terms and help), served by `server.mjs` with `npm start`. Pushing to `main` deploys it. Try it here with `PORT=3999 npm start`.
+
 The game ships as an iPhone and iPad app (Capacitor, in `ios/`). Everything it needs is inside the app, so it plays with no connection. `fastlane ios beta` sends a build to TestFlight; see `fastlane/Fastfile`.
 
 The save lives in the app's own settings store (`src/platform.ts`), not the web view's storage, which a device may clear when it is short of space.
