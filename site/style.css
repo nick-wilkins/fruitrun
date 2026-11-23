@@ -404,6 +404,34 @@ main > section > * {
     #cdeeff;
 }
 
+.made {
+  background: #ffe1ee;
+}
+
+.more {
+  display: inline-block;
+  padding: 0.55em 1.3em;
+  border-radius: 99rem;
+  border: 0.22rem solid var(--ink);
+  background: var(--orange);
+  color: #fff;
+  font-family: var(--font);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: 0 0.3rem 0 rgba(59, 36, 18, 0.9);
+}
+
+.story .lead {
+  margin-left: 0;
+}
+
+.sign {
+  font-family: var(--font);
+  font-weight: 800;
+  font-size: 1.3rem;
+  margin-top: 1.6em;
+}
+
 .cta {
   background:
     linear-gradient(rgba(255, 154, 31, 0.9), rgba(255, 95, 162, 0.9)),
