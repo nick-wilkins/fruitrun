@@ -243,6 +243,7 @@ function race(level: Level): void {
             (quickest ? 'Your best today! ' : `Your best today: ${formatTime(best?.time ?? time)}. `) + (known === null ? '' : known === 0 ? 'That was your last go today.' : known === 1 ? 'One go left.' : `${known} goes left.`),
           ),
           known === 0 ? null : el('button.btn.orange', { onclick: () => void go() }, '↻ Race again'),
+          shareButton(level, order.findIndex((finisher) => finisher.you) + 1, time),
           el('button.btn.green', { onclick: () => home() }, 'Done ▶'),
           ].filter((node) => node !== null),
         );
@@ -251,6 +252,33 @@ function race(level: Level): void {
     { rivals, drivers: rivalDrivers(level, SPEED) },
   );
   run.start();
+}
+
+const PLACES = ['', '🏆 I won', '🥈 I came 2nd in', '🥉 I came 3rd in', '🏁 I came 4th in'];
+
+/** Hands the time to the device's own share sheet, or copies it where there is none. */
+function shareButton(level: Level, place: number, time: number): HTMLButtonElement {
+  const url = 'https://smoothiescramble.com/play/';
+  const text = `${PLACES[place] ?? '🏁 I raced'} today's Smoothie Scramble race on ${level.name} in ${formatTime(time)}! Can you beat my time? 🍓🥭🫐`;
+  const button = el('button.btn.blue', {}, '📤 Share');
+  button.onclick = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ text, url });
+      } catch {
+        // Closing the share sheet without sharing lands here, and needs nothing.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      button.textContent = '✓ Copied!';
+    } catch {
+      button.textContent = 'Could not copy';
+    }
+    setTimeout(() => (button.textContent = '📤 Share'), 2000);
+  };
+  return button;
 }
 
 // A run in progress cannot be drawn without the surface, so it ends.
