@@ -273,6 +273,9 @@ function shareButton(level: Level, place: number, time: number): HTMLButtonEleme
     try {
       await navigator.clipboard.writeText(`${text} ${url}`);
       button.textContent = '✓ Copied!';
+      if (!button.parentElement?.querySelector('.share-note')) {
+        button.parentElement?.append(el('p.raced-wait.daily-note.share-note', {}, 'Copied! Paste it to your friends and see if they can beat your time.'));
+      }
     } catch {
       button.textContent = 'Could not copy';
     }
